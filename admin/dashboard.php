@@ -37,175 +37,188 @@ try {
 }
 ?>
 
-<div class="container mx-auto px-4 py-8">
-    <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
-        <p class="text-gray-600 mt-2">Overview of system statistics and activities</p>
-    </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Community Health Tracker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
     
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <!-- Staff Card -->
-        <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 border-l-4 border-blue-500">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
-                    <i class="fas fa-user-shield text-2xl"></i>
-                </div>
-                <div>
+    <div class="container mx-auto px-4 py-6">
+        <h1 class="text-2xl font-bold mb-2">Admin Dashboard</h1>
+        <p class="text-gray-600 mb-6">Overview of system statistics and activities</p>
+        
+        <?php if (isset($_SESSION['error_message'])): ?>
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                <?= $_SESSION['error_message'] ?>
+                <?php unset($_SESSION['error_message']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Staff Card -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                        <i class="fas fa-user-shield text-blue-600"></i>
+                    </div>
                     <h3 class="text-lg font-semibold text-gray-700">Total Staff</h3>
-                    <p class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($stats['total_staff']) ?></p>
-                    <p class="text-sm text-gray-500 mt-1">Registered health staff</p>
                 </div>
+                <p class="text-3xl font-bold text-blue-600 mb-2"><?= $stats['total_staff'] ?></p>
+                <p class="text-gray-500 text-sm mb-4">Registered health staff</p>
+                <a href="/community-health-tracker/admin/staff" class="text-blue-600 text-sm font-medium hover:underline">View all staff</a>
             </div>
-            <div class="mt-4 pt-3 border-t border-gray-100">
-                <a href="/community-health-tracker/admin/staff" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
-                    View all staff
-                    <i class="fas fa-arrow-right ml-1 text-xs"></i>
-                </a>
-            </div>
-        </div>
-        
-        <!-- Users Card -->
-        <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 border-l-4 border-green-500">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
-                    <i class="fas fa-users text-2xl"></i>
-                </div>
-                <div>
+            
+            <!-- Users Card -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mr-3">
+                        <i class="fas fa-users text-green-600"></i>
+                    </div>
                     <h3 class="text-lg font-semibold text-gray-700">Total Users</h3>
-                    <p class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($stats['total_users']) ?></p>
-                    <p class="text-sm text-gray-500 mt-1">Registered community users</p>
                 </div>
+                <p class="text-3xl font-bold text-green-600 mb-2"><?= $stats['total_users'] ?></p>
+                <p class="text-gray-500 text-sm mb-4">Registered community users</p>
+                <a href="/community-health-tracker/admin/users" class="text-blue-600 text-sm font-medium hover:underline">Manage users</a>
             </div>
-            <div class="mt-4 pt-3 border-t border-gray-100">
-                <a href="/community-health-tracker/admin/users" class="text-green-600 hover:text-green-800 text-sm font-medium flex items-center">
-                    Manage users
-                    <i class="fas fa-arrow-right ml-1 text-xs"></i>
-                </a>
-            </div>
-        </div>
-        
-        <!-- Patients Card -->
-        <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 border-l-4 border-purple-500">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
-                    <i class="fas fa-procedures text-2xl"></i>
-                </div>
-                <div>
+            
+            <!-- Patients Card -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mr-3">
+                        <i class="fas fa-procedures text-purple-600"></i>
+                    </div>
                     <h3 class="text-lg font-semibold text-gray-700">Total Patients</h3>
-                    <p class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($stats['total_patients']) ?></p>
-                    <p class="text-sm text-gray-500 mt-1">Patient records</p>
                 </div>
+                <p class="text-3xl font-bold text-purple-600 mb-2"><?= $stats['total_patients'] ?></p>
+                <p class="text-gray-500 text-sm mb-4">Patient records</p>
+                <a href="/community-health-tracker/admin/patients" class="text-blue-600 text-sm font-medium hover:underline">View patients</a>
             </div>
-            <div class="mt-4 pt-3 border-t border-gray-100">
-                <a href="/community-health-tracker/admin/patients" class="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center">
-                    View patients
-                    <i class="fas fa-arrow-right ml-1 text-xs"></i>
-                </a>
-            </div>
-        </div>
-        
-        <!-- Pending Approvals Card -->
-        <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 border-l-4 border-yellow-500">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
-                    <i class="fas fa-clock text-2xl"></i>
-                </div>
-                <div>
+            
+            <!-- Pending Approvals Card -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
+                        <i class="fas fa-clock text-yellow-600"></i>
+                    </div>
                     <h3 class="text-lg font-semibold text-gray-700">Pending Approvals</h3>
-                    <p class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($stats['pending_approvals']) ?></p>
-                    <p class="text-sm text-gray-500 mt-1">Awaiting approval</p>
                 </div>
+                <p class="text-3xl font-bold text-yellow-600 mb-2"><?= $stats['pending_approvals'] ?></p>
+                <p class="text-gray-500 text-sm mb-4">Awaiting approval</p>
+                <a href="/community-health-tracker/admin/approvals" class="text-blue-600 text-sm font-medium hover:underline">Review approvals</a>
             </div>
-            <div class="mt-4 pt-3 border-t border-gray-100">
-                <a href="/community-health-tracker/admin/approvals" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium flex items-center">
-                    Review approvals
-                    <i class="fas fa-arrow-right ml-1 text-xs"></i>
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Recent Activities Section -->
-    <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-        <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center">
-                <i class="fas fa-history text-xl text-gray-600 mr-3"></i>
-                <h2 class="text-xl font-semibold text-gray-800">Recent Activities</h2>
-            </div>
-            <a href="/community-health-tracker/admin/activities" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                View all activities
-            </a>
         </div>
         
-        <div class="space-y-4">
-            <?php
-            try {
-                $stmt = $pdo->query("SELECT * FROM sitio1_activities ORDER BY created_at DESC LIMIT 5");
-                $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Recent Activities Section -->
+            <div class="bg-white p-6 rounded-lg shadow lg:col-span-2">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold flex items-center">
+                        <i class="fas fa-history text-gray-600 mr-2"></i> Recent Activities
+                    </h2>
+                    <a href="/community-health-tracker/admin/activities" class="text-blue-600 text-sm hover:underline">View all activities</a>
+                </div>
                 
-                if (count($activities) > 0) {
-                    foreach ($activities as $activity) {
-                        echo '<div class="flex items-start pb-4 border-b border-gray-100 last:border-0 last:pb-0">';
-                        echo '    <div class="p-2 bg-gray-100 rounded-full mr-4">';
-                        echo '        <i class="fas ' . htmlspecialchars($activity['icon'] ?? 'fa-info-circle') . ' text-gray-600"></i>';
-                        echo '    </div>';
-                        echo '    <div class="flex-1">';
-                        echo '        <p class="text-gray-800">' . htmlspecialchars($activity['description']) . '</p>';
-                        echo '        <p class="text-sm text-gray-500 mt-1">' . htmlspecialchars($activity['created_at']) . '</p>';
-                        echo '    </div>';
-                        echo '</div>';
-                    }
-                } else {
-                    echo '<p class="text-gray-600 py-4 text-center">No recent activities found.</p>';
-                }
-            } catch (PDOException $e) {
-                echo '<p class="text-red-500 py-4">Unable to load recent activities.</p>';
-                error_log("Activities error: " . $e->getMessage());
-            }
-            ?>
+                <div class="space-y-4">
+                    <div class="flex items-start">
+                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mr-3 mt-1">
+                            <i class="fas fa-user-plus text-gray-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-700">New staff member registered</p>
+                            <p class="text-gray-500 text-sm">2 hours ago</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start">
+                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mr-3 mt-1">
+                            <i class="fas fa-user-check text-gray-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-700">User account approved</p>
+                            <p class="text-gray-500 text-sm">5 hours ago</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start">
+                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mr-3 mt-1">
+                            <i class="fas fa-file-medical text-gray-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-700">New patient record added</p>
+                            <p class="text-gray-500 text-sm">Yesterday</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start">
+                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mr-3 mt-1">
+                            <i class="fas fa-stethoscope text-gray-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-700">Health check-up completed</p>
+                            <p class="text-gray-500 text-sm">2 days ago</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions Section -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-6 flex items-center">
+                    <i class="fas fa-bolt text-gray-600 mr-2"></i> Quick Actions
+                </h2>
+                
+                <div class="space-y-4">
+                    <a href="/community-health-tracker/admin/add-staff" class="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                        <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center mr-3">
+                            <i class="fas fa-user-plus text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-medium">Add New Staff</h3>
+                            <p class="text-gray-500 text-sm">Register health personnel</p>
+                        </div>
+                    </a>
+                    
+                    <a href="/community-health-tracker/admin/generate-report" class="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                        <div class="w-10 h-10 rounded-lg bg-green-600 flex items-center justify-center mr-3">
+                            <i class="fas fa-file-export text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-medium">Generate Report</h3>
+                            <p class="text-gray-500 text-sm">Export system data</p>
+                        </div>
+                    </a>
+                    
+                    <a href="/community-health-tracker/admin/settings" class="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                        <div class="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center mr-3">
+                            <i class="fas fa-cog text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-medium">System Settings</h3>
+                            <p class="text-gray-500 text-sm">Configure application</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
+
     
-    <!-- Quick Actions -->
-    <div class="bg-white p-6 rounded-lg shadow-md">
-        <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
-            <i class="fas fa-bolt text-yellow-500 mr-3"></i>
-            Quick Actions
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <a href="/community-health-tracker/admin/add-staff" class="bg-blue-50 hover:bg-blue-100 p-4 rounded-lg border border-blue-100 transition-colors duration-200 flex items-center">
-                <div class="bg-blue-100 text-blue-600 p-3 rounded-full mr-4">
-                    <i class="fas fa-user-plus"></i>
-                </div>
-                <div>
-                    <h3 class="font-medium text-gray-800">Add New Staff</h3>
-                    <p class="text-sm text-gray-600">Register health personnel</p>
-                </div>
-            </a>
-            
-            <a href="/community-health-tracker/admin/generate-report" class="bg-green-50 hover:bg-green-100 p-4 rounded-lg border border-green-100 transition-colors duration-200 flex items-center">
-                <div class="bg-green-100 text-green-600 p-3 rounded-full mr-4">
-                    <i class="fas fa-file-export"></i>
-                </div>
-                <div>
-                    <h3 class="font-medium text-gray-800">Generate Report</h3>
-                    <p class="text-sm text-gray-600">Export system data</p>
-                </div>
-            </a>
-            
-            <a href="/community-health-tracker/admin/settings" class="bg-purple-50 hover:bg-purple-100 p-4 rounded-lg border border-purple-100 transition-colors duration-200 flex items-center">
-                <div class="bg-purple-100 text-purple-600 p-3 rounded-full mr-4">
-                    <i class="fas fa-cog"></i>
-                </div>
-                <div>
-                    <h3 class="font-medium text-gray-800">System Settings</h3>
-                    <p class="text-sm text-gray-600">Configure application</p>
-                </div>
-            </a>
-        </div>
-    </div>
-</div>
+</body>
+</html>
 
 <?php
 // require_once __DIR__ . '/../includes/footer.php';

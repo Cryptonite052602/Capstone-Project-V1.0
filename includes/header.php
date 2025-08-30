@@ -42,7 +42,7 @@ require_once __DIR__ . '/header.php';
     <?php if (isLoggedIn()): ?>
         <?php if (isAdmin()): ?>
             <!-- Admin Header -->
-            <nav class="text-white shadow-lg sticky h-[80px] top-0 z-50">
+            <nav class="bg-[#3C96E1] text-white shadow-lg sticky h-[80px] top-0 z-50">
                 <div class="flex items-center w-full sm:w-auto">
                     <div class="flex items-center space-x-4 ml-2">
                         <!-- Hamburger Menu Button -->
@@ -58,7 +58,7 @@ require_once __DIR__ . '/header.php';
                     <div class="flex items-center space-x-2 mt-5 mr-5 ml-2 border-r border-white pr-6">
                         <div class="bg-gray-300 h-8 w-8 rounded-full"></div>
                         <div class="flex flex-col items-start">
-                            <span class="text-[#51E800] text-sm">Welcome Administrator</span>
+                            <span class="text-[#51E800] text-sm">Welcome Administrator!</span>
                             <span class="text-xs"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
                         </div>
                     </div>
@@ -233,7 +233,7 @@ require_once __DIR__ . '/header.php';
 
         <?php elseif (isUser()): ?>
             <!-- User Header -->
-            <nav class="bg-purple-600 text-white shadow-lg sticky top-0 z-50">
+            <nav class="bg-blue-600 text-white shadow-lg sticky top-0 z-50">
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <div class="h-8 w-8">
