@@ -53,17 +53,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_health_info'])) 
                     $medical_history, $current_medications, $family_history,
                     $patient_id
                 ]);
+                
+                // Also update the gender in the main patient table
+                $stmt = $pdo->prepare("UPDATE sitio1_patients SET gender = ? WHERE id = ?");
+                $stmt->execute([$gender, $patient_id]);
+                
                 $message = "Patient health information updated successfully!";
             } else {
                 // Insert new record
                 $stmt = $pdo->prepare("INSERT INTO existing_info_patients 
                     (patient_id, gender, height, weight, blood_type, allergies, 
-                    medical_history, current_medications, family_history, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+                    medical_history, current_medications, family_history)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([
                     $patient_id, $gender, $height, $weight, $blood_type, $allergies,
                     $medical_history, $current_medications, $family_history
                 ]);
+                
+                // Also update the gender in the main patient table
+                $stmt = $pdo->prepare("UPDATE sitio1_patients SET gender = ? WHERE id = ?");
+                $stmt->execute([$gender, $patient_id]);
+                
                 $message = "Patient health information saved successfully!";
             }
             
@@ -86,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_patient'])) {
     $address = trim($_POST['address']);
     $contact = trim($_POST['contact']);
     $lastCheckup = trim($_POST['last_checkup']);
+    $userId = !empty($_POST['user_id']) ? intval($_POST['user_id']) : null;
     
     // Medical information
     $height = !empty($_POST['height']) ? floatval($_POST['height']) : null;
@@ -101,26 +112,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_patient'])) {
             // Start transaction
             $pdo->beginTransaction();
             
-            // Insert into main patients table
+            // Insert into main patients table (removed consultation_type)
             $stmt = $pdo->prepare("INSERT INTO sitio1_patients 
-                (full_name, age, gender, address, contact, last_checkup, added_by) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$fullName, $age, $gender, $address, $contact, $lastCheckup, $_SESSION['user']['id']]);
+                (full_name, age, gender, address, contact, last_checkup, added_by, user_id) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$fullName, $age, $gender, $address, $contact, $lastCheckup, $_SESSION['user']['id'], $userId]);
             $patientId = $pdo->lastInsertId();
+            
+            // Get patient count for this user to generate display ID
+            $stmt = $pdo->prepare("SELECT COUNT(*) as patient_count FROM sitio1_patients WHERE added_by = ?");
+            $stmt->execute([$_SESSION['user']['id']]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            $patientCount = $result['patient_count'];
             
             // Insert into medical info table
             $stmt = $pdo->prepare("INSERT INTO existing_info_patients 
-                (patient_id, height, weight, blood_type, allergies, medical_history, current_medications, family_history) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                (patient_id, gender, height, weight, blood_type, allergies, medical_history, current_medications, family_history) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
-                $patientId, $height, $weight, $bloodType, 
+                $patientId, $gender, $height, $weight, $bloodType, 
                 $allergies, $medicalHistory, $currentMedications, $familyHistory
             ]);
             
             $pdo->commit();
             
-            $message = 'Patient record added successfully!';
-            header('Location: existing_info_patients.php');
+            // Set success message and redirect
+            $_SESSION['success_message'] = 'Patient record added successfully! Patient ID: ' . $patientCount;
+            header('Location: existing_info_patients.php?tab=patients-tab');
             exit();
         } catch (PDOException $e) {
             $pdo->rollBack();
@@ -131,8 +149,113 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_patient'])) {
     }
 }
 
+// Check for success message from session
+if (isset($_SESSION['success_message'])) {
+    $message = $_SESSION['success_message'];
+    unset($_SESSION['success_message']);
+}
+
+// Handle patient deletion
+if (isset($_GET['delete_patient'])) {
+    $patientId = $_GET['delete_patient'];
+    
+    try {
+        // Start transaction
+        $pdo->beginTransaction();
+        
+        // Get patient data
+        $stmt = $pdo->prepare("SELECT * FROM sitio1_patients WHERE id = ? AND added_by = ?");
+        $stmt->execute([$patientId, $_SESSION['user']['id']]);
+        $patient = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($patient) {
+            // Insert into deleted_patients table
+            $stmt = $pdo->prepare("INSERT INTO deleted_patients 
+                (original_id, full_name, age, gender, address, contact, last_checkup, added_by, deleted_at, deleted_by) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)");
+            $stmt->execute([
+                $patient['id'], $patient['full_name'], $patient['age'], $patient['gender'], 
+                $patient['address'], $patient['contact'], $patient['last_checkup'], 
+                $patient['added_by'], $_SESSION['user']['id']
+            ]);
+            
+            // Delete from main table
+            $stmt = $pdo->prepare("DELETE FROM sitio1_patients WHERE id = ?");
+            $stmt->execute([$patientId]);
+            
+            // Delete health info
+            $stmt = $pdo->prepare("DELETE FROM existing_info_patients WHERE patient_id = ?");
+            $stmt->execute([$patientId]);
+            
+            $pdo->commit();
+            
+            $_SESSION['success_message'] = 'Patient record moved to archive successfully!';
+            header('Location: existing_info_patients.php');
+            exit();
+        } else {
+            $error = 'Patient not found!';
+        }
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        $error = 'Error deleting patient record: ' . $e->getMessage();
+    }
+}
+
+// Handle converting user to patient
+if (isset($_GET['convert_to_patient'])) {
+    $userId = $_GET['convert_to_patient'];
+    
+    try {
+        // Get user details including gender
+        $stmt = $pdo->prepare("SELECT * FROM sitio1_users WHERE id = ? AND approved = 1");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($user) {
+            // Check if user already exists as a patient
+            $stmt = $pdo->prepare("SELECT * FROM sitio1_patients WHERE user_id = ? AND added_by = ?");
+            $stmt->execute([$userId, $_SESSION['user']['id']]);
+            $existingPatient = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($existingPatient) {
+                $error = 'This user is already registered as a patient.';
+            } else {
+                // Start transaction
+                $pdo->beginTransaction();
+                
+                // Insert into main patients table with gender from user
+                $stmt = $pdo->prepare("INSERT INTO sitio1_patients 
+                    (full_name, age, gender, address, contact, added_by, user_id) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([
+                    $user['full_name'], $user['age'], $user['gender'], $user['address'], $user['contact'],
+                    $_SESSION['user']['id'], $userId
+                ]);
+                $patientId = $pdo->lastInsertId();
+                
+                // Insert medical info with gender from user
+                $stmt = $pdo->prepare("INSERT INTO existing_info_patients 
+                    (patient_id, gender) VALUES (?, ?)");
+                $stmt->execute([$patientId, $user['gender']]);
+                
+                $pdo->commit();
+                
+                $_SESSION['success_message'] = 'User converted to patient successfully!';
+                header('Location: existing_info_patients.php?tab=patients-tab');
+                exit();
+            }
+        } else {
+            $error = 'User not found or not approved!';
+        }
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        $error = 'Error converting user to patient: ' . $e->getMessage();
+    }
+}
+
 // Get search term if exists
 $searchTerm = isset($_GET['search']) ? trim($_GET['search']) : '';
+$searchBy = isset($_GET['search_by']) ? trim($_GET['search_by']) : 'name';
 
 // Get patient ID if selected
 $selectedPatientId = isset($_GET['patient_id']) ? $_GET['patient_id'] : (isset($_POST['patient_id']) ? $_POST['patient_id'] : '');
@@ -142,20 +265,31 @@ $viewPrinted = isset($_GET['view_printed']) && $_GET['view_printed'] == 'true';
 
 // Get list of patients matching search
 $patients = [];
+$searchedUsers = [];
 if (!empty($searchTerm)) {
     try {
-        // First check what columns exist in the table
-        $stmt = $pdo->prepare("SHOW COLUMNS FROM sitio1_patients LIKE 'gender'");
-        $stmt->execute();
-        $genderColumnExists = $stmt->fetch();
-        
-        // Build query based on available columns
-        $query = "SELECT id, full_name, age" . ($genderColumnExists ? ", gender" : "") . 
-                 " FROM sitio1_patients WHERE added_by = ? AND full_name LIKE ? ORDER BY full_name LIMIT 10";
-        
-        $stmt = $pdo->prepare($query);
-        $stmt->execute([$_SESSION['user']['id'], "%$searchTerm%"]);
-        $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($searchBy === 'unique_number') {
+            // Search by unique number from sitio1_users table
+            $query = "SELECT id, full_name, email, age, gender, address, contact, unique_number, 'user' as type
+                     FROM sitio1_users 
+                     WHERE approved = 1 AND unique_number LIKE ? 
+                     ORDER BY full_name LIMIT 10";
+            
+            $stmt = $pdo->prepare($query);
+            $stmt->execute(["%$searchTerm%"]);
+            $searchedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            // Search by name (default) - FIXED: removed consultation_type and added gender
+            $query = "SELECT p.id, p.full_name, p.age, p.gender, e.blood_type, e.height, e.weight
+                     FROM sitio1_patients p 
+                     LEFT JOIN existing_info_patients e ON p.id = e.patient_id 
+                     WHERE p.added_by = ? AND p.full_name LIKE ? 
+                     ORDER BY p.full_name LIMIT 10";
+            
+            $stmt = $pdo->prepare($query);
+            $stmt->execute([$_SESSION['user']['id'], "%$searchTerm%"]);
+            $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     } catch (PDOException $e) {
         $error = "Error fetching patients: " . $e->getMessage();
     }
@@ -163,12 +297,14 @@ if (!empty($searchTerm)) {
 
 // Get all patients with their medical info for the patient list
 try {
-    $stmt = $pdo->prepare("SELECT p.*, m.height, m.weight, m.blood_type, m.allergies, 
-                          m.medical_history, m.current_medications, m.family_history
+    $stmt = $pdo->prepare("SELECT p.*, e.height, e.weight, e.blood_type, e.allergies,
+                          e.medical_history, e.current_medications, e.family_history,
+                          u.unique_number, u.email as user_email
                           FROM sitio1_patients p
-                          LEFT JOIN existing_info_patients m ON p.id = m.patient_id
+                          LEFT JOIN existing_info_patients e ON p.id = e.patient_id
+                          LEFT JOIN sitio1_users u ON p.user_id = u.id
                           WHERE p.added_by = ? AND p.deleted_at IS NULL
-                          ORDER BY p.created_at DESC LIMIT 10");
+                          ORDER BY p.created_at DESC LIMIT 20");
     $stmt->execute([$_SESSION['user']['id']]);
     $allPatients = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -180,9 +316,12 @@ $health_info = [];
 $patient_details = [];
 if (!empty($selectedPatientId)) {
     try {
-        // Get basic patient info
-        $stmt = $pdo->prepare("SELECT * FROM sitio1_patients WHERE id = ?");
-        $stmt->execute([$selectedPatientId]);
+        // Get basic patient info - FIXED: added gender field
+        $stmt = $pdo->prepare("SELECT p.*, u.unique_number, u.email as user_email 
+                              FROM sitio1_patients p 
+                              LEFT JOIN sitio1_users u ON p.user_id = u.id
+                              WHERE p.id = ? AND p.added_by = ?");
+        $stmt->execute([$selectedPatientId, $_SESSION['user']['id']]);
         $patient_details = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$patient_details) {
@@ -192,990 +331,604 @@ if (!empty($selectedPatientId)) {
             $stmt = $pdo->prepare("SELECT * FROM existing_info_patients WHERE patient_id = ?");
             $stmt->execute([$selectedPatientId]);
             $health_info = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            // If health info exists but doesn't have gender, use the one from patient table
+            if ($health_info && empty($health_info['gender']) && !empty($patient_details['gender'])) {
+                $health_info['gender'] = $patient_details['gender'];
+            }
         }
     } catch (PDOException $e) {
         $error = "Error fetching health information: " . $e->getMessage();
     }
 }
+?>
 
-// If in view printed information mode, show simplified layout
-if ($viewPrinted && !empty($selectedPatientId) && !empty($patient_details)): ?>
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Health Record - <?= htmlspecialchars($patient_details['full_name']) ?></title>
-        <style>
-            /* Base Styles */
-            body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                line-height: 1.6;
-                color: #333;
-                margin: 0;
-                padding: 0;
-                background: #f9f9f9;
-            }
-            
-            /* Document Container */
-            .health-record {
-                max-width: 800px;
-                margin: 0 auto;
-                padding: 30px;
-                background: white;
-                box-shadow: 0 0 20px rgba(0,0,0,0.1);
-            }
-            
-            /* Header with Logo */
-            .record-header {
-                display: flex;
-                align-items: center;
-                margin-bottom: 30px;
-                padding-bottom: 20px;
-                border-bottom: 2px solid #3498db;
-            }
-            
-            .clinic-logo {
-                width: 80px;
-                height: 80px;
-                margin-right: 20px;
-                background-color: #3498db;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-weight: bold;
-                font-size: 14px;
-                text-align: center;
-            }
-            
-            .clinic-info {
-                flex: 1;
-            }
-            
-            .clinic-name {
-                font-size: 24px;
-                font-weight: bold;
-                color: #2c3e50;
-                margin: 0 0 5px 0;
-            }
-            
-            .clinic-address {
-                font-size: 14px;
-                color: #7f8c8d;
-                margin: 0;
-            }
-            
-            .document-title {
-                font-size: 20px;
-                color: #3498db;
-                text-align: center;
-                margin: 20px 0;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-            
-            /* Patient Information */
-            .patient-info {
-                background: #f8f9fa;
-                padding: 20px;
-                border-radius: 5px;
-                margin-bottom: 30px;
-            }
-            
-            .info-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-                gap: 15px;
-            }
-            
-            .info-item {
-                margin-bottom: 10px;
-            }
-            
-            .info-label {
-                font-weight: bold;
-                color: #2c3e50;
-                display: inline-block;
-                min-width: 120px;
-            }
-            
-            /* Sections */
-            .section {
-                margin-bottom: 25px;
-                page-break-inside: avoid;
-            }
-            
-            .section-title {
-                font-size: 16px;
-                color: #3498db;
-                border-bottom: 1px solid #ecf0f1;
-                padding-bottom: 5px;
-                margin-bottom: 15px;
-                text-transform: uppercase;
-            }
-            
-            /* Vital Stats */
-            .vital-stats {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                gap: 15px;
-                margin-bottom: 20px;
-            }
-            
-            .stat-item {
-                background: #ecf0f1;
-                padding: 10px;
-                border-radius: 5px;
-            }
-            
-            .stat-label {
-                font-weight: bold;
-                font-size: 14px;
-                color: #7f8c8d;
-            }
-            
-            .stat-value {
-                font-size: 18px;
-                color: #2c3e50;
-            }
-            
-            /* BMI Indicator */
-            .bmi-value {
-                font-weight: bold;
-            }
-            
-            .underweight { color: #3498db; }
-            .normal { color: #2ecc71; }
-            .overweight { color: #f39c12; }
-            .obese { color: #e74c3c; }
-            
-            /* Content Areas */
-            .content-area {
-                background: #f8f9fa;
-                padding: 15px;
-                border-radius: 5px;
-                margin-bottom: 15px;
-            }
-            
-            /* QR Code */
-            .qr-container {
-                text-align: center;
-                margin: 30px 0;
-            }
-            
-            .qr-code {
-                display: inline-block;
-                padding: 10px;
-                background: white;
-                border: 1px solid #ecf0f1;
-                border-radius: 5px;
-            }
-            
-            .qr-label {
-                font-size: 12px;
-                color: #7f8c8d;
-                margin-top: 5px;
-            }
-            
-            /* Signature Area */
-            .signature-area {
-                display: flex;
-                justify-content: space-between;
-                margin-top: 50px;
-            }
-            
-            .signature-box {
-                width: 250px;
-                text-align: center;
-            }
-            
-            .signature-line {
-                border-top: 1px solid #333;
-                margin: 40px auto 5px;
-                width: 80%;
-            }
-            
-            /* Print Styles */
-            @media print {
-                body {
-                    background: none;
-                    padding: 0;
-                    font-size: 12pt;
-                }
-                
-                .health-record {
-                    box-shadow: none;
-                    padding: 0;
-                    max-width: 100%;
-                }
-                
-                .no-print {
-                    display: none !important;
-                }
-                
-                @page {
-                    size: A4;
-                    margin: 15mm;
-                }
-                
-                .page-break {
-                    page-break-after: always;
-                }
-            }
-            
-            /* Action Buttons */
-            .action-buttons {
-                text-align: center;
-                margin: 30px 0;
-                padding: 15px;
-                background: #ecf0f1;
-                border-radius: 5px;
-            }
-            
-            .action-btn {
-                padding: 10px 20px;
-                margin: 0 10px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-weight: bold;
-                transition: all 0.3s;
-            }
-            
-            .print-btn {
-                background-color: #3498db;
-                color: white;
-            }
-            
-            .print-btn:hover {
-                background-color: #2980b9;
-            }
-            
-            .close-btn {
-                background-color: #95a5a6;
-                color: white;
-            }
-            
-            .close-btn:hover {
-                background-color: #7f8c8d;
-            }
-            
-            .export-btn {
-                background-color: #2ecc71;
-                color: white;
-            }
-            
-            .export-btn:hover {
-                background-color: #27ae60;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="health-record">
-            <!-- Document Header with Logo -->
-            <div class="record-header">
-                <div class="clinic-logo">
-                    CHC<br>Gawi
-                </div>
-                <div class="clinic-info">
-                    <h1 class="clinic-name">Community Health Center</h1>
-                    <p class="clinic-address">Barangay Health Center, Gawi, Oslob, Cebu, Philippines</p>
-                </div>
-            </div>
-            
-            <h2 class="document-title">Patient Health Record</h2>
-            
-            <!-- Patient Information -->
-            <div class="patient-info">
-                <div class="info-grid">
-                    <div>
-                        <div class="info-item">
-                            <span class="info-label">Patient Name:</span>
-                            <?= htmlspecialchars($patient_details['full_name']) ?>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Age:</span>
-                            <?= htmlspecialchars($patient_details['age'] ?? 'N/A') ?>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Gender:</span>
-                            <?= htmlspecialchars($health_info['gender'] ?? ($patient_details['gender'] ?? 'N/A')) ?>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="info-item">
-                            <span class="info-label">Record Date:</span>
-                            <?= date('F j, Y', strtotime($health_info['created_at'] ?? 'now')) ?>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Last Updated:</span>
-                            <?= date('F j, Y', strtotime($health_info['updated_at'] ?? $health_info['created_at'] ?? 'now')) ?>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Record ID:</span>
-                            <?= htmlspecialchars($selectedPatientId) ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Vital Statistics -->
-            <div class="section">
-                <h3 class="section-title">Vital Statistics</h3>
-                <div class="vital-stats">
-                    <div class="stat-item">
-                        <div class="stat-label">Height</div>
-                        <div class="stat-value"><?= htmlspecialchars($health_info['height'] ?? 'N/A') ?> cm</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Weight</div>
-                        <div class="stat-value"><?= htmlspecialchars($health_info['weight'] ?? 'N/A') ?> kg</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Blood Type</div>
-                        <div class="stat-value"><?= htmlspecialchars($health_info['blood_type'] ?? 'N/A') ?></div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">BMI</div>
-                        <div class="stat-value">
-                            <?php 
-                                if (!empty($health_info['height']) && !empty($health_info['weight'])) {
-                                    $bmi = $health_info['weight'] / (($health_info['height']/100) * ($health_info['height']/100));
-                                    echo '<span class="bmi-value">' . number_format($bmi, 1) . '</span>';
-                                    
-                                    // Add BMI category
-                                    if ($bmi < 18.5) {
-                                        echo '<span class="underweight"> (Underweight)</span>';
-                                    } elseif ($bmi >= 18.5 && $bmi < 25) {
-                                        echo '<span class="normal"> (Normal)</span>';
-                                    } elseif ($bmi >= 25 && $bmi < 30) {
-                                        echo '<span class="overweight"> (Overweight)</span>';
-                                    } else {
-                                        echo '<span class="obese"> (Obese)</span>';
-                                    }
-                                } else {
-                                    echo 'N/A';
-                                }
-                            ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Medical Information Sections -->
-            <?php if (!empty($health_info['allergies'])): ?>
-            <div class="section">
-                <h3 class="section-title">Allergies</h3>
-                <div class="content-area">
-                    <?= nl2br(htmlspecialchars($health_info['allergies'])) ?>
-                </div>
-            </div>
-            <?php endif; ?>
-            
-            <?php if (!empty($health_info['medical_history'])): ?>
-            <div class="section">
-                <h3 class="section-title">Medical History</h3>
-                <div class="content-area">
-                    <?= nl2br(htmlspecialchars($health_info['medical_history'])) ?>
-                </div>
-            </div>
-            <?php endif; ?>
-            
-            <?php if (!empty($health_info['current_medications'])): ?>
-            <div class="section">
-                <h3 class="section-title">Current Medications</h3>
-                <div class="content-area">
-                    <?= nl2br(htmlspecialchars($health_info['current_medications'])) ?>
-                </div>
-            </div>
-            <?php endif; ?>
-            
-            <?php if (!empty($health_info['family_history'])): ?>
-            <div class="section">
-                <h3 class="section-title">Family History</h3>
-                <div class="content-area">
-                    <?= nl2br(htmlspecialchars($health_info['family_history'])) ?>
-                </div>
-            </div>
-            <?php endif; ?>
-            
-            <!-- QR Code for Verification -->
-            <div class="qr-container">
-                <div class="qr-code">
-                    <div id="qrCode"></div>
-                    <div class="qr-label">Scan to verify this record</div>
-                </div>
-            </div>
-            
-            <!-- Signature Area -->
-            <div class="signature-area">
-                <div class="signature-box">
-                    <div class="signature-line"></div>
-                    <p>Patient's Signature</p>
-                </div>
-                <div class="signature-box">
-                    <div class="signature-line"></div>
-                    <p>Healthcare Provider</p>
-                    <p><strong><?= htmlspecialchars($_SESSION['user']['full_name'] ?? '') ?></strong></p>
-                </div>
-            </div>
-            
-            <!-- Action Buttons (Not Printed) -->
-            <div class="action-buttons no-print">
-                <button onclick="window.print()" class="action-btn print-btn">Print Record</button>
-                <button onclick="window.close()" class="action-btn close-btn">Close Window</button>
-                <button onclick="exportToPDF()" class="action-btn export-btn">Export as PDF</button>
-            </div>
-        </div>
-    
-        <!-- QR Code Generation -->
-        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-        <!-- PDF Generation -->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-        
-        <script>
-            // Generate QR Code
-            QRCode.toCanvas(document.getElementById('qrCode'), 
-                `Patient Health Record\n` +
-                `Name: <?= htmlspecialchars($patient_details['full_name']) ?>\n` +
-                `ID: <?= htmlspecialchars($selectedPatientId) ?>\n` +
-                `Date: <?= date('M j, Y', strtotime($health_info['updated_at'] ?? $health_info['created_at'] ?? 'now')) ?>`, 
-                { width: 150, margin: 0 }, 
-                function(error) {
-                    if (error) console.error(error);
-                }
-            );
-            
-            // Export to PDF function
-            function exportToPDF() {
-                // Load jsPDF
-                const { jsPDF } = window.jspdf;
-                
-                // Get the health record element
-                const element = document.querySelector('.health-record');
-                
-                // Use html2canvas to capture the element
-                html2canvas(element, {
-                    scale: 2,
-                    logging: false,
-                    useCORS: true,
-                    allowTaint: true
-                }).then(canvas => {
-                    // Create PDF
-                    const imgData = canvas.toDataURL('image/png');
-                    const pdf = new jsPDF('p', 'mm', 'a4');
-                    const imgWidth = 210; // A4 width in mm
-                    const pageHeight = 295; // A4 height in mm
-                    const imgHeight = canvas.height * imgWidth / canvas.width;
-                    let heightLeft = imgHeight;
-                    let position = 0;
-                    
-                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                    heightLeft -= pageHeight;
-                    
-                    // Add additional pages if needed
-                    while (heightLeft >= 0) {
-                        position = heightLeft - imgHeight;
-                        pdf.addPage();
-                        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                        heightLeft -= pageHeight;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Health Records</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3498db',
+                        secondary: '#2c3e50',
+                        success: '#2ecc71',
+                        danger: '#e74c3c',
+                        warning: '#f39c12',
+                        info: '#17a2b8'
                     }
-                    
-                    // Save the PDF
-                    pdf.save(`Health_Record_<?= htmlspecialchars($patient_details['full_name']) ?>.pdf`);
-                });
+                }
             }
-        </script>
-    </body>
-    </html>
-    <?php
-    exit();
-    endif;
-    ?>
-
-<div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">Patient Health Records</h1>
-    
-    <?php if ($message): ?>
-        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-            <?= htmlspecialchars($message) ?>
-        </div>
-    <?php endif; ?>
-    
-    <?php if ($error): ?>
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <?= htmlspecialchars($error) ?>
-        </div>
-    <?php endif; ?>
-    
-    <!-- Search Bar -->
-    <div class="bg-white p-6 rounded-lg shadow mb-8">
-        <form method="get" action="" class="mb-6">
-            <div class="flex items-center">
-                <div class="relative flex-grow">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <input type="text" id="search" name="search" value="<?= htmlspecialchars($searchTerm) ?>" 
-                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" 
-                        placeholder="Search patients by name...">
-                </div>
-                <button type="submit" class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    Search
-                </button>
-                <?php if (!empty($searchTerm)): ?>
-                    <a href="?" class="ml-3 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Clear
-                    </a>
-                <?php endif; ?>
-            </div>
-        </form>
-    </div>
-
-    <!-- Patient List -->
-    <div class="bg-white p-6 rounded-lg shadow mb-8">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-semibold">Patient Records</h2>
-            <div class="flex space-x-2">
-                <a href="deleted_patients.php" class="inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    <svg class="-ml-1 mr-1 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M5 4a1 1 0 00-1 1v1a1 1 0 001 1h1a1 1 0 001-1V5a1 1 0 00-1-1H5zM12 4a1 1 0 00-1 1v1a1 1 0 001 1h1a1 1 0 001-1V5a1 1 0 00-1-1h-1zM5 12a1 1 0 00-1 1v1a1 1 0 001 1h1a1 1 0 001-1v-1a1 1 0 00-1-1H5z" clip-rule="evenodd" />
-                    </svg>
-                    Archive
-                </a>
-                <button id="showFormBtn" class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    <svg class="-ml-1 mr-1 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-                    </svg>
-                    Add Patient
-                </button>
-            </div>
-        </div>
+        }
+    </script>
+    <style>
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .patient-card {
+            transition: all 0.3s ease;
+        }
+        .patient-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .modal {
+            transition: opacity 0.3s ease;
+        }
+        .required-field::after {
+            content: " *";
+            color: #e74c3c;
+        }
+        .patient-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .patient-table th, .patient-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .patient-table th {
+            background-color: #f8fafc;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .patient-table tr:hover {
+            background-color: #f1f5f9;
+        }
+        .patient-id {
+            font-weight: bold;
+            color: #3498db;
+        }
+        .user-badge {
+            background-color: #e0e7ff;
+            color: #3730a3;
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-6 text-secondary">Patient Health Records</h1>
         
-        <?php if (empty($allPatients)): ?>
-            <div class="text-center py-8">
-                <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <h3 class="mt-2 text-sm font-medium text-gray-900">No patients found</h3>
-                <p class="mt-1 text-sm text-gray-500">Get started by adding a new patient.</p>
-                <div class="mt-6">
-                    <button id="showFormBtnEmpty" type="button" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-                        </svg>
-                        Add Patient
-                    </button>
-                </div>
-            </div>
-        <?php else: ?>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age/Gender</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blood Type</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Check-up</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        <?php foreach ($allPatients as $patient): ?>
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex items-center">
-                                        <div class="flex-shrink-0 h-10 w-10">
-                                            <svg class="h-10 w-10 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                            </svg>
-                                        </div>
-                                        <div class="ml-4">
-                                            <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($patient['full_name']) ?></div>
-                                            <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($patient['id']) ?></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900"><?= $patient['age'] ?? 'N/A' ?></div>
-                                    <div class="text-sm text-gray-500"><?= isset($patient['gender']) && $patient['gender'] ? htmlspecialchars($patient['gender']) : 'N/A' ?></div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?= $patient['blood_type'] ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' ?>">
-                                        <?= htmlspecialchars($patient['blood_type'] ?: 'N/A') ?>
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <?= $patient['last_checkup'] ? date('M d, Y', strtotime($patient['last_checkup'])) : 'N/A' ?>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <div class="flex space-x-2">
-                                        <a href="?patient_id=<?= $patient['id'] ?>" class="text-blue-600 hover:text-blue-900" title="View Health Info">
-                                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                                                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
-                                            </svg>
-                                        </a>
-                                        <a href="?patient_id=<?= $patient['id'] ?>&view_printed=true" class="text-green-600 hover:text-green-900" title="Print Record">
-                                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" />
-                                            </svg>
-                                        </a>
-                                        <a href="soft_delete_patient.php?id=<?= $patient['id'] ?>" class="text-yellow-600 hover:text-yellow-900" title="Archive" onclick="return confirm('Move this patient record to archive?')">
-                                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                <path d="M5 4a1 1 0 00-1 1v1a1 1 0 001 1h1a1 1 0 001-1V5a1 1 0 00-1-1H5zM12 4a1 1 0 00-1 1v1a1 1 0 001 1h1a1 1 0 001-1V5a1 1 0 00-1-1h-1zM5 12a1 1 0 00-1 1v1a1 1 0 001 1h1a1 1 0 001-1v-1a1 1 0 00-1-1H5z" />
-                                                <path d="M3 5a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2H5a2 2 0 01-2-2V5zM12 5a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2h-1a2 2 0 01-2-2V5z" />
-                                            </svg>
-                                        </a>
-                                        <a href="deleted_patients.php?id=<?= $patient['id'] ?>" class="text-red-600 hover:text-red-900" title="Delete" onclick="return confirm('Are you sure you want to permanently delete this patient record?')">
-                                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                            </svg>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+        <?php if ($message): ?>
+            <div id="successMessage" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 flex items-center">
+                <i class="fas fa-check-circle mr-2"></i>
+                <?= htmlspecialchars($message) ?>
             </div>
         <?php endif; ?>
-    </div>
-    
-    <!-- Add New Patient Form (Initially Hidden) -->
-    <div id="patientFormContainer" class="bg-white p-6 rounded-lg shadow mb-8 hidden">
-        <h2 class="text-xl font-semibold mb-4">Add New Patient</h2>
-        <form method="POST" action="">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Personal Information -->
-                <div>
-                    <label for="full_name" class="block text-gray-700 mb-2">Full Name *</label>
-                    <input type="text" id="full_name" name="full_name" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                </div>
-                
-                <div>
-                    <label for="age" class="block text-gray-700 mb-2">Age</label>
-                    <input type="number" id="age" name="age" min="0" max="120" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                
-                <div>
-                    <label for="gender" class="block text-gray-700 mb-2">Gender</label>
-                    <select id="gender" name="gender" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Select Gender</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label for="address" class="block text-gray-700 mb-2">Address</label>
-                    <input type="text" id="address" name="address" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                
-                <div>
-                    <label for="contact" class="block text-gray-700 mb-2">Contact Number</label>
-                    <input type="text" id="contact" name="contact" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                
-                <div>
-                    <label for="last_checkup" class="block text-gray-700 mb-2">Last Check-up Date</label>
-                    <input type="date" id="last_checkup" name="last_checkup" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                
-                <!-- Medical Information -->
-                <div>
-                    <label for="height" class="block text-gray-700 mb-2">Height (cm)</label>
-                    <input type="number" id="height" name="height" step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                
-                <div>
-                    <label for="weight" class="block text-gray-700 mb-2">Weight (kg)</label>
-                    <input type="number" id="weight" name="weight" step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                
-                <div>
-                    <label for="blood_type" class="block text-gray-700 mb-2">Blood Type</label>
-                    <select id="blood_type" name="blood_type" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Select Blood Type</option>
-                        <option value="A+">A+</option>
-                        <option value="A-">A-</option>
-                        <option value="B+">B+</option>
-                        <option value="B-">B-</option>
-                        <option value="AB+">AB+</option>
-                        <option value="AB-">AB-</option>
-                        <option value="O+">O+</option>
-                        <option value="O-">O-</option>
-                    </select>
-                </div>
+        
+        <?php if ($error): ?>
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                <?= htmlspecialchars($error) ?>
+            </div>
+        <?php endif; ?>
+        
+        <!-- Tabs Navigation -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="flex border-b">
+                <button class="tab-btn py-4 px-6 font-medium text-gray-600 hover:text-primary border-b-2 border-transparent hover:border-primary transition" data-tab="patients-tab">
+                    <i class="fas fa-list mr-2"></i>Patient Records
+                </button>
+                <button class="tab-btn py-4 px-6 font-medium text-gray-600 hover:text-primary border-b-2 border-transparent hover:border-primary transition" data-tab="add-tab">
+                    <i class="fas fa-plus-circle mr-2"></i>Add New Patient
+                </button>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <div>
-                    <label for="allergies" class="block text-gray-700 mb-2">Allergies</label>
-                    <textarea id="allergies" name="allergies" rows="3" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                </div>
-                
-                <div>
-                    <label for="current_medications" class="block text-gray-700 mb-2">Current Medications</label>
-                    <textarea id="current_medications" name="current_medications" rows="3" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                </div>
-            </div>
-            
-            <div class="mt-6">
-                <label for="medical_history" class="block text-gray-700 mb-2">Medical History</label>
-                <textarea id="medical_history" name="medical_history" rows="4" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-            </div>
-            
-            <div class="mt-6">
-                <label for="family_history" class="block text-gray-700 mb-2">Family History</label>
-                <textarea id="family_history" name="family_history" rows="4" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-            </div>
-            
-            <div class="mt-6 flex justify-between">
-                <button type="button" id="cancelFormBtn" class="bg-gray-500 text-white py-2 px-6 rounded-lg hover:bg-gray-600 transition">Cancel</button>
-                <button type="submit" name="add_patient" class="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition">Add Patient</button>
-            </div>
-        </form>
-    </div>
-    
-    <!-- Patient Health Info Form (Shown when patient is selected) -->
-    <?php if (!empty($selectedPatientId) && !empty($patient_details)): ?>
-        <div class="bg-white p-6 rounded-lg shadow mb-8">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-semibold">Edit Health Information</h2>
-                <div>
-                    <a href="?patient_id=<?= htmlspecialchars($selectedPatientId) ?>&view_printed=true" 
-                       class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">
-                        <svg class="-ml-1 mr-1 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" />
-                        </svg>
-                        Print Record
+            <!-- Patients Tab -->
+            <div id="patients-tab" class="tab-content p-6 active">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold text-secondary">Patient Records</h2>
+                    <a href="deleted_patients.php" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition">
+                        <i class="fas fa-archive mr-2"></i>View Archive
                     </a>
                 </div>
+                
+                <!-- Search Form -->
+                <form method="get" action="" class="mb-6 bg-gray-50 p-4 rounded-lg">
+                    <input type="hidden" name="tab" value="patients-tab">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label for="search_by" class="block text-gray-700 mb-2 font-medium">Search By</label>
+                            <select id="search_by" name="search_by" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                                <option value="name" <?= $searchBy === 'name' ? 'selected' : '' ?>>Name</option>
+                                <option value="unique_number" <?= $searchBy === 'unique_number' ? 'selected' : '' ?>>Unique Number</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="search" class="block text-gray-700 mb-2 font-medium">Search Term</label>
+                            <div class="flex items-center">
+                                <div class="relative flex-grow">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <i class="fas fa-search text-gray-400"></i>
+                                    </div>
+                                    <input type="text" id="search" name="search" value="<?= htmlspecialchars($searchTerm) ?>" 
+                                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" 
+                                        placeholder="<?= $searchBy === 'unique_number' ? 'Enter unique number...' : 'Search patients by name...' ?>">
+                                </div>
+                                <button type="submit" class="ml-3 inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition">
+                                    <i class="fas fa-search mr-2"></i> Search
+                                </button>
+                                <?php if (!empty($searchTerm)): ?>
+                                    <a href="existing_info_patients.php" class="ml-3 inline-flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition">
+                                        <i class="fas fa-times mr-2"></i> Clear
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                
+                <?php if (!empty($searchTerm)): ?>
+                    <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h3 class="text-lg font-medium text-secondary">Search Results for "<?= htmlspecialchars($searchTerm) ?>"</h3>
+                        </div>
+                        
+                        <?php if (empty($patients) && empty($searchedUsers)): ?>
+                            <div class="p-6 text-center">
+                                <i class="fas fa-search text-3xl text-gray-400 mb-3"></i>
+                                <p class="text-gray-500">No patients or users found matching your search.</p>
+                            </div>
+                        <?php else: ?>
+                            <!-- Display Patients Search Results -->
+                            <?php if (!empty($patients)): ?>
+                                <div class="p-4">
+                                    <h4 class="text-md font-medium text-secondary mb-3">Patient Records</h4>
+                                    <div class="overflow-x-auto">
+                                        <table class="patient-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Name</th>
+                                                    <th>Age</th>
+                                                    <th>Gender</th>
+                                                    <th>Blood Type</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($patients as $index => $patient): ?>
+                                                    <tr>
+                                                        <td class="patient-id"><?= $index + 1 ?></td>
+                                                        <td><?= htmlspecialchars($patient['full_name']) ?></td>
+                                                        <td><?= $patient['age'] ?? 'N/A' ?></td>
+                                                        <td><?= isset($patient['gender']) && $patient['gender'] ? htmlspecialchars($patient['gender']) : 'N/A' ?></td>
+                                                        <td class="font-semibold text-primary"><?= htmlspecialchars($patient['blood_type'] ?? 'N/A') ?></td>
+                                                        <td>
+                                                            <button onclick="openViewModal(<?= $patient['id'] ?>)" class="text-primary hover:text-blue-700 transition px-3 py-1 rounded-md">
+                                                                <i class="fas fa-eye mr-1"></i> View
+                                                            </button>
+                                                            <a href="?delete_patient=<?= $patient['id'] ?>" class="text-danger hover:text-red-700 transition px-3 py-1 rounded-md" onclick="return confirm('Are you sure you want to archive this patient record?')">
+                                                                <i class="fas fa-trash-alt mr-1"></i> Archive
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                            
+                            <!-- Display Users Search Results -->
+                            <?php if (!empty($searchedUsers)): ?>
+                                <div class="p-4 border-t border-gray-200">
+                                    <h4 class="text-md font-medium text-secondary mb-3">Registered Users</h4>
+                                    <div class="overflow-x-auto">
+                                        <table class="patient-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Name</th>
+                                                    <th>Email</th>
+                                                    <th>Age</th>
+                                                    <th>Gender</th>
+                                                    <th>Contact</th>
+                                                    <th>Unique Number</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($searchedUsers as $index => $user): ?>
+                                                    <tr>
+                                                        <td class="patient-id"><?= $index + 1 ?></td>
+                                                        <td><?= htmlspecialchars($user['full_name']) ?></td>
+                                                        <td><?= htmlspecialchars($user['email']) ?></td>
+                                                        <td><?= $user['age'] ?? 'N/A' ?></td>
+                                                        <td><?= htmlspecialchars($user['gender'] ?? 'N/A') ?></td>
+                                                        <td><?= htmlspecialchars($user['contact'] ?? 'N/A') ?></td>
+                                                        <td class="font-semibold text-primary"><?= htmlspecialchars($user['unique_number'] ?? 'N/A') ?></td>
+                                                        <td>
+                                                            <a href="?convert_to_patient=<?= $user['id'] ?>" class="text-success hover:text-green-700 transition px-3 py-1 rounded-md" onclick="return confirm('Are you sure you want to add this user as a patient?')">
+                                                                <i class="fas fa-user-plus mr-1"></i> Add as Patient
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if (empty($searchTerm)): ?>
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-secondary">All Patient Records</h3>
+                    </div>
+                    
+                    <?php if (empty($allPatients)): ?>
+                        <div class="text-center py-12 bg-gray-50 rounded-lg">
+                            <i class="fas fa-user-injured text-4xl text-gray-400 mb-4"></i>
+                            <h3 class="text-lg font-medium text-gray-900">No patients found</h3>
+                            <p class="mt-1 text-sm text-gray-500">Get started by adding a new patient.</p>
+                            <div class="mt-6">
+                                <button data-tab="add-tab" class="tab-trigger inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 transition">
+                                    <i class="fas fa-plus-circle mr-2"></i>Add Patient
+                                </button>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="patient-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Age</th>
+                                        <th>Gender</th>
+                                        <th>Blood Type</th>
+                                        <th>Type</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($allPatients as $index => $patient): ?>
+                                        <tr>
+                                            <td class="patient-id"><?= $index + 1 ?></td>
+                                            <td><?= htmlspecialchars($patient['full_name']) ?></td>
+                                            <td><?= $patient['age'] ?? 'N/A' ?></td>
+                                            <td><?= isset($patient['gender']) && $patient['gender'] ? htmlspecialchars($patient['gender']) : 'N/A' ?></td>
+                                            <td class="font-semibold text-primary"><?= htmlspecialchars($patient['blood_type'] ?? 'N/A') ?></td>
+                                            <td>
+                                                <?php if (!empty($patient['unique_number'])): ?>
+                                                    <span class="user-badge">Registered User</span>
+                                                <?php else: ?>
+                                                    <span class="text-gray-500">Regular Patient</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <button onclick="openViewModal(<?= $patient['id'] ?>)" class="text-primary hover:text-blue-700 transition px-3 py-1 rounded-md">
+                                                    <i class="fas fa-eye mr-1"></i> View
+                                                </button>
+                                                <a href="?delete_patient=<?= $patient['id'] ?>" class="text-danger hover:text-red-700 transition px-3 py-1 rounded-md" onclick="return confirm('Are you sure you want to archive this patient record?')">
+                                                    <i class="fas fa-trash-alt mr-1"></i> Archive
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="mt-6 text-center p-4 border-t border-gray-200">
+                            <a href="all_patients.php" class="inline-flex items-center px-4 py-2 bg-secondary text-white rounded-md hover:bg-gray-700 transition">
+                                <i class="fas fa-list mr-2"></i>View All Patients
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
             </div>
             
-            <form method="post" action="" id="healthInfoForm">
-                <input type="hidden" name="patient_id" value="<?= htmlspecialchars($selectedPatientId) ?>">
+            <!-- Add Patient Tab -->
+            <div id="add-tab" class="tab-content p-6">
+                <h2 class="text-xl font-semibold mb-6 text-secondary">Add New Patient</h2>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <!-- Add gender field -->
-                    <div>
-                        <label for="gender" class="block text-sm font-medium text-gray-700 mb-1 required-field">Gender</label>
-                        <select id="gender" name="gender" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
-                            <option value="">-- Select gender --</option>
-                            <option value="Male" <?= isset($health_info['gender']) && $health_info['gender'] == 'Male' ? 'selected' : '' ?>>Male</option>
-                            <option value="Female" <?= isset($health_info['gender']) && $health_info['gender'] == 'Female' ? 'selected' : '' ?>>Female</option>
-                            <option value="Other" <?= isset($health_info['gender']) && $health_info['gender'] == 'Other' ? 'selected' : '' ?>>Other</option>
-                        </select>
+                <form method="POST" action="" class="bg-gray-50 p-6 rounded-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Personal Information -->
+                        <div>
+                            <label for="full_name" class="block text-gray-700 mb-2 font-medium">Full Name <span class="text-danger">*</span></label>
+                            <input type="text" id="full_name" name="full_name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" required>
+                        </div>
+                        
+                        <div>
+                            <label for="age" class="block text-gray-700 mb-2 font-medium">Age</label>
+                            <input type="number" id="age" name="age" min="0" max="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label for="gender" class="block text-gray-700 mb-2 font-medium">Gender</label>
+                            <select id="gender" name="gender" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="address" class="block text-gray-700 mb-2 font-medium">Address</label>
+                            <input type="text" id="address" name="address" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label for="contact" class="block text-gray-700 mb-2 font-medium">Contact Number</label>
+                            <input type="text" id="contact" name="contact" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label for="last_checkup" class="block text-gray-700 mb-2 font-medium">Last Check-up Date</label>
+                            <input type="date" id="last_checkup" name="last_checkup" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        
+                        <!-- Medical Information -->
+                        <div>
+                            <label for="height" class="block text-gray-700 mb-2 font-medium">Height (cm)</label>
+                            <input type="number" id="height" name="height" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label for="weight" class="block text-gray-700 mb-2 font-medium">Weight (kg)</label>
+                            <input type="number" id="weight" name="weight" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        
+                        <div>
+                            <label for="blood_type" class="block text-gray-700 mb-2 font-medium">Blood Type</label>
+                            <select id="blood_type" name="blood_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                                <option value="">Select Blood Type</option>
+                                <option value="A+">A+</option>
+                                <option value="A-">A-</option>
+                                <option value="B+">B+</option>
+                                <option value="B-">B-</option>
+                                <option value="AB+">AB+</option>
+                                <option value="AB-">AB-</option>
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                            </select>
+                        </div>
                     </div>
                     
-                    <div>
-                        <label for="height" class="block text-sm font-medium text-gray-700 mb-1 required-field">Height (cm)</label>
-                        <input type="number" step="0.1" id="height" name="height" value="<?= htmlspecialchars($health_info['height'] ?? '') ?>" 
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="Enter height in centimeters" required>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <div>
+                            <label for="allergies" class="block text-gray-700 mb-2 font-medium">Allergies</label>
+                            <textarea id="allergies" name="allergies" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"></textarea>
+                        </div>
+                        
+                        <div>
+                            <label for="current_medications" class="block text-gray-700 mb-2 font-medium">Current Medications</label>
+                            <textarea id="current_medications" name="current_medications" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"></textarea>
+                        </div>
                     </div>
-                    <div>
-                        <label for="weight" class="block text-sm font-medium text-gray-700 mb-1 required-field">Weight (kg)</label>
-                        <input type="number" step="0.1" id="weight" name="weight" value="<?= htmlspecialchars($health_info['weight'] ?? '') ?>" 
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="Enter weight in kilograms" required>
+                    
+                    <div class="mt-6">
+                        <label for="medical_history" class="block text-gray-700 mb-2 font-medium">Medical History</label>
+                        <textarea id="medical_history" name="medical_history" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"></textarea>
                     </div>
-                    <div>
-                        <label for="blood_type" class="block text-sm font-medium text-gray-700 mb-1 required-field">Blood Type</label>
-                        <select id="blood_type" name="blood_type" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
-                            <option value="">-- Select blood type --</option>
-                            <option value="A+" <?= isset($health_info['blood_type']) && $health_info['blood_type'] == 'A+' ? 'selected' : '' ?>>A+</option>
-                            <option value="A-" <?= isset($health_info['blood_type']) && $health_info['blood_type'] == 'A-' ? 'selected' : '' ?>>A-</option>
-                            <option value="B+" <?= isset($health_info['blood_type']) && $health_info['blood_type'] == 'B+' ? 'selected' : '' ?>>B+</option>
-                            <option value="B-" <?= isset($health_info['blood_type']) && $health_info['blood_type'] == 'B-' ? 'selected' : '' ?>>B-</option>
-                            <option value="AB+" <?= isset($health_info['blood_type']) && $health_info['blood_type'] == 'AB+' ? 'selected' : '' ?>>AB+</option>
-                            <option value="AB-" <?= isset($health_info['blood_type']) && $health_info['blood_type'] == 'AB-' ? 'selected' : '' ?>>AB-</option>
-                            <option value="O+" <?= isset($health_info['blood_type']) && $health_info['blood_type'] == 'O+' ? 'selected' : '' ?>>O+</option>
-                            <option value="O-" <?= isset($health_info['blood_type']) && $health_info['blood_type'] == 'O-' ? 'selected' : '' ?>>O-</option>
-                        </select>
+                    
+                    <div class="mt-6">
+                        <label for="family_history" class="block text-gray-700 mb-2 font-medium">Family History</label>
+                        <textarea id="family_history" name="family_history" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"></textarea>
                     </div>
-                    <div>
-                        <label for="bmi" class="block text-sm font-medium text-gray-700 mb-1">BMI</label>
-                        <input type="text" id="bmi" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100" 
-                            value="<?php 
-                                if (!empty($health_info['height']) && !empty($health_info['weight'])) {
-                                    $bmi = $health_info['weight'] / (($health_info['height']/100) * ($health_info['height']/100));
-                                    echo number_format($bmi, 1);
-                                    
-                                    // Add BMI category
-                                    if ($bmi < 18.5) {
-                                        echo ' (Underweight)';
-                                    } elseif ($bmi >= 18.5 && $bmi < 25) {
-                                        echo ' (Normal weight)';
-                                    } elseif ($bmi >= 25 && $bmi < 30) {
-                                        echo ' (Overweight)';
-                                    } else {
-                                        echo ' (Obese)';
-                                    }
-                                } else {
-                                    echo 'N/A';
-                                }
-                            ?>" 
-                            readonly>
+                    
+                    <div class="mt-6 flex justify-end space-x-4">
+                        <button type="reset" class="bg-gray-500 text-white py-2 px-6 rounded-lg hover:bg-gray-600 transition">
+                            <i class="fas fa-times mr-2"></i>Reset
+                        </button>
+                        <button type="submit" name="add_patient" class="bg-primary text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition">
+                            <i class="fas fa-save mr-2"></i>Add Patient
+                        </button>
                     </div>
-                </div>
-                
-                <div class="mt-6">
-                    <label for="allergies" class="block text-sm font-medium text-gray-700 mb-1">Allergies</label>
-                    <textarea id="allergies" name="allergies" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="List any known allergies"><?= htmlspecialchars($health_info['allergies'] ?? '') ?></textarea>
-                </div>
-                
-                <div class="mt-6">
-                    <label for="medical_history" class="block text-sm font-medium text-gray-700 mb-1">Medical History</label>
-                    <textarea id="medical_history" name="medical_history" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Previous illnesses, surgeries, chronic conditions"><?= htmlspecialchars($health_info['medical_history'] ?? '') ?></textarea>
-                </div>
-                
-                <div class="mt-6">
-                    <label for="current_medications" class="block text-sm font-medium text-gray-700 mb-1">Current Medications</label>
-                    <textarea id="current_medications" name="current_medications" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="List current medications with dosage"><?= htmlspecialchars($health_info['current_medications'] ?? '') ?></textarea>
-                </div>
-                
-                <div class="mt-6">
-                    <label for="family_history" class="block text-sm font-medium text-gray-700 mb-1">Family History</label>
-                    <textarea id="family_history" name="family_history" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Family history of diseases"><?= htmlspecialchars($health_info['family_history'] ?? '') ?></textarea>
-                </div>
-                
-                <div class="mt-6 flex justify-between">
-                    <a href="?" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
-                        Back to List
-                    </a>
-                    <button type="submit" name="save_health_info" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                        Save Health Information
-                    </button>
-                </div>
-            </form>
-
-            <div class="mt-6 qr-code">
-                <div id="qrCodeContainerView"></div>
-                <p class="text-sm text-gray-500 mt-2">Scan this QR code to verify this record</p>
+                </form>
             </div>
-
-            <script>
-            document.getElementById('healthInfoForm').addEventListener('submit', function(e) {
-                const requiredFields = [
-                    'height', 'weight', 'blood_type', 'gender'
-                ];
-                
-                let isValid = true;
-                
-                requiredFields.forEach(field => {
-                    const input = document.querySelector(`[name="${field}"]`);
-                    if (!input.value.trim()) {
-                        input.classList.add('border-red-500');
-                        isValid = false;
-                    } else {
-                        input.classList.remove('border-red-500');
-                    }
-                });
-                
-                if (!isValid) {
-                    e.preventDefault();
-                    alert('Please fill in all required fields (marked with *)');
-                }
-            });
-
-            // Recalculate BMI when height or weight changes
-            const heightInput = document.getElementById('height');
-            const weightInput = document.getElementById('weight');
-            const bmiInput = document.getElementById('bmi');
-
-            function calculateBMI() {
-                const height = parseFloat(heightInput.value);
-                const weight = parseFloat(weightInput.value);
-                
-                if (height && weight) {
-                    const bmi = weight / Math.pow(height/100, 2);
-                    let bmiText = bmi.toFixed(1);
-                    
-                    // Add BMI category
-                    if (bmi < 18.5) {
-                        bmiText += ' (Underweight)';
-                    } else if (bmi >= 18.5 && bmi < 25) {
-                        bmiText += ' (Normal weight)';
-                    } else if (bmi >= 25 && bmi < 30) {
-                        bmiText += ' (Overweight)';
-                    } else {
-                        bmiText += ' (Obese)';
-                    }
-                    
-                    bmiInput.value = bmiText;
-                } else {
-                    bmiInput.value = 'N/A';
-                }
-            }
-
-            heightInput.addEventListener('input', calculateBMI);
-            weightInput.addEventListener('input', calculateBMI);
-
-            // Generate QR code in view mode
-            QRCode.toCanvas(document.getElementById('qrCodeContainerView'), 
-                `Patient: <?= htmlspecialchars($patient_details['full_name']) ?>\n` +
-                `Record ID: <?= htmlspecialchars($selectedPatientId) ?>\n` +
-                `Date: <?= date('Y-m-d') ?>`, 
-                { width: 150 }, 
-                function(error) {
-                    if (error) console.error(error);
-                }
-            );
-            </script>
-
-            <style>
-            .required-field::after {
-                content: " *";
-                color: red;
-            }
-            .border-red-500 {
-                border-color: #ef4444;
-            }
-            </style>
         </div>
-    <?php endif; ?>
-</div>
+    </div>
+    
+    <!-- View/Edit Modal -->
+    <div id="viewModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 modal" style="display: none;">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-secondary">Patient Health Information</h3>
+                <button onclick="closeViewModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <div id="modalContent">
+                    <!-- Content will be loaded via AJAX -->
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 flex justify-end space-x-4">
+                <button onclick="closeViewModal()" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition">
+                    <i class="fas fa-times mr-2"></i>Close
+                </button>
+                <button onclick="printPatientRecord()" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 transition">
+                    <i class="fas fa-print mr-2"></i>Print
+                </button>
+                <button onclick="exportToExcel()" class="px-4 py-2 bg-success text-white rounded-md hover:bg-green-700 transition">
+                    <i class="fas fa-file-excel mr-2"></i>Export
+                </button>
+            </div>
+        </div>
+    </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const showFormBtn = document.getElementById('showFormBtn');
-        const showFormBtnEmpty = document.getElementById('showFormBtnEmpty');
-        const cancelFormBtn = document.getElementById('cancelFormBtn');
-        const patientFormContainer = document.getElementById('patientFormContainer');
+    <script>
+        // Auto-hide messages after 3 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                var successMessage = document.querySelector('.bg-green-100');
+                var errorMessage = document.querySelector('.bg-red-100');
+                
+                if (successMessage) {
+                    successMessage.style.display = 'none';
+                }
+                
+                if (errorMessage) {
+                    errorMessage.style.display = 'none';
+                }
+            }, 3000);
+        });
         
-        if (showFormBtn) {
-            showFormBtn.addEventListener('click', function() {
-                patientFormContainer.classList.remove('hidden');
-                window.scrollTo({
-                    top: patientFormContainer.offsetTop,
-                    behavior: 'smooth'
+        // Tab functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+            const tabTriggers = document.querySelectorAll('.tab-trigger');
+            
+            // Handle tab button clicks
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabId = button.getAttribute('data-tab');
+                    
+                    // Update active tab button
+                    tabButtons.forEach(btn => btn.classList.remove('border-primary', 'text-primary'));
+                    button.classList.add('border-primary', 'text-primary');
+                    
+                    // Show active tab content
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    document.getElementById(tabId).classList.add('active');
+                    
+                    // Update URL with tab parameter
+                    const url = new URL(window.location);
+                    url.searchParams.set('tab', tabId);
+                    window.history.replaceState({}, '', url);
                 });
             });
-        }
-        
-        if (showFormBtnEmpty) {
-            showFormBtnEmpty.addEventListener('click', function() {
-                patientFormContainer.classList.remove('hidden');
-                window.scrollTo({
-                    top: patientFormContainer.offsetTop,
-                    behavior: 'smooth'
+            
+            // Handle external tab triggers
+            tabTriggers.forEach(trigger => {
+                trigger.addEventListener('click', () => {
+                    const tabId = trigger.getAttribute('data-tab');
+                    
+                    // Update active tab button
+                    tabButtons.forEach(btn => {
+                        if (btn.getAttribute('data-tab') === tabId) {
+                            btn.classList.add('border-primary', 'text-primary');
+                        } else {
+                            btn.classList.remove('border-primary', 'text-primary');
+                        }
+                    });
+                    
+                    // Show active tab content
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    document.getElementById(tabId).classList.add('active');
+                    
+                    // Update URL with tab parameter
+                    const url = new URL(window.location);
+                    url.searchParams.set('tab', tabId);
+                    window.history.replaceState({}, '', url);
                 });
             });
+            
+            // Check if URL has tab parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const tabParam = urlParams.get('tab');
+            if (tabParam) {
+                const tabButton = document.querySelector(`.tab-btn[data-tab="${tabParam}"]`);
+                if (tabButton) tabButton.click();
+            }
+        });
+        
+        // Open view modal
+        function openViewModal(patientId) {
+            // Show loading state
+            document.getElementById('modalContent').innerHTML = `
+                <div class="flex justify-center items-center py-12">
+                    <i class="fas fa-spinner fa-spin text-4xl text-primary"></i>
+                </div>
+            `;
+            
+            // Show modal
+            document.getElementById('viewModal').style.display = 'flex';
+            
+            // Load patient data via AJAX
+            fetch(`get_patient_data.php?id=${patientId}`)
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('modalContent').innerHTML = data;
+                })
+                .catch(error => {
+                    document.getElementById('modalContent').innerHTML = `
+                        <div class="text-center py-8 text-danger">
+                            <i class="fas fa-exclamation-circle text-3xl mb-3"></i>
+                            <p>Error loading patient data. Please try again.</p>
+                        </div>
+                    `;
+                });
         }
         
-        if (cancelFormBtn) {
-            cancelFormBtn.addEventListener('click', function() {
-                patientFormContainer.classList.add('hidden');
-            });
+        // Close view modal
+        function closeViewModal() {
+            document.getElementById('viewModal').style.display = 'none';
         }
-    });
-</script>
-
+        
+        // Print patient record
+        function printPatientRecord() {
+            // This would open the print view in a new window
+            const patientId = document.querySelector('#healthInfoForm input[name="patient_id"]').value;
+            window.open(`?patient_id=${patientId}&view_printed=true`, '_blank');
+        }
+        
+        // Export to Excel
+        function exportToExcel() {
+            // This would trigger a download of the patient data in Excel format
+            const patientId = document.querySelector('#healthInfoForm input[name="patient_id"]').value;
+            window.location.href = `export_patient.php?id=${patientId}&format=excel`;
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('viewModal');
+            if (event.target === modal) {
+                closeViewModal();
+            }
+        };
+        
+        // Clear search on page refresh
+        if (window.history.replaceState && !window.location.search.includes('search=')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    </script>
+</body>
+</html>
