@@ -15,8 +15,32 @@ if (!isStaff()) {
 
 global $pdo;
 
-// Function to send email notification
-function sendAccountStatusEmail($email, $status, $message = '') {
+// Function to generate unique number - MOVED TO TOP
+function generateUniqueNumber($pdo) {
+    $prefix = 'CHT'; // Community Health Tracker prefix
+    $unique = false;
+    $uniqueNumber = '';
+    
+    while (!$unique) {
+        // Generate random 6-digit number
+        $randomNumber = str_pad(mt_rand(1, 999999), 6, '0', STR_PAD_LEFT);
+        $uniqueNumber = $prefix . $randomNumber;
+        
+        // Check if this number already exists
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM sitio1_users WHERE unique_number = ?");
+        $stmt->execute([$uniqueNumber]);
+        $count = $stmt->fetchColumn();
+        
+        if ($count == 0) {
+            $unique = true;
+        }
+    }
+    
+    return $uniqueNumber;
+}
+
+// Function to send email notification - UPDATED VERSION
+function sendAccountStatusEmail($email, $status, $message = '', $uniqueNumber = '') {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         return false; // Skip invalid emails
     }
@@ -45,6 +69,8 @@ function sendAccountStatusEmail($email, $status, $message = '') {
             $mail->Body    = '
                 <h2>Account Approved</h2>
                 <p>Your account with Community Health Tracker has been approved by our staff.</p>
+                <p><strong>Your Unique Identification Number: ' . $uniqueNumber . '</strong></p>
+                <p>Please keep this number safe as it will be used to identify you in our system.</p>
                 <p>You can now log in and access all features of our system.</p>
                 <p>Thank you for joining us!</p>
             ';
@@ -232,15 +258,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if (in_array($action, ['approve', 'decline'])) {
                 if ($action === 'approve') {
-                    $stmt = $pdo->prepare("UPDATE sitio1_users SET approved = TRUE WHERE id = ?");
-                    $stmt->execute([$userId]);
+                    // Generate unique number using the function that's now defined
+                    $uniqueNumber = generateUniqueNumber($pdo);
+                    
+                    $stmt = $pdo->prepare("UPDATE sitio1_users SET approved = TRUE, unique_number = ?, status = 'approved' WHERE id = ?");
+                    $stmt->execute([$uniqueNumber, $userId]);
                     
                     // Send approval email
                     if (isset($user['email'])) {
-                        sendAccountStatusEmail($user['email'], 'approved');
+                        sendAccountStatusEmail($user['email'], 'approved', '', $uniqueNumber);
                     }
                     
-                    $success = 'User approved successfully!';
+                    $success = 'User approved successfully! Unique number: ' . $uniqueNumber;
+                    
+                    // Refresh the page to update the UI
+                    header("Location: " . $_SERVER['PHP_SELF'] . "?success=" . urlencode('User approved successfully! Unique number: ' . $uniqueNumber));
+                    exit();
                 } else {
                     $declineReason = isset($_POST['decline_reason']) ? trim($_POST['decline_reason']) : 'No reason provided';
                     
@@ -253,6 +286,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     
                     $success = 'User declined successfully!';
+                    
+                    // Refresh the page to update the UI
+                    header("Location: " . $_SERVER['PHP_SELF'] . "?success=" . urlencode('User declined successfully!'));
+                    exit();
                 }
             }
         } catch (PDOException $e) {
@@ -261,6 +298,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Error: ' . $e->getMessage();
         }
     }
+
+    // Handle invoice generation
+    if (isset($_POST['generate_invoice'])) {
+        $appointmentId = intval($_POST['appointment_id']);
+        
+        try {
+            // Get appointment details
+            $stmt = $pdo->prepare("SELECT ua.*, u.full_name, u.email, u.contact, 
+                   a.date, a.start_time, a.end_time,
+                   s.full_name as staff_name, s.specialization
+            FROM user_appointments ua
+            JOIN sitio1_users u ON ua.user_id = u.id
+            JOIN sitio1_appointments a ON ua.appointment_id = a.id
+            JOIN sitio1_users s ON a.staff_id = s.id
+            WHERE ua.id = ?");
+            $stmt->execute([$appointmentId]);
+            $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($appointment) {
+                // Generate a unique invoice number
+                $invoiceNumber = 'INV-' . date('Ymd') . '-' . str_pad($appointmentId, 4, '0', STR_PAD_LEFT);
+                
+                // Generate priority number (based on appointment time and date)
+                $priorityNumber = 'P-' . date('md', strtotime($appointment['date'])) . 
+                                 '-' . str_replace(':', '', substr($appointment['start_time'], 0, 5));
+                
+                // Update appointment with invoice details
+                $updateStmt = $pdo->prepare("UPDATE user_appointments 
+                                            SET invoice_number = ?, priority_number = ?, status = 'approved', 
+                                            processed_at = NOW(), invoice_generated_at = NOW() 
+                                            WHERE id = ?");
+                $updateStmt->execute([$invoiceNumber, $priorityNumber, $appointmentId]);
+                
+                // Send notification email to user
+                if (filter_var($appointment['email'], FILTER_VALIDATE_EMAIL)) {
+                    $mail = new PHPMailer(true);
+                    
+                    try {
+                        // Server settings
+                        $mail->isSMTP();
+                        $mail->Host       = 'smtp.gmail.com';
+                        $mail->SMTPAuth   = true;
+                        $mail->Username   = 'cabanagarchiel@gmail.com';
+                        $mail->Password   = 'qmdh ofnf bhfj wxsa';
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                        $mail->Port       = 587;
+
+                        // Recipients
+                        $mail->setFrom('your-email@gmail.com', 'Community Health Tracker');
+                        $mail->addAddress($appointment['email']);
+
+                        // Content
+                        $mail->isHTML(true);
+                        $mail->Subject = 'Your Appointment Has Been Approved - Invoice #' . $invoiceNumber;
+                        $mail->Body    = '
+                            <h2>Appointment Approved</h2>
+                            <p>Your appointment with Community Health Tracker has been approved.</p>
+                            <p><strong>Appointment Details:</strong></p>
+                            <ul>
+                                <li>Date: ' . date('M d, Y', strtotime($appointment['date'])) . '</li>
+                                <li>Time: ' . date('h:i A', strtotime($appointment['start_time'])) . ' - ' . date('h:i A', strtotime($appointment['end_time'])) . '</li>
+                                <li>Health Worker: ' . htmlspecialchars($appointment['staff_name']) . '</li>
+                                <li>Priority Number: ' . $priorityNumber . '</li>
+                                <li>Invoice Number: ' . $invoiceNumber . '</li>
+                            </ul>
+                            <p>You can view and download your invoice from your dashboard.</p>
+                            <p>Thank you for choosing our services!</p>
+                        ';
+
+                        $mail->send();
+                    } catch (Exception $e) {
+                        error_log("Email could not be sent. Mailer Error: {$mail->ErrorInfo}");
+                    }
+                }
+                
+                $success = 'Invoice generated and appointment approved successfully!';
+            } else {
+                $error = 'Appointment not found.';
+            }
+        } catch (PDOException $e) {
+            $error = 'Error generating invoice: ' . $e->getMessage();
+        }
+    }
+    
+    // Handle approval without invoice
+    if (isset($_POST['approve_without_invoice'])) {
+        $appointmentId = intval($_POST['appointment_id']);
+        
+        try {
+            $stmt = $pdo->prepare("UPDATE user_appointments SET status = 'approved', processed_at = NOW() WHERE id = ?");
+            $stmt->execute([$appointmentId]);
+            
+            $success = 'Appointment approved successfully!';
+        } catch (PDOException $e) {
+            $error = 'Error approving appointment: ' . $e->getMessage();
+        }
+    }
+}
+
+// Check for success message from URL parameter (after redirect)
+if (isset($_GET['success'])) {
+    $success = urldecode($_GET['success']);
 }
 
 // Get available slots
@@ -274,40 +413,6 @@ $unapprovedUsers = [];
 
 try {
     // Get available slots
-    $stmt = $pdo->prepare("SELECT * FROM sitio1_appointments WHERE staff_id = ? AND date >= CURDATE() ORDER BY date, start_time");
-    $stmt->execute([$staffId]);
-    $availableSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Get pending appointments
-    $stmt = $pdo->prepare("SELECT ua.*, u.full_name, u.contact, a.date, a.start_time, a.end_time 
-                          FROM user_appointments ua 
-                          JOIN sitio1_users u ON ua.user_id = u.id 
-                          JOIN sitio1_appointments a ON ua.appointment_id = a.id 
-                          WHERE a.staff_id = ? AND ua.status = 'pending' AND a.date >= CURDATE() 
-                          ORDER BY a.date, a.start_time");
-    $stmt->execute([$staffId]);
-    $pendingAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Get all appointments
-    $stmt = $pdo->prepare("SELECT ua.*, u.full_name, u.contact, a.date, a.start_time, a.end_time 
-                          FROM user_appointments ua 
-                          JOIN sitio1_users u ON ua.user_id = u.id 
-                          JOIN sitio1_appointments a ON ua.appointment_id = a.id 
-                          WHERE a.staff_id = ? 
-                          ORDER BY a.date DESC, a.start_time DESC");
-    $stmt->execute([$staffId]);
-    $allAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Get unapproved users
-    $stmt = $pdo->query("SELECT * FROM sitio1_users WHERE approved = FALSE AND (status IS NULL OR status != 'declined') ORDER BY created_at DESC");
-    $unapprovedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $error = 'Error fetching data: ' . $e->getMessage();
-}
-
-// Get available slots with booked count
-$availableSlots = [];
-try {
     $stmt = $pdo->prepare("
         SELECT a.*, 
                COUNT(ua.id) as booked_count 
@@ -319,8 +424,36 @@ try {
     ");
     $stmt->execute([$staffId]);
     $availableSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get pending appointments
+    $stmt = $pdo->prepare("SELECT ua.*, u.full_name, u.email, u.contact, a.date, a.start_time, a.end_time 
+                          FROM user_appointments ua 
+                          JOIN sitio1_users u ON ua.user_id = u.id 
+                          JOIN sitio1_appointments a ON ua.appointment_id = a.id 
+                          WHERE a.staff_id = ? AND ua.status = 'pending' AND a.date >= CURDATE() 
+                          ORDER BY a.date, a.start_time");
+    $stmt->execute([$staffId]);
+    $pendingAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get all appointments with user's unique number
+    $stmt = $pdo->prepare("SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time 
+                          FROM user_appointments ua 
+                          JOIN sitio1_users u ON ua.user_id = u.id 
+                          JOIN sitio1_appointments a ON ua.appointment_id = a.id 
+                          WHERE a.staff_id = ? 
+                          ORDER BY a.date DESC, a.start_time DESC");
+    $stmt->execute([$staffId]);
+    $allAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get unapproved users
+    $stmt = $pdo->query("SELECT * FROM sitio1_users WHERE approved = FALSE AND (status IS NULL OR status != 'declined') ORDER BY created_at DESC");
+    $unapprovedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Update stats after potential changes
+    $stmt = $pdo->query("SELECT COUNT(*) FROM sitio1_users WHERE approved = FALSE AND (status IS NULL OR status != 'declined')");
+    $stats['unapproved_users'] = $stmt->fetchColumn();
 } catch (PDOException $e) {
-    $error = 'Error fetching available slots: ' . $e->getMessage();
+    $error = 'Error fetching data: ' . $e->getMessage();
 }
 ?>
 
@@ -682,6 +815,7 @@ try {
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Health Concerns</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
@@ -702,15 +836,16 @@ try {
                                                         <?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>
                                                     </div>
                                                 </td>
+                                                <td class="px-6 py-4">
+                                                    <div class="text-sm text-gray-900">
+                                                        <?= !empty($appointment['health_concerns']) ? htmlspecialchars($appointment['health_concerns']) : 'No health concerns specified' ?>
+                                                    </div>
+                                                </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <form method="POST" action="" class="inline mr-2">
-                                                        <input type="hidden" name="appointment_id" value="<?= $appointment['id'] ?>">
-                                                        <input type="hidden" name="action" value="approve">
-                                                        <button type="submit" name="approve_appointment" 
-                                                                class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium hover:bg-green-200">
-                                                            Approve
-                                                        </button>
-                                                    </form>
+                                                    <button onclick="openInvoiceModal(<?= $appointment['id'] ?>)" 
+                                                            class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium hover:bg-green-200 mr-2">
+                                                        Approve
+                                                    </button>
                                                     <button onclick="openRejectionModal(<?= $appointment['id'] ?>)" 
                                                             class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-medium hover:bg-red-200">
                                                         Reject
@@ -740,9 +875,11 @@ try {
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-gray-50">
                                         <tr>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient ID</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
@@ -751,6 +888,9 @@ try {
                                             $isPast = strtotime($appointment['date']) < strtotime(date('Y-m-d'));
                                         ?>
                                             <tr class="<?= $isPast ? 'bg-gray-50' : '' ?>">
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm font-medium text-blue-600"><?= !empty($appointment['unique_number']) ? htmlspecialchars($appointment['unique_number']) : 'N/A' ?></div>
+                                                </td>
                                                 <td class="px-6 py-4 whitespace-nowrap">
                                                     <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
                                                     <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['contact']) ?></div>
@@ -775,6 +915,14 @@ try {
                                                            ($appointment['status'] === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800')) ?>">
                                                         <?= ucfirst($appointment['status']) ?>
                                                     </span>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <?php if (!empty($appointment['invoice_number'])): ?>
+                                                        <div class="text-sm font-medium text-blue-600"><?= $appointment['invoice_number'] ?></div>
+                                                        <div class="text-xs text-gray-500">Priority: <?= $appointment['priority_number'] ?></div>
+                                                    <?php else: ?>
+                                                        <span class="text-gray-400">No invoice</span>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                     <?php if ($appointment['status'] === 'approved' && !$isPast): ?>
@@ -803,7 +951,9 @@ try {
                 <h2 class="text-xl font-semibold mb-4 text-blue-700">Patient Account Approvals</h2>
                 
                 <?php if (empty($unapprovedUsers)): ?>
-                    <p class="text-gray-600">No pending patient approvals.</p>
+                    <div class="bg-blue-50 p-4 rounded-lg text-center">
+                        <p class="text-gray-600">No pending patient approvals.</p>
+                    </div>
                 <?php else: ?>
                     <div class="overflow-x-auto">
                         <table class="min-w-full bg-white">
@@ -813,6 +963,7 @@ try {
                                     <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Full Name</th>
                                     <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
                                     <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Date Registered</th>
+                                    <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
                                     <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
                                 </tr>
                             </thead>
@@ -824,14 +975,26 @@ try {
                                         <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($user['email'] ?? 'N/A') ?></td>
                                         <td class="py-2 px-4 border-b border-gray-200"><?= date('M d, Y', strtotime($user['created_at'])) ?></td>
                                         <td class="py-2 px-4 border-b border-gray-200">
-                                            <form method="POST" action="" class="inline">
-                                                <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
-                                                <input type="hidden" name="action" value="approve">
-                                                <button type="submit" name="approve_user" class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 mr-2">Approve</button>
-                                            </form>
-                                            
-                                            <!-- Decline with reason modal trigger -->
-                                            <button onclick="openDeclineModal(<?= $user['id'] ?>)" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Decline</button>
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                <?= $user['status'] === 'approved' ? 'bg-green-100 text-green-800' : 
+                                                   ($user['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                                   'bg-red-100 text-red-800') ?>">
+                                                <?= ucfirst($user['status'] ?? 'pending') ?>
+                                            </span>
+                                        </td>
+                                        <td class="py-2 px-4 border-b border-gray-200">
+                                            <?php if ($user['status'] !== 'approved'): ?>
+                                                <form method="POST" action="" class="inline">
+                                                    <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
+                                                    <input type="hidden" name="action" value="approve">
+                                                    <button type="submit" name="approve_user" class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 mr-2">Approve</button>
+                                                </form>
+                                                
+                                                <!-- Decline with reason modal trigger -->
+                                                <button onclick="openDeclineModal(<?= $user['id'] ?>)" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Decline</button>
+                                            <?php else: ?>
+                                                <span class="text-gray-400">No actions available</span>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -839,6 +1002,32 @@ try {
                         </table>
                     </div>
                 <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Generation Modal -->
+    <div id="invoiceModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Approve Appointment</h3>
+                <p class="text-gray-600 mb-4">Would you like to generate an invoice for this appointment?</p>
+                
+                <form id="invoiceForm" method="POST" action="">
+                    <input type="hidden" name="appointment_id" id="invoice_appointment_id">
+                    
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button type="button" onclick="closeInvoiceModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium">
+                            Cancel
+                        </button>
+                        <button type="submit" name="approve_without_invoice" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                            Approve Only
+                        </button>
+                        <button type="submit" name="generate_invoice" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">
+                            Generate Invoice
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -858,6 +1047,7 @@ try {
                         OK
                     </button>
                 </div>
+            </div>
             </div>
         </div>
     </div>
@@ -1050,38 +1240,6 @@ try {
         activeTabBtn.classList.add('border-blue-500', 'text-blue-600');
     }
 
-    // Initialize tabs
-    document.addEventListener('DOMContentLoaded', function() {
-        // Set first tab as active by default
-        switchTab('appointment-management');
-        switchAppointmentTab('add-slot');
-        
-        // Add click event listeners to all tab buttons
-        document.querySelectorAll('#dashboardTabs button').forEach(tabBtn => {
-            tabBtn.addEventListener('click', function() {
-                const targetTab = this.getAttribute('data-tabs-target').replace('#', '');
-                switchTab(targetTab);
-            });
-        });
-        
-        // Add click event listeners to appointment tab buttons
-        document.querySelectorAll('#appointmentTabs button').forEach(tabBtn => {
-            tabBtn.addEventListener('click', function() {
-                const targetTab = this.getAttribute('data-tabs-target').replace('#', '');
-                switchAppointmentTab(targetTab);
-            });
-        });
-        
-        // Show success/error modals if messages exist
-        <?php if ($success): ?>
-            showSuccessModal('<?= addslashes($success) ?>');
-        <?php endif; ?>
-        
-        <?php if ($error): ?>
-            showErrorModal('<?= addslashes($error) ?>');
-        <?php endif; ?>
-    });
-
     // Modal functions
     function openEditModal(slot, timeSlotValue) {
         document.getElementById('edit_slot_id').value = slot.id;
@@ -1111,6 +1269,15 @@ try {
 
     function closeRejectionModal() {
         document.getElementById('rejectionModal').classList.add('hidden');
+    }
+
+    function openInvoiceModal(appointmentId) {
+        document.getElementById('invoice_appointment_id').value = appointmentId;
+        document.getElementById('invoiceModal').classList.remove('hidden');
+    }
+
+    function closeInvoiceModal() {
+        document.getElementById('invoiceModal').classList.add('hidden');
     }
     
     function openDeclineModal(userId) {
@@ -1167,6 +1334,42 @@ try {
         }, 300);
     }
 
+    // Initialize tabs
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set first tab as active by default
+        switchTab('appointment-management');
+        switchAppointmentTab('add-slot');
+        
+        // Add click event listeners to all tab buttons
+        document.querySelectorAll('#dashboardTabs button').forEach(tabBtn => {
+            tabBtn.addEventListener('click', function() {
+                const targetTab = this.getAttribute('data-tabs-target').replace('#', '');
+                switchTab(targetTab);
+            });
+        });
+        
+        // Add click event listeners to appointment tab buttons
+        document.querySelectorAll('#appointmentTabs button').forEach(tabBtn => {
+            tabBtn.addEventListener('click', function() {
+                const targetTab = this.getAttribute('data-tabs-target').replace('#', '');
+                switchAppointmentTab(targetTab);
+            });
+        });
+        
+        // Show success/error modals if messages exist
+        <?php if ($success): ?>
+            showSuccessModal('<?= addslashes($success) ?>');
+            // Refresh the page after a short delay to update the UI
+            setTimeout(function() {
+                window.location.href = window.location.href.split('?')[0];
+            }, 3000);
+        <?php endif; ?>
+        
+        <?php if ($error): ?>
+            showErrorModal('<?= addslashes($error) ?>');
+        <?php endif; ?>
+    });
+
     // Close modal when clicking outside
     window.onclick = function(event) {
         const modal = document.getElementById('editModal');
@@ -1177,6 +1380,11 @@ try {
         const rejectionModal = document.getElementById('rejectionModal');
         if (event.target === rejectionModal) {
             closeRejectionModal();
+        }
+        
+        const invoiceModal = document.getElementById('invoiceModal');
+        if (event.target === invoiceModal) {
+            closeInvoiceModal();
         }
         
         const successModal = document.getElementById('successModal');
