@@ -411,17 +411,17 @@ function closeLearnMoreModal() {
 }
 </script>
 
-<!-- Login Modal -->
+<!-- Login Modal - Redesigned with wider dimensions -->
 <div id="loginModal" class="fixed inset-0 hidden z-50 h-full w-full backdrop-blur-sm bg-black/30 flex justify-center items-center p-4">
-    <div class="relative bg-white rounded-lg shadow-lg w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto">
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto">
         <!-- Close Icon (X) -->
-        <button onclick="closeModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+        <button onclick="closeModal()" class="absolute top-4 right-4 z-50 text-gray-500 hover:text-gray-700 bg-white rounded-full p-2 shadow-md">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
         </button>
 
-        <div id="mainModal" class="p-6">
+        <div id="mainModal" class="p-8">
             <div class="flex items-start gap-4 mb-8">
                 <img src="./asssets/images/check-icon.png" alt="check-icon" class="h-12 w-12 flex-shrink-0">
                 <p class="text-base text-gray-700">
@@ -451,7 +451,7 @@ function closeLearnMoreModal() {
         </div>
 
         <!-- Login Form Modal -->
-        <div id="loginFormModal" class="hidden p-6">
+        <div id="loginFormModal" class="hidden p-8">
             <div class="text-center mb-8">
                 <h2 class="text-2xl font-bold text-[#FC566C]">Access Your Account</h2>
                 <p class="text-gray-600 mt-2">Sign in to your resident account</p>
@@ -462,19 +462,19 @@ function closeLearnMoreModal() {
                 
                 <!-- Username -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="username">Username</label>
-                    <input type="text" name="username" id="username" placeholder="Enter Username" 
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="login_username">Username</label>
+                    <input type="text" name="username" id="login_username" placeholder="Enter Username" 
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" />
                 </div>
 
                 <!-- Password -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="password">Password</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="login_password">Password</label>
                     <div class="relative">
-                        <input id="password" name="password" type="password" placeholder="Password" 
+                        <input id="login_password" name="password" type="password" placeholder="Password" 
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent pr-10" />
-                        <button type="button" onclick="togglePassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
-                            <i id="eyeIcon" class="fas fa-eye"></i>
+                        <button type="button" onclick="toggleLoginPassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
+                            <i id="loginEyeIcon" class="fas fa-eye"></i>
                         </button>
                     </div>
                 </div>
@@ -504,8 +504,8 @@ function closeLearnMoreModal() {
             </form>
         </div>
 
-        <!-- First Registration Modal -->
-        <div id="registerFormModal" class="hidden p-6">
+        <!-- First Registration Modal - Redesigned with all fields -->
+        <div id="registerFormModal" class="hidden p-8">
             <div class="text-center mb-8">
                 <h2 class="text-2xl font-bold text-[#FC566C]">Register Your Account</h2>
                 <p class="text-gray-600 mt-2">Sign up to your resident account</p>
@@ -523,42 +523,54 @@ function closeLearnMoreModal() {
                 </div>
             <?php endif; ?>
             
-            <form id="firstRegisterForm" class="space-y-4">
-                <!-- Full Name -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="full_name">Full Name</label>
-                    <input type="text" id="full_name" name="full_name" placeholder="Full Name" 
-                        value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                </div>
-
-                <!-- Age and Contact -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form id="firstRegisterForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Full Name -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="age">Age</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="full_name">Full Name *</label>
+                        <input type="text" id="full_name" name="full_name" placeholder="Full Name" 
+                            value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
+                    </div>
+
+                    <!-- Age -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="age">Age *</label>
                         <input type="number" id="age" name="age" placeholder="Age" min="1" max="120"
                             value="<?php echo isset($_POST['age']) ? htmlspecialchars($_POST['age']) : ''; ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
                     </div>
 
+                    <!-- Gender -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="contact">Contact Number</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="gender">Gender *</label>
+                        <select id="gender" name="gender" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent">
+                            <option value="">Select Gender</option>
+                            <option value="Male" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Male') ? 'selected' : ''; ?>>Male</option>
+                            <option value="Female" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Female') ? 'selected' : ''; ?>>Female</option>
+                            <option value="Other" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Other') ? 'selected' : ''; ?>>Other</option>
+                        </select>
+                    </div>
+
+                    <!-- Contact Number -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="contact">Contact Number *</label>
                         <input type="tel" id="contact" name="contact" placeholder="Contact Number"
                             value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
                     </div>
-                </div>
 
-                <!-- Address -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="address">Address</label>
-                    <input type="text" id="address" name="address" placeholder="Address"
-                        value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
+                    <!-- Address -->
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="address">Address *</label>
+                        <input type="text" id="address" name="address" placeholder="Complete Address"
+                            value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
+                    </div>
                 </div>
 
                 <!-- Continue Button -->
-                <div class="pt-2">
+                <div class="pt-4">
                     <button type="button" id="openSecondRegister"
                         class="w-full bg-[#FC566C] text-white py-3 px-4 rounded-lg hover:bg-[#f1233f] transition flex items-center justify-center gap-2">
                         Continue
@@ -578,13 +590,13 @@ function closeLearnMoreModal() {
             </form>
         </div>
 
-        <!-- Second Registration Modal -->
-        <div id="secondRegisterFormModal" class="hidden p-6">
-            <button class="text-[#FC566C] hover:text-[#f1233f] mb-4 flex items-center gap-1" id="backToFirstRegister">
+        <!-- Second Registration Modal - Redesigned -->
+        <div id="secondRegisterFormModal" class="hidden p-8">
+            <button class="text-[#FC566C] hover:text-[#f1233f] mb-6 flex items-center gap-1" id="backToFirstRegister">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
                     <path d="M15.75 19.5L8.25 12l7.5-7.5v15z" />
                 </svg>
-                <span>Back</span>
+                <span>Back to Personal Information</span>
             </button>
 
             <div class="text-center mb-8">
@@ -596,46 +608,59 @@ function closeLearnMoreModal() {
                 <!-- Hidden fields to pass data from first form -->
                 <input type="hidden" name="full_name" id="hidden_full_name" value="">
                 <input type="hidden" name="age" id="hidden_age" value="">
+                <input type="hidden" name="gender" id="hidden_gender" value="">
                 <input type="hidden" name="contact" id="hidden_contact" value="">
                 <input type="hidden" name="address" id="hidden_address" value="">
                 
-                <div class="space-y-4">
-                    <!-- Username -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="username">Username</label>
-                        <input type="text" id="username" name="username" placeholder="Username"
-                            value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                    </div>
-                    
-                    <!-- Email -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="email">Email</label>
-                        <input type="email" id="email" name="email" placeholder="Email"
-                            value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                    </div>
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Username -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="reg_username">Username *</label>
+                            <input type="text" id="reg_username" name="username" placeholder="Username"
+                                value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
+                        </div>
+                        
+                        <!-- Email -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="email">Email *</label>
+                            <input type="email" id="email" name="email" placeholder="Email"
+                                value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
+                        </div>
 
-                    <!-- Password -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="password">Password</label>
-                        <input type="password" id="password" name="password" placeholder="Password (min 8 characters)"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" 
-                            minlength="8" required />
-                        <p class="mt-1 text-xs text-gray-500">Password must be at least 8 characters</p>
-                    </div>
+                        <!-- Password -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="reg_password">Password *</label>
+                            <div class="relative">
+                                <input type="password" id="reg_password" name="password" placeholder="Password (min 8 characters)"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent pr-10" 
+                                    minlength="8" required />
+                                <button type="button" onclick="toggleRegPassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
+                                    <i id="regEyeIcon" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Password must be at least 8 characters</p>
+                        </div>
 
-                    <!-- Confirm Password -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="confirm_password">Confirm Password</label>
-                        <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" 
-                            minlength="8" required />
-                        <p id="passwordMatchError" class="mt-1 text-xs text-red-500 hidden">Passwords do not match</p>
+                        <!-- Confirm Password -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="confirm_password">Confirm Password *</label>
+                            <div class="relative">
+                                <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent pr-10" 
+                                    minlength="8" required />
+                                <button type="button" onclick="toggleConfirmPassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
+                                    <i id="confirmEyeIcon" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <p id="passwordMatchError" class="mt-1 text-xs text-red-500 hidden">Passwords do not match</p>
+                        </div>
                     </div>
 
                     <!-- Submit Button -->
-                    <div class="pt-2">
+                    <div class="pt-4">
                         <button type="submit" id="submitButton"
                             class="w-full bg-[#FC566C] text-white py-3 px-4 rounded-lg hover:bg-[#f1233f] transition flex items-center justify-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -649,7 +674,6 @@ function closeLearnMoreModal() {
         </div>
     </div>
 </div>
-
 
 <script>
 // Modal functions
@@ -677,9 +701,37 @@ function closeLearnMoreModal() {
     document.body.style.overflow = 'auto';
 }
 
-function togglePassword() {
-    const password = document.getElementById('password');
-    const eyeIcon = document.getElementById('eyeIcon');
+function toggleLoginPassword() {
+    const password = document.getElementById('login_password');
+    const eyeIcon = document.getElementById('loginEyeIcon');
+    if (password.type === 'password') {
+        password.type = 'text';
+        eyeIcon.classList.remove('fa-eye');
+        eyeIcon.classList.add('fa-eye-slash');
+    } else {
+        password.type = 'password';
+        eyeIcon.classList.remove('fa-eye-slash');
+        eyeIcon.classList.add('fa-eye');
+    }
+}
+
+function toggleRegPassword() {
+    const password = document.getElementById('reg_password');
+    const eyeIcon = document.getElementById('regEyeIcon');
+    if (password.type === 'password') {
+        password.type = 'text';
+        eyeIcon.classList.remove('fa-eye');
+        eyeIcon.classList.add('fa-eye-slash');
+    } else {
+        password.type = 'password';
+        eyeIcon.classList.remove('fa-eye-slash');
+        eyeIcon.classList.add('fa-eye');
+    }
+}
+
+function toggleConfirmPassword() {
+    const password = document.getElementById('confirm_password');
+    const eyeIcon = document.getElementById('confirmEyeIcon');
     if (password.type === 'password') {
         password.type = 'text';
         eyeIcon.classList.remove('fa-eye');
@@ -720,7 +772,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const backToFirstRegister = document.getElementById('backToFirstRegister');
     const registerFormModal = document.getElementById('registerFormModal');
     const secondRegisterFormModal = document.getElementById('secondRegisterFormModal');
-    const password = document.getElementById('password');
+    const password = document.getElementById('reg_password');
     const confirmPassword = document.getElementById('confirm_password');
     const passwordMatchError = document.getElementById('passwordMatchError');
     const submitButton = document.getElementById('submitButton');
@@ -750,6 +802,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Transfer data to hidden fields in second form
         document.getElementById('hidden_full_name').value = document.getElementById('full_name').value;
         document.getElementById('hidden_age').value = document.getElementById('age').value;
+        document.getElementById('hidden_gender').value = document.getElementById('gender').value;
         document.getElementById('hidden_contact').value = document.getElementById('contact').value;
         document.getElementById('hidden_address').value = document.getElementById('address').value;
         
