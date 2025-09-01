@@ -589,88 +589,88 @@ function closeLearnMoreModal() {
     </form>
 </div>
 
-        <!-- Second Registration Modal - Redesigned -->
-        <div id="secondRegisterFormModal" class="hidden p-8">
-            <button class="text-[#FC566C] hover:text-[#f1233f] mb-6 flex items-center gap-1" id="backToFirstRegister">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-                    <path d="M15.75 19.5L8.25 12l7.5-7.5v15z" />
-                </svg>
-                <span>Back to Personal Information</span>
-            </button>
+<!-- Second Registration Modal - Redesigned -->
+<div id="secondRegisterFormModal" class="hidden p-8">
+    <button class="text-[#FC566C] hover:text-[#f1233f] mb-6 flex items-center gap-1" id="backToFirstRegister">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+            <path d="M15.75 19.5L8.25 12l7.5-7.5v15z" />
+        </svg>
+        <span>Back to Personal Information</span>
+    </button>
 
-            <div class="text-center mb-8">
-                <h2 class="text-2xl font-bold text-[#FC566C]">Complete Your Registration</h2>
-                <p class="text-gray-600 mt-2">Add your account credentials</p>
-            </div>
+    <div class="text-center mb-8">
+        <h2 class="text-2xl font-bold text-[#FC566C]">Complete Your Registration</h2>
+        <p class="text-gray-600 mt-2">Add your account credentials</p>
+    </div>
 
-            <form method="POST" action="/community-health-tracker/auth/register.php" id="secondRegisterForm">
-                <!-- Hidden fields to pass data from first form -->
-                <input type="hidden" name="full_name" id="hidden_full_name" value="">
-                <input type="hidden" name="age" id="hidden_age" value="">
-                <input type="hidden" name="gender" id="hidden_gender" value="">
-                <input type="hidden" name="contact" id="hidden_contact" value="">
-                <input type="hidden" name="address" id="hidden_address" value="">
+    <form method="POST" action="/community-health-tracker/auth/register.php" id="secondRegisterForm">
+        <!-- Hidden fields to pass data from first form -->
+        <input type="hidden" name="full_name" id="hidden_full_name" value="">
+        <input type="hidden" name="age" id="hidden_age" value="">
+        <input type="hidden" name="gender" id="hidden_gender" value="">
+        <input type="hidden" name="contact" id="hidden_contact" value="">
+        <input type="hidden" name="address" id="hidden_address" value="">
+        
+        <div class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Username -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="reg_username">Username *</label>
+                    <input type="text" id="reg_username" name="username" placeholder="Username"
+                        value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
+                </div>
                 
-                <div class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Username -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1" for="reg_username">Username *</label>
-                            <input type="text" id="reg_username" name="username" placeholder="Username"
-                                value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                        </div>
-                        
-                        <!-- Email -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1" for="email">Email *</label>
-                            <input type="email" id="email" name="email" placeholder="Email"
-                                value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                        </div>
+                <!-- Email -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="email">Email *</label>
+                    <input type="email" id="email" name="email" placeholder="Email"
+                        value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
+                </div>
 
-                        <!-- Password -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1" for="reg_password">Password *</label>
-                            <div class="relative">
-                                <input type="password" id="reg_password" name="password" placeholder="Password (min 8 characters)"
-                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent pr-10" 
-                                    minlength="8" required />
-                                <button type="button" onclick="toggleRegPassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
-                                    <i id="regEyeIcon" class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                            <p class="mt-1 text-xs text-gray-500">Password must be at least 8 characters</p>
-                        </div>
-
-                        <!-- Confirm Password -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1" for="confirm_password">Confirm Password *</label>
-                            <div class="relative">
-                                <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password"
-                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent pr-10" 
-                                    minlength="8" required />
-                                <button type="button" onclick="toggleConfirmPassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
-                                    <i id="confirmEyeIcon" class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                            <p id="passwordMatchError" class="mt-1 text-xs text-red-500 hidden">Passwords do not match</p>
-                        </div>
-                    </div>
-
-                    <!-- Submit Button -->
-                    <div class="pt-4">
-                        <button type="submit" id="submitButton"
-                            class="w-full bg-[#FC566C] text-white py-3 px-4 rounded-lg hover:bg-[#f1233f] transition flex items-center justify-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Complete Registration
+                <!-- Password -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="reg_password">Password *</label>
+                    <div class="relative">
+                        <input type="password" id="reg_password" name="password" placeholder="Password (min 8 characters)"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent pr-10" 
+                            minlength="8" required />
+                        <button type="button" onclick="toggleRegPassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
+                            <i id="regEyeIcon" class="fas fa-eye"></i>
                         </button>
                     </div>
+                    <p class="mt-1 text-xs text-gray-500">Password must be at least 8 characters</p>
                 </div>
-            </form>
+
+                <!-- Confirm Password -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="confirm_password">Confirm Password *</label>
+                    <div class="relative">
+                        <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent pr-10" 
+                            minlength="8" required />
+                        <button type="button" onclick="toggleConfirmPassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
+                            <i id="confirmEyeIcon" class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <p id="passwordMatchError" class="mt-1 text-xs text-red-500 hidden">Passwords do not match</p>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="pt-4">
+                <button type="submit" id="submitButton"
+                    class="w-full bg-[#FC566C] text-white py-3 px-4 rounded-lg hover:bg-[#f1233f] transition flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Complete Registration
+                </button>
+            </div>
         </div>
+    </form>
+</div>
     </div>
 </div>
 
