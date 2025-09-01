@@ -42,51 +42,72 @@ require_once __DIR__ . '/header.php';
     <?php if (isLoggedIn()): ?>
         <?php if (isAdmin()): ?>
             <!-- Admin Header -->
-            <nav class="bg-[#3C96E1] text-white shadow-lg sticky h-[80px] top-0 z-50">
-                <div class="flex items-center w-full sm:w-auto">
-                    <div class="flex items-center space-x-4 ml-2">
-                        <!-- Hamburger Menu Button -->
-                        <button id="hamburger" class="h-10 w-8 mt-5 ml-0 sm:ml-3 cursor-pointer hover:text-gray-200 transition-colors" onclick="toggleSidebar()">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" class="w-6 h-6">
-                                <path d="M3 12h18M3 6h18M3 18h18" stroke-linecap="round" />
-                            </svg>
-                        </button>
-                    </div>
+            <nav class="bg-[#3C96E1] text-white shadow-lg sticky top-0 z-50 h-[80px]">
+  <div class="flex justify-between items-center h-full px-4">
+    
+    <!-- LEFT: Hamburger + Profile -->
+    <div class="flex items-center space-x-4">
+      <!-- Hamburger -->
+      <button id="hamburger" 
+        class="h-10 w-8 cursor-pointer hover:text-gray-200 transition-colors"
+        onclick="toggleSidebar()">
+        <svg xmlns="http://www.w3.org/2000/svg" 
+             viewBox="0 0 24 24" fill="none" 
+             stroke="currentColor" stroke-width="2" 
+             class="w-6 h-6">
+          <path d="M3 12h18M3 6h18M3 18h18" stroke-linecap="round" />
+        </svg>
+      </button>
 
-                    <!-- Profile section - shown on mobile/desktop-->
-                    <div class="flex items-center space-x-2 mt-5 mr-5 ml-2 border-r border-white pr-6">
-                        <div class="bg-gray-300 h-8 w-8 rounded-full"></div>
-                        <div class="flex flex-col items-start">
-                            <span class="text-[#51E800] text-sm">Welcome Administrator!</span>
-                            <span class="text-xs"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
-                        </div>
-                    </div>
+      <!-- Profile -->
+      <div class="flex items-center space-x-2 border-l border-white pl-4">
+        <div class="bg-gray-300 h-8 w-8 rounded-full"></div>
+        <div class="flex flex-col items-start">
+          <span class="text-[#51E800] text-sm">Welcome Administrator!</span>
+          <span class="text-xs"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- CENTER: Search -->
+    <div class="flex-1 flex items-center justify-center">
+      <div class="relative w-full max-w-md">
+        <input 
+          type="search" 
+          placeholder="Search"
+          class="h-10 w-full rounded-3xl pl-7 pr-10 border border-gray-300 
+                 focus:border-blue-500 focus:outline-none focus:ring-2 
+                 focus:ring-blue-200 transition-colors text-black"
+        >
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="h-5 w-5 absolute right-3 top-1/2 transform -translate-y-1/2 
+                    text-gray-400 hover:text-gray-600 cursor-pointer transition-colors" 
+             fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+      </div>
+    </div>
+    
+    <!-- RIGHT: Logout -->
+    <div class="flex items-center">
+      <a href="/community-health-tracker/auth/logout.php" 
+         class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition">
+        Logout
+      </a>
+    </div>
+  </div>
+</nav>
 
-                    <!-- Search bar - Responsive for mobile and desktop -->
-                    <div class="relative flex-1 top-2 mr-5 sm:mt-2 sm:mx-6 sm:max-w-md lg:max-w-lg">
-                        <input class="h-10 w-full rounded-3xl pl-7 pr-10 border border-gray-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-colors" type="search" placeholder="Search">
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                            class="h-5 w-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer transition-colors" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                    </div>
-                    
-                    <!-- Logout Button -->
-                    <div class="flex items-center">
-                        <a href="/community-health-tracker/auth/logout.php" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition">Logout</a>
-                    </div>
-                </div>
-
-                <!-- SIDE BAR CONTENT -->
-                <!-- Sidebar -->
-                <div id="sidebar" class="sidebar bg-white py-2 w-[90px] h-[40rem] rounded-tr-lg mt-7 rounded-br-lg shadow-[4px_4px_8px_0px_rgba(0,0,0,0.1)] fixed lg:relative z-20">
-                    <div class="container mx-auto px-4">
-                        <div class="ml-3 mt-7 space-y-[3rem]">
-                            <!-- Dashboard -->
-                            <div class="div">
+<!-- SIDEBAR -->
+<div id="sidebar" 
+     class="sidebar bg-white py-2 w-[90px] h-screen rounded-tr-lg rounded-br-lg 
+            shadow-[4px_4px_8px_0px_rgba(0,0,0,0.1)] fixed transition-all duration-300 
+            left-0 top-[80px] z-20 overflow-y-auto">
+  <div class="container mx-auto px-4">
+    <div class="ml-3 mt-7 space-y-[3rem]">
+      <!-- Dashboard -->
+      <div class="div">
                                 <a href="/community-health-tracker/admin/dashboard.php">
                                     <svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="24.000000pt" height="24.000000pt"
                                         viewBox="0 0 24.000000 24.000000" preserveAspectRatio="xMidYMid meet">
@@ -195,8 +216,19 @@ require_once __DIR__ . '/header.php';
                             </a>
                         </div>
                     </div>
-                </div>
-            </nav>
+</div>
+
+<script>
+  function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar.classList.contains("-ml-[90px]")) {
+      sidebar.classList.remove("-ml-[90px]");
+    } else {
+      sidebar.classList.add("-ml-[90px]");
+    }
+  }
+</script>
+
 
         <?php elseif (isStaff()): ?>
             <!-- Staff Header -->
@@ -222,8 +254,7 @@ require_once __DIR__ . '/header.php';
                     <div class="container mx-auto px-4">
                         <ul class="flex space-x-6">
                             <li><a href="/community-health-tracker/staff/dashboard.php" class="hover:bg-red-800 px-3 py-1 rounded">Dashboard</a></li>
-                            <li><a href="/community-health-tracker/staff/manage_accounts.php" class="hover:bg-red-800 px-3 py-1 rounded">Manage Accounts</a></li>
-                            <li><a href="/community-health-tracker/staff/existing_info_patients.php" class="hover:bg-red-800 px-3 py-1 rounded">Progress Tracker</a></li>
+                            <li><a href="/community-health-tracker/staff/existing_info_patients.php" class="hover:bg-red-800 px-3 py-1 rounded">Patient Profile</a></li>
                             <li><a href="/community-health-tracker/staff/announcements.php" class="hover:bg-red-800 px-3 py-1 rounded">Announcements</a></li>
                             <!-- <li><a href="/community-health-tracker/staff/appointments.php" class="hover:bg-red-800 px-3 py-1 rounded">Appointments</a></li> -->
                         </ul>
@@ -233,7 +264,7 @@ require_once __DIR__ . '/header.php';
 
         <?php elseif (isUser()): ?>
             <!-- User Header -->
-            <nav class="bg-blue-600 text-white shadow-lg sticky top-0 z-50">
+            <nav class="bg-purple-600 text-white shadow-lg sticky top-0 z-50">
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <div class="h-8 w-8">
@@ -264,8 +295,6 @@ require_once __DIR__ . '/header.php';
                         <ul class="flex space-x-6">
                             <li><a href="/community-health-tracker/user/dashboard.php"
                                     class="hover:bg-purple-800 px-3 py-1 rounded">Dashboard</a></li>
-                            <li><a href="/community-health-tracker/user/appointments.php"
-                                    class="hover:bg-purple-800 px-3 py-1 rounded">Appointments</a></li>
                             <li><a href="/community-health-tracker/user/health_records.php"
                                     class="hover:bg-purple-800 px-3 py-1 rounded">My Record</a></li>
                             <li><a href="/community-health-tracker/user/announcements.php"
