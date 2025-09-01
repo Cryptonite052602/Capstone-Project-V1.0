@@ -8,132 +8,163 @@ if (!isStaff()) {
     exit();
 }
 
-global $pdo;
+$message = '';
+$error = '';
 
-// Get soft-deleted patients
-$patients = [];
-
-try {
-    $stmt = $pdo->prepare("SELECT p.*, m.blood_type 
-                          FROM sitio1_patients p
-                          LEFT JOIN existing_info_patients m ON p.id = m.patient_id
-                          WHERE p.added_by = ? AND p.deleted_at IS NOT NULL
-                          ORDER BY p.deleted_at DESC");
-    $stmt->execute([$_SESSION['user']['id']]);
-    $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $_SESSION['error'] = 'Error fetching archived patient records: ' . $e->getMessage();
+// Handle patient restoration
+if (isset($_GET['restore_patient'])) {
+    $deletedPatientId = $_GET['restore_patient'];
+    
+    try {
+        // Start transaction
+        $pdo->beginTransaction();
+        
+        // Get deleted patient data
+        $stmt = $pdo->prepare("SELECT * FROM deleted_patients WHERE id = ? AND deleted_by = ?");
+        $stmt->execute([$deletedPatientId, $_SESSION['user']['id']]);
+        $deletedPatient = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($deletedPatient) {
+            // Insert back into main patients table
+            $stmt = $pdo->prepare("INSERT INTO sitio1_patients 
+                (id, full_name, age, gender, address, contact, last_checkup, added_by, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->execute([
+                $deletedPatient['original_id'],
+                $deletedPatient['full_name'],
+                $deletedPatient['age'],
+                $deletedPatient['gender'],
+                $deletedPatient['address'],
+                $deletedPatient['contact'],
+                $deletedPatient['last_checkup'],
+                $deletedPatient['added_by']
+            ]);
+            
+            // Remove from deleted patients table
+            $stmt = $pdo->prepare("DELETE FROM deleted_patients WHERE id = ?");
+            $stmt->execute([$deletedPatientId]);
+            
+            $pdo->commit();
+            
+            $message = 'Patient record restored successfully!';
+            header('Location: deleted_patients.php');
+            exit();
+        } else {
+            $error = 'Deleted patient not found or access denied!';
+        }
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        $error = 'Error restoring patient record: ' . $e->getMessage();
+    }
 }
 
-// Handle restore action
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['restore_patient'])) {
-        $id = intval($_POST['id']);
-        
-        if ($id > 0) {
-            try {
-                $stmt = $pdo->prepare("UPDATE sitio1_patients SET deleted_at = NULL WHERE id = ? AND added_by = ?");
-                $stmt->execute([$id, $_SESSION['user']['id']]);
-                
-                $_SESSION['success'] = 'Patient record restored successfully!';
-                header('Location: deleted_patients.php');
-                exit();
-            } catch (PDOException $e) {
-                $_SESSION['error'] = 'Error restoring patient record: ' . $e->getMessage();
-            }
-        }
-    }
+// Handle permanent deletion
+if (isset($_GET['permanent_delete'])) {
+    $deletedPatientId = $_GET['permanent_delete'];
     
-    // Handle permanent deletion
-    if (isset($_POST['delete_permanently'])) {
-        $id = intval($_POST['id']);
+    try {
+        $stmt = $pdo->prepare("DELETE FROM deleted_patients WHERE id = ? AND deleted_by = ?");
+        $stmt->execute([$deletedPatientId, $_SESSION['user']['id']]);
         
-        if ($id > 0) {
-            try {
-                // Start transaction
-                $pdo->beginTransaction();
-                
-                // Delete from medical info table first
-                $stmt = $pdo->prepare("DELETE FROM existing_info_patients WHERE patient_id = ?");
-                $stmt->execute([$id]);
-                
-                // Then delete from main patients table
-                $stmt = $pdo->prepare("DELETE FROM sitio1_patients WHERE id = ? AND added_by = ?");
-                $stmt->execute([$id, $_SESSION['user']['id']]);
-                
-                $pdo->commit();
-                
-                $_SESSION['success'] = 'Patient record permanently deleted successfully!';
-                header('Location: deleted_patients.php');
-                exit();
-            } catch (PDOException $e) {
-                $pdo->rollBack();
-                $_SESSION['error'] = 'Error permanently deleting patient record: ' . $e->getMessage();
-            }
+        if ($stmt->rowCount() > 0) {
+            $message = 'Patient record permanently deleted!';
+        } else {
+            $error = 'Record not found or access denied!';
         }
+        
+        header('Location: deleted_patients.php');
+        exit();
+    } catch (PDOException $e) {
+        $error = 'Error permanently deleting record: ' . $e->getMessage();
     }
+}
+
+// Get all deleted patients
+try {
+    $stmt = $pdo->prepare("SELECT * FROM deleted_patients WHERE deleted_by = ? ORDER BY deleted_at DESC");
+    $stmt->execute([$_SESSION['user']['id']]);
+    $deletedPatients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $error = "Error fetching deleted patients: " . $e->getMessage();
 }
 ?>
 
-<div class="container mx-auto px-4">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">Archived Patient Records</h1>
-        <a href="patient_records.php" class="text-blue-600 hover:underline">Back to Active Records</a>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deleted Patients - Community Health Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Deleted Patients Archive</h1>
+            <a href="existing_info_patients.php" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
+                <i class="fas fa-arrow-left mr-2"></i>Back to Patients
+            </a>
+        </div>
+        
+        <?php if ($message): ?>
+            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+                <i class="fas fa-check-circle mr-2"></i><?= htmlspecialchars($message) ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if ($error): ?>
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                <i class="fas fa-exclamation-circle mr-2"></i><?= htmlspecialchars($error) ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (empty($deletedPatients)): ?>
+            <div class="bg-white rounded-lg shadow p-6 text-center">
+                <i class="fas fa-archive text-4xl text-gray-400 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-700">No deleted patients found</h3>
+                <p class="text-gray-500 mt-2">Patients you delete will appear here for restoration.</p>
+            </div>
+        <?php else: ?>
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deleted On</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <?php foreach ($deletedPatients as $patient): ?>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($patient['full_name']) ?></div>
+                                        <div class="text-sm text-gray-500">ID: <?= $patient['original_id'] ?></div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= $patient['age'] ?? 'N/A' ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= $patient['gender'] ?? 'N/A' ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <?= date('M j, Y g:i A', strtotime($patient['deleted_at'])) ?>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <a href="?restore_patient=<?= $patient['id'] ?>" class="text-green-600 hover:text-green-900 mr-3" onclick="return confirm('Restore this patient record?')">
+                                            <i class="fas fa-undo mr-1"></i>Restore
+                                        </a>
+                                        <a href="?permanent_delete=<?= $patient['id'] ?>" class="text-red-600 hover:text-red-900" onclick="return confirm('Permanently delete this record? This cannot be undone.')">
+                                            <i class="fas fa-trash mr-1"></i>Delete Permanently
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
-    
-    <?php if (isset($_SESSION['error'])): ?>
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <?= $_SESSION['error']; unset($_SESSION['error']); ?>
-        </div>
-    <?php endif; ?>
-    
-    <?php if (isset($_SESSION['success'])): ?>
-        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-            <?= $_SESSION['success']; unset($_SESSION['success']); ?>
-        </div>
-    <?php endif; ?>
-    
-    <?php if (empty($patients)): ?>
-        <p class="text-gray-600">No archived patient records found.</p>
-    <?php else: ?>
-        <div class="overflow-x-auto">
-            <table class="min-w-full bg-white">
-                <thead>
-                    <tr>
-                        <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
-                        <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Age/Gender</th>
-                        <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Blood Type</th>
-                        <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Archived On</th>
-                        <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($patients as $patient): ?>
-                        <tr>
-                            <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($patient['full_name']) ?></td>
-                            <td class="py-2 px-4 border-b border-gray-200">
-                                <?= $patient['age'] ?: 'N/A' ?>
-                                <?= $patient['gender'] ? '/'.htmlspecialchars($patient['gender']) : '' ?>
-                            </td>
-                            <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($patient['blood_type'] ?: 'N/A') ?></td>
-                            <td class="py-2 px-4 border-b border-gray-200"><?= date('M d, Y H:i', strtotime($patient['deleted_at'])) ?></td>
-                            <td class="py-2 px-4 border-b border-gray-200">
-                                <form method="POST" action="" class="inline">
-                                    <input type="hidden" name="id" value="<?= $patient['id'] ?>">
-                                    <button type="submit" name="restore_patient" class="text-green-600 hover:underline mr-2">
-                                        Restore
-                                    </button>
-                                    <button type="submit" name="delete_permanently" class="text-red-600 hover:underline" 
-                                        onclick="return confirm('WARNING: This will permanently delete this patient record and all associated data. Are you sure?')">
-                                        Delete Permanently
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    <?php endif; ?>
-</div>
-
+</body>
+</html>
