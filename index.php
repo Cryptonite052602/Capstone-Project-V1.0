@@ -504,91 +504,90 @@ function closeLearnMoreModal() {
             </form>
         </div>
 
-        <!-- First Registration Modal - Redesigned with all fields -->
-        <div id="registerFormModal" class="hidden p-8">
-            <div class="text-center mb-8">
-                <h2 class="text-2xl font-bold text-[#FC566C]">Register Your Account</h2>
-                <p class="text-gray-600 mt-2">Sign up to your resident account</p>
-            </div>
-            
-            <?php if (!empty($error)): ?>
-                <div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm" role="alert">
-                    <span><?php echo htmlspecialchars($error); ?></span>
-                </div>
-            <?php endif; ?>
-            
-            <?php if (!empty($success)): ?>
-                <div class="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded text-sm" role="alert">
-                    <span><?php echo htmlspecialchars($success); ?></span>
-                </div>
-            <?php endif; ?>
-            
-            <form id="firstRegisterForm" class="space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Full Name -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="full_name">Full Name *</label>
-                        <input type="text" id="full_name" name="full_name" placeholder="Full Name" 
-                            value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                    </div>
-
-                    <!-- Age -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="age">Age *</label>
-                        <input type="number" id="age" name="age" placeholder="Age" min="1" max="120"
-                            value="<?php echo isset($_POST['age']) ? htmlspecialchars($_POST['age']) : ''; ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                    </div>
-
-                    <!-- Gender -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="gender">Gender *</label>
-                        <select id="gender" name="gender" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent">
-                            <option value="">Select Gender</option>
-                            <option value="Male" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Male') ? 'selected' : ''; ?>>Male</option>
-                            <option value="Female" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Female') ? 'selected' : ''; ?>>Female</option>
-                            <option value="Other" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Other') ? 'selected' : ''; ?>>Other</option>
-                        </select>
-                    </div>
-
-                    <!-- Contact Number -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="contact">Contact Number *</label>
-                        <input type="tel" id="contact" name="contact" placeholder="Contact Number"
-                            value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                    </div>
-
-                    <!-- Address -->
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="address">Address *</label>
-                        <input type="text" id="address" name="address" placeholder="Complete Address"
-                            value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                    </div>
-                </div>
-
-                <!-- Continue Button -->
-                <div class="pt-4">
-                    <button type="button" id="openSecondRegister"
-                        class="w-full bg-[#FC566C] text-white py-3 px-4 rounded-lg hover:bg-[#f1233f] transition flex items-center justify-center gap-2">
-                        Continue
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                </div>
-
-                <!-- Login Link -->
-                <div class="text-center pt-4">
-                    <p class="text-sm text-gray-600">
-                        Already have an account? 
-                        <button id="registerToLogin" type="button" class="font-medium text-[#FC566C] hover:underline">Login here</button>
-                    </p>
-                </div>
-            </form>
+        <!-- First Registration Modal -->
+<div id="registerFormModal" class="hidden p-6">
+    <div class="text-center mb-8">
+        <h2 class="text-2xl font-bold text-[#FC566C]">Register Your Account</h2>
+        <p class="text-gray-600 mt-2">Sign up to your resident account</p>
+    </div>
+    
+    <?php if (!empty($error)): ?>
+        <div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm" role="alert">
+            <span><?php echo htmlspecialchars($error); ?></span>
         </div>
+    <?php endif; ?>
+    
+    <?php if (!empty($success)): ?>
+        <div class="mb-6 bg-green-100 border border-green-400 text-green-700 px-极 py-3 rounded text-sm" role="alert">
+            <span><?php echo htmlspecialchars($success); ?></span>
+        </div>
+    <?php endif; ?>
+    
+    <form id="firstRegisterForm" class="space-y-4">
+        <!-- Full Name -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="full_name">Full Name</label>
+            <input type="text" id="full_name" name="full_name" placeholder="Full Name" 
+                value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
+        </div>
+
+        <!-- Age and Gender - Now side by side -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1" for="age">Age</label>
+                <input type="number" id="age极 name="age" placeholder="Age" min="1" max="120"
+                    value="<?php echo isset($_POST['age']) ? htmlspecialchars($_POST['age']) : ''; ?>"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
+            </div>
+
+            <!-- Gender Field -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1" for="gender">Gender</label>
+                <select id="gender" name="gender" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent">
+                    <option value="">Select Gender</option>
+                    <option value="Male" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Male') ? 'selected' : ''; ?>>Male</option>
+                    <option value="Female" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Female') ? 'selected' : ''; ?>>Female</option>
+                    <option value="Other" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Other') ? 'selected' : ''; ?>>Other</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Contact and Address -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="contact">Contact Number</label>
+            <input type="tel" id="contact" name="contact" placeholder="Contact Number"
+                value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="address">Address</label>
+            <input type="text" id="address" name="address" placeholder="Address"
+                value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2极 focus:ring-[#3C96极1] focus:border-transparent" required />
+        </div>
+
+        <!-- Continue Button -->
+        <div class="pt-2">
+            <button type="button" id="openSecondRegister"
+                class="w-full bg-[#FC566C] text-white py-3 px-4 rounded-lg hover:bg-[#f1233f] transition flex items-center justify-center gap-2">
+                Continue
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Login Link -->
+        <div class="text-center pt-4">
+            <p class="text-sm text-gray-600">
+                Already have an account? 
+                <button id="registerToLogin" type="button" class="font-medium text-[#FC566C] hover:underline">Login here</button>
+            </p>
+        </div>
+    </form>
+</div>
 
         <!-- Second Registration Modal - Redesigned -->
         <div id="secondRegisterFormModal" class="hidden p-8">
