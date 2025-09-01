@@ -11,929 +11,137 @@ if (!isUser()) {
 global $pdo;
 
 $userId = $_SESSION['user']['id'];
+$userData = null;
 $error = '';
 $success = '';
-$activeTab = $_GET['tab'] ?? 'upcoming';
+$activeTab = $_GET['tab'] ?? 'dashboard';
 
-// Handle appointment cancellation
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])) {
-    $appointmentId = $_POST['appointment_id'];
-    
-    try {
-        $stmt = $pdo->prepare("UPDATE user_appointments SET status = 'rejected' WHERE id = ? AND user_id = ?");
-        $stmt->execute([$appointmentId, $userId]);
-        
-        // Set success message for modal
-        $_SESSION['notification'] = [
-            'type' => 'success',
-            'message' => 'Appointment cancelled successfully!'
-        ];
-        header('Location: ' . $_SERVER['HTTP_REFERER']);
-        exit();
-    } catch (PDOException $e) {
-        $error = 'Error cancelling appointment: ' . $e->getMessage();
-    }
-}
-
-// Get available dates with slots and staff information
-$availableDates = [];
-
+// Get user data
 try {
-    $stmt = $pdo->query("
-        SELECT 
-            a.date, 
-            a.id as slot_id,
-            a.start_time, 
-            a.end_time,
-            a.max_slots,
-            s.full_name as staff_name,
-            s.specialization,
-            COUNT(ua.id) as booked_slots,
-            (a.max_slots - COUNT(ua.id)) as available_slots
-        FROM sitio1_appointments a
-        JOIN sitio1_staff s ON a.staff_id = s.id
-        LEFT JOIN user_appointments ua ON ua.appointment_id = a.id AND ua.status IN ('pending', 'approved')
-        WHERE a.date >= CURDATE()
-        GROUP BY a.id
-        ORDER BY a.date, a.start_time
-    ");
-    $availableSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $pdo->prepare("SELECT * FROM sitio1_users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $userData = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // Organize by date
-    foreach ($availableSlots as $slot) {
-        $date = $slot['date'];
-        if (!isset($availableDates[$date])) {
-            $availableDates[$date] = [
-                'date' => $date,
-                'slots' => []
-            ];
-        }
-        $availableDates[$date]['slots'][] = $slot;
+    if (!$userData) {
+        $error = 'User data not found.';
     }
-    $availableDates = array_values($availableDates);
 } catch (PDOException $e) {
-    $error = 'Error fetching available dates: ' . $e->getMessage();
+    $error = 'Error fetching user data: ' . $e->getMessage();
 }
 
-// Get counts for each tab
-$counts = [
-    'upcoming' => 0,
-    'past' => 0,
-    'cancelled' => 0
+// Get stats for dashboard
+$stats = [
+    'pending_consultations' => 0,
+    'upcoming_appointments' => 0,
+    'unread_announcements' => 0
 ];
 
-try {
-    // Upcoming count
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as count
-        FROM user_appointments ua
-        JOIN sitio1_appointments a ON ua.appointment_id = a.id
-        WHERE ua.user_id = ? AND ua.status IN ('pending', 'approved') AND a.date >= CURDATE()
-    ");
-    $stmt->execute([$userId]);
-    $counts['upcoming'] = $stmt->fetch()['count'];
+if ($userData) {
+    try {
+        // Pending consultations
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM sitio1_consultations WHERE user_id = ? AND status = 'pending'");
+        $stmt->execute([$userId]);
+        $stats['pending_consultations'] = $stmt->fetchColumn();
 
-    // Past count
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as count
-        FROM user_appointments ua
-        JOIN sitio1_appointments a ON ua.appointment_id = a.id
-        WHERE ua.user_id = ? AND (ua.status = 'completed' OR a.date < CURDATE())
-    ");
-    $stmt->execute([$userId]);
-    $counts['past'] = $stmt->fetch()['count'];
+        // Upcoming appointments
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM user_appointments ua 
+                              JOIN sitio1_appointments a ON ua.appointment_id = a.id 
+                              WHERE ua.user_id = ? AND ua.status IN ('pending', 'approved') AND a.date >= CURDATE()");
+        $stmt->execute([$userId]);
+        $stats['upcoming_appointments'] = $stmt->fetchColumn();
 
-    // Cancelled count
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as count
-        FROM user_appointments ua
-        WHERE ua.user_id = ? AND ua.status = 'rejected'
-    ");
-    $stmt->execute([$userId]);
-    $counts['cancelled'] = $stmt->fetch()['count'];
-} catch (PDOException $e) {
-    $error = 'Error fetching appointment counts: ' . $e->getMessage();
-}
-
-// Get user's appointments
-$appointments = [];
-
-try {
-    $query = "
-        SELECT ua.*, a.date, a.start_time, a.end_time, s.full_name as staff_name, s.specialization
-        FROM user_appointments ua
-        JOIN sitio1_appointments a ON ua.appointment_id = a.id
-        JOIN sitio1_staff s ON a.staff_id = s.id
-        WHERE ua.user_id = ?
-    ";
-    
-    if ($activeTab === 'upcoming') {
-        $query .= " AND ua.status IN ('pending', 'approved') AND a.date >= CURDATE()";
-    } elseif ($activeTab === 'past') {
-        $query .= " AND (ua.status = 'completed' OR a.date < CURDATE())";
-    } elseif ($activeTab === 'cancelled') {
-        $query .= " AND ua.status = 'rejected'";
+        // Unread announcements
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM sitio1_announcements a 
+                              LEFT JOIN user_announcements ua ON a.id = ua.announcement_id AND ua.user_id = ? 
+                              WHERE ua.id IS NULL");
+        $stmt->execute([$userId]);
+        $stats['unread_announcements'] = $stmt->fetchColumn();
+    } catch (PDOException $e) {
+        $error = 'Error fetching statistics: ' . $e->getMessage();
     }
-    
-    $query .= " ORDER BY a.date " . ($activeTab === 'past' ? 'DESC' : 'ASC') . ", a.start_time";
-    
-    $stmt = $pdo->prepare($query);
-    $stmt->execute([$userId]);
-    $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $error = 'Error fetching appointments: ' . $e->getMessage();
-}
-?>
-
-
-<style>
-
-/* Add to your CSS */
-.fixed {
-    position: fixed;
-}
-.inset-0 {
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-}
-.hidden {
-    display: none;
-}
-.z-50 {
-    z-index: 50;
 }
 
-</style>
+// APPOINTMENTS CODE
+$appointmentTab = $_GET['appointment_tab'] ?? 'upcoming';
 
-<div class="container mx-auto px-4">
-    <!-- Success Modal -->
-    <div id="success-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-        <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="success-modal-backdrop"></div>
-        <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-sm w-full opacity-0 scale-95" id="success-modal-content">
-            <div class="p-6 text-center">
-                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-                    <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                </div>
-                <h3 class="mt-3 text-lg font-medium text-gray-900">Appointment Successfully Booked</h3>
-                <div class="mt-2 px-4 py-3">
-                    <p class="text-sm text-gray-500" id="success-message"></p>
-                </div>
-            </div>
-        </div>
-    </div>
+// Handle appointment booking (with health info + consent)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) {
+    if (!isset($_POST['appointment_id'], $_POST['selected_date'], $_POST['consent'])) {
+        $error = 'Missing required booking information.';
+    } else {
+        $appointmentId = intval($_POST['appointment_id']);
+        $selectedDate  = $_POST['selected_date'];
+        $notes         = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
+        $serviceId     = !empty($_POST['service_id']) ? intval($_POST['service_id']) : null;
+        $serviceType   = !empty($_POST['service_type']) ? $_POST['service_type'] : 'General Checkup';
 
-    <!-- Error Modal -->
-    <div id="error-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-        <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="error-modal-backdrop"></div>
-        <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-sm w-full opacity-0 scale-95" id="error-modal-content">
-            <div class="p-6 text-center">
-                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                    <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </div>
-                <h3 class="mt-3 text-lg font-medium text-gray-900">You have an active appointment.</h3>
-                <div class="mt-2 px-4 py-3">
-                    <p class="text-sm text-gray-500" id="error-message"></p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Session Notification -->
-    <?php if (isset($_SESSION['notification'])): ?>
-        <div id="session-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="session-modal-backdrop"></div>
-            <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-sm w-full opacity-0 scale-95" id="session-modal-content">
-                <div class="p-6 text-center">
-                    <?php if ($_SESSION['notification']['type'] === 'success'): ?>
-                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-                            <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                            </svg>
-                        </div>
-                        <h3 class="mt-3 text-lg font-medium text-gray-900">Success!</h3>
-                    <?php else: ?>
-                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                            <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </div>
-                        <h3 class="mt-3 text-lg font-medium text-gray-900">Error!</h3>
-                    <?php endif; ?>
-                    <div class="mt-2 px-4 py-3">
-                        <p class="text-sm text-gray-500"><?= htmlspecialchars($_SESSION['notification']['message']) ?></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php unset($_SESSION['notification']); ?>
-    <?php endif; ?>
-
-    <h1 class="text-2xl font-bold mb-6 flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-        Community Health Appointments
-    </h1>
-
-    <?php if ($error): ?>
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-            </svg>
-            <?= htmlspecialchars($error) ?>
-        </div>
-    <?php endif; ?>
-    
-    <?php if ($success): ?>
-        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-            </svg>
-            <?= htmlspecialchars($success) ?>
-        </div>
-    <?php endif; ?>
-
-    <!-- Enhanced Tabs with Counts and Icons -->
-    <div class="flex border-b border-gray-200 mb-6">
-        <a href="?tab=upcoming" class="<?= $activeTab === 'upcoming' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Upcoming
-            <span class="ml-1 bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full"><?= $counts['upcoming'] ?></span>
-        </a>
-        <a href="?tab=past" class="<?= $activeTab === 'past' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Completed
-            <span class="ml-1 bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full"><?= $counts['past'] ?></span>
-        </a>
-        <a href="?tab=cancelled" class="<?= $activeTab === 'cancelled' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Cancelled
-            <span class="ml-1 bg-red-100 text-red-800 text-xs font-semibold px-2 py-0.5 rounded-full"><?= $counts['cancelled'] ?></span>
-        </a>
-        <a href="#book-appointment" class="ml-auto px-4 py-2 font-medium text-blue-600 hover:text-blue-800 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            + New Appointment
-        </a>
-    </div>
-
-    <div class="flex flex-col md:flex-row gap-6">
-        <!-- Left Side - Schedule Health Check-up -->
-        <div class="md:w-1/2">
-            <div id="book-appointment" class="bg-white p-6 rounded-lg shadow">
-                <h2 class="text-xl font-semibold mb-4 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Schedule Health Check-up
-                </h2>
-                
-                <!-- Enhanced Date Selection with Calendar Grid -->
-                <div class="mb-6">
-                    <h3 class="font-medium text-gray-700 mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Available Dates
-                    </h3>
-                    <?php if (!empty($availableDates)): ?>
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                            <?php foreach ($availableDates as $dateInfo): 
-                                $date = $dateInfo['date'];
-                                $hasAvailableSlots = false;
-                                foreach ($dateInfo['slots'] as $slot) {
-                                    if ($slot['available_slots'] > 0) {
-                                        $hasAvailableSlots = true;
-                                        break;
-                                    }
-                                }
-                            ?>
-                                <a href="?date=<?= $date ?>" class="border rounded-lg p-2 text-center transition <?= ($_GET['date'] ?? '') === $date ? 'border-blue-500 bg-blue-50' : ($hasAvailableSlots ? 'border-gray-200 hover:bg-blue-50' : 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed') ?>">
-                                    <div class="font-medium"><?= date('D', strtotime($date)) ?></div>
-                                    <div class="text-sm"><?= date('M j', strtotime($date)) ?></div>
-                                    <?php if (!$hasAvailableSlots): ?>
-                                        <div class="text-xs text-red-500 mt-1">Fully Booked</div>
-                                    <?php endif; ?>
-                                </a>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <p class="text-gray-500 text-sm">No available dates found. Please check back later.</p>
-                    <?php endif; ?>
-                </div>
-
-                <form id="appointment-form" method="GET" action="" class="mb-6">
-                    <div class="grid grid-cols-1 gap-4">
-                        <div>
-                            <label for="appointment_date" class="block text-gray-700 mb-2 font-medium">Or select specific date:</label>
-                            <select id="appointment_date" name="date" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">-- Select date --</option>
-                                <?php foreach ($availableDates as $dateInfo): 
-                                    $date = $dateInfo['date'];
-                                    $hasAvailableSlots = false;
-                                    foreach ($dateInfo['slots'] as $slot) {
-                                        if ($slot['available_slots'] > 0) {
-                                            $hasAvailableSlots = true;
-                                            break;
-                                        }
-                                    }
-                                ?>
-                                    <option value="<?= $date ?>" <?= ($_GET['date'] ?? '') === $date ? 'selected' : '' ?> <?= !$hasAvailableSlots ? 'disabled' : '' ?>>
-                                        <?= date('l, F j, Y', strtotime($date)) ?>
-                                        <?= !$hasAvailableSlots ? ' (Fully Booked)' : '' ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <?php if (isset($_GET['date'])): 
-                            $selectedDate = $_GET['date'];
-                            $selectedDateInfo = null;
-                            foreach ($availableDates as $dateInfo) {
-                                if ($dateInfo['date'] === $selectedDate) {
-                                    $selectedDateInfo = $dateInfo;
-                                    break;
-                                }
-                            }
-                        ?>
-                            <div>
-                                <label for="appointment_slot" class="block text-gray-700 mb-2 font-medium">Available Time Slots:</label>
-                                <?php if ($selectedDateInfo && !empty($selectedDateInfo['slots'])): ?>
-                                    <div class="space-y-2">
-                                        <?php foreach ($selectedDateInfo['slots'] as $slot): 
-                                            $isAvailable = $slot['available_slots'] > 0;
-                                        ?>
-                                            <div class="border rounded-lg p-3 <?= $isAvailable ? 'border-gray-200 hover:bg-blue-50' : 'border-gray-200 bg-gray-100 text-gray-500' ?>">
-                                                <div class="flex items-center">
-                                                    <input 
-                                                        type="radio" 
-                                                        id="slot_<?= $slot['slot_id'] ?>" 
-                                                        name="slot" 
-                                                        value="<?= $slot['slot_id'] ?>" 
-                                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500" 
-                                                        <?= !$isAvailable ? 'disabled' : '' ?>
-                                                        required
-                                                    >
-                                                    <label for="slot_<?= $slot['slot_id'] ?>" class="ml-3 block">
-                                                        <div class="font-medium">
-                                                            <?= date('h:i A', strtotime($slot['start_time'])) ?> - <?= date('h:i A', strtotime($slot['end_time'])) ?>
-                                                        </div>
-                                                        <div class="text-sm">
-                                                            <span class="font-medium">Health Worker:</span> <?= htmlspecialchars($slot['staff_name']) ?>
-                                                            <?php if (!empty($slot['specialization'])): ?>
-                                                                (<?= htmlspecialchars($slot['specialization']) ?>)
-                                                            <?php endif; ?>
-                                                        </div>
-                                                        <div class="text-sm <?= $isAvailable ? 'text-green-600' : 'text-red-600' ?>">
-                                                            <?= $isAvailable ? 
-                                                                "{$slot['available_slots']} slot" . ($slot['available_slots'] > 1 ? 's' : '') . " available" : 
-                                                                'Fully booked' ?>
-                                                        </div>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php else: ?>
-                                    <p class="text-gray-500 text-sm">No available slots for this date.</p>
-                                <?php endif; ?>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <div class="flex items-end">
-                            <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                                Find Availability
-                            </button>
-                        </div>
-                    </div>
-                </form>
-
-                <?php if (isset($_GET['date']) && isset($_GET['slot'])): ?>
-                    <?php
-                    $selectedDate = $_GET['date'];
-                    $selectedSlotId = $_GET['slot'];
-                    $selectedSlot = null;
-                    
-                    // Find the selected slot
-                    foreach ($availableDates as $dateInfo) {
-                        if ($dateInfo['date'] === $selectedDate) {
-                            foreach ($dateInfo['slots'] as $slot) {
-                                if ($slot['slot_id'] == $selectedSlotId) {
-                                    $selectedSlot = $slot;
-                                    break 2;
-                                }
-                            }
-                        }
-                    }
-                    
-                    if ($selectedSlot): ?>
-    <div class="border border-gray-200 rounded-lg p-6 mb-6">
-        <h3 class="font-semibold text-lg mb-4 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            Confirm Health Visit
-        </h3>
-        <div class="space-y-3">
-            <div class="flex items-start">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <div>
-                    <p class="font-medium text-gray-700">Health Worker</p>
-                    <p><?= htmlspecialchars($selectedSlot['staff_name']) ?>
-                    <?php if (!empty($selectedSlot['specialization'])): ?>
-                        (<?= htmlspecialchars($selectedSlot['specialization']) ?>)
-                    <?php endif; ?>
-                    </p>
-                </div>
-            </div>
-            <div class="flex items-start">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <div>
-                    <p class="font-medium text-gray-700">Date & Time</p>
-                    <p><?= date('M d, Y', strtotime($selectedDate)) ?> at <?= date('h:i A', strtotime($selectedSlot['start_time'])) ?> - <?= date('h:i A', strtotime($selectedSlot['end_time'])) ?></p>
-                </div>
-            </div>
-            <div class="flex items-start">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <div>
-                    <p class="font-medium text-gray-700">Availability</p>
-                    <p><?= $selectedSlot['available_slots'] ?> slot<?= $selectedSlot['available_slots'] > 1 ? 's' : '' ?> remaining (out of <?= $selectedSlot['max_slots'] ?>)</p>
-                </div>
-            </div>
-        </div>
-        
-        <form method="POST" action="/community-health-tracker/api/appointments.php" class="ajax-form mt-6">
-            <input type="hidden" name="appointment_id" value="<?= $selectedSlot['slot_id'] ?>">
-            <input type="hidden" name="selected_date" value="<?= $selectedDate ?>">
-            
-            <!-- Health Conditions Section -->
-            <div class="mb-6">
-                <h4 class="font-medium text-gray-700 mb-3">Select Health Conditions</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <?php 
-                    $healthConditions = [
-                        'Asthma', 'Tuberculosis', 'Malnutrition', 'Obesity',
-                        'Pneumonia', 'Dengue', 'Anemia', 'Arthritis',
-                        'Stroke', 'Cancer', 'Depression'
-                    ];
-                    
-                    foreach ($healthConditions as $condition): ?>
-                        <div class="flex items-center">
-                            <input type="checkbox" id="condition_<?= strtolower(str_replace(' ', '_', $condition)) ?>" 
-                                   name="health_condition[]" value="<?= $condition ?>"
-                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="condition_<?= strtolower(str_replace(' ', '_', $condition)) ?>" 
-                                   class="ml-2 text-gray-700"><?= $condition ?></label>
-                        </div>
-                    <?php endforeach; ?>
-                    
-                    <!-- Other Condition Option -->
-                    <div class="flex items-center">
-                        <input type="checkbox" id="other_condition" name="health_condition[]" value="Other"
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label for="other_condition" class="ml-2 text-gray-700">Other</label>
-                    </div>
-                </div>
-                
-                <div class="mt-3" id="other_condition_container" style="display: none;">
-                    <label for="other_condition_specify" class="block text-gray-700 mb-1 text-sm">Please specify:</label>
-                    <input type="text" id="other_condition_specify" name="other_condition_specify" 
-                           class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-            </div>
-            
-            <!-- Existing Health Concerns Textarea -->
-            <div class="mb-4">
-                <label for="appointment_notes" class="block text-gray-700 mb-2 font-medium">Health Concerns Details</label>
-                <textarea id="appointment_notes" name="notes" rows="3" 
-                          class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                          placeholder="Describe your symptoms, concerns, or any other relevant information"></textarea>
-            </div>
-            
-            <!-- Consent Checkbox -->
-            <div class="flex items-center mb-4">
-                <input type="checkbox" id="consent" name="consent" required
-                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                <label for="consent" class="ml-2 text-gray-700">
-                    I consent to sharing my health information for this appointment
-                </label>
-            </div>
-            
-            <!-- Submit Button -->
-            <button type="submit" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center justify-center" <?= $selectedSlot['available_slots'] <= 0 ? 'disabled' : '' ?>>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-                <?= $selectedSlot['available_slots'] > 0 ? 'Book Appointment' : 'Slot Full' ?>
-            </button>
-        </form>
-    </div>
-<?php else: ?>
-    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-        </svg>
-        Selected slot is no longer available. Please choose another.
-    </div>
-<?php endif; ?>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('appointmentForm');
-    const otherCheckbox = document.getElementById('other_condition');
-    const otherContainer = document.getElementById('other_condition_container');
-    const conditionsError = document.getElementById('conditions-error');
-    const consentError = document.getElementById('consent-error');
-
-    // Toggle other condition input field
-    otherCheckbox.addEventListener('change', function() {
-        otherContainer.style.display = this.checked ? 'block' : 'none';
-        if (this.checked) {
-            document.getElementById('other_condition_specify').focus();
+        // Collect health concerns
+        $healthConcerns = [];
+        if (!empty($_POST['health_concerns']) && is_array($_POST['health_concerns'])) {
+            $healthConcerns = $_POST['health_concerns'];
         }
-    });
 
-    // Real-time validation
-    form.addEventListener('change', function() {
-        validateForm();
-    });
-
-    form.addEventListener('submit', function(e) {
-        if (!validateForm()) {
-            e.preventDefault();
-        }
-    });
-
-    function validateForm() {
-        let isValid = true;
-        
-        // Validate health conditions
-        const checkedConditions = document.querySelectorAll('input[name="health_condition[]"]:checked');
-        if (checkedConditions.length === 0) {
-            conditionsError.classList.remove('hidden');
-            isValid = false;
+        // Validation: must have at least 1 concern
+        if (count($healthConcerns) === 0) {
+            $error = "You must select at least one health concern.";
         } else {
-            conditionsError.classList.add('hidden');
-        }
-
-        // Validate other condition if checked
-        if (otherCheckbox.checked && !document.getElementById('other_condition_specify').value.trim()) {
-            isValid = false;
-        }
-
-        // Validate consent
-        if (!document.getElementById('consent').checked) {
-            consentError.classList.remove('hidden');
-            isValid = false;
-        } else {
-            consentError.classList.add('hidden');
-        }
-
-        return isValid;
-    }
-
-    // Initialize form state
-    validateForm();
-});
-</script>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Right Side - Appointments List -->
-        <div class="md:w-1/2">
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h2 class="text-xl font-semibold mb-4 flex items-center">
-                    <?php if ($activeTab === 'upcoming'): ?>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Upcoming Appointments
-                    <?php elseif ($activeTab === 'past'): ?>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Completed Appointments
-                    <?php else: ?>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Cancelled Appointments
-                    <?php endif; ?>
-                </h2>
-
-                <?php if (empty($appointments)): ?>
-                    <div class="text-center py-8">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <p class="text-gray-600 mt-2">No <?= $activeTab ?> appointments found.</p>
-                    </div>
-                <?php else: ?>
-                    <div class="space-y-4">
-                        <?php foreach ($appointments as $appointment): ?>
-                            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
-                                <div class="flex justify-between items-start">
-                                    <div class="flex items-start">
-                                        <?php if ($appointment['status'] === 'approved'): ?>
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        <?php elseif ($appointment['status'] === 'pending'): ?>
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        <?php elseif ($appointment['status'] === 'completed'): ?>
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        <?php else: ?>
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        <?php endif; ?>
-                                        <div>
-                                            <h3 class="font-semibold">Health Worker: <?= htmlspecialchars($appointment['staff_name']) ?>
-                                            <?php if (!empty($appointment['specialization'])): ?>
-                                                (<?= htmlspecialchars($appointment['specialization']) ?>)
-                                            <?php endif; ?>
-                                            </h3>
-                                            <p class="text-sm text-gray-600">
-                                                <?= date('M d, Y', strtotime($appointment['date'])) ?> 
-                                                at <?= date('h:i A', strtotime($appointment['start_time'])) ?> - <?= date('h:i A', strtotime($appointment['end_time'])) ?>
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <span class="px-2 py-1 text-xs rounded-full 
-                                        <?= $appointment['status'] === 'approved' ? 'bg-green-100 text-green-800' : 
-                                           ($appointment['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                                           ($appointment['status'] === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800')) ?>">
-                                        <?= ucfirst($appointment['status']) ?>
-                                    </span>
-                                </div>
-                                
-                                <?php if (!empty($appointment['notes'])): ?>
-                                    <div class="mt-3 pl-7">
-                                        <p class="text-sm text-gray-700">
-                                            <span class="font-medium">Notes:</span> <?= htmlspecialchars($appointment['notes']) ?>
-                                        </p>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <?php if ($activeTab === 'upcoming' && $appointment['status'] !== 'rejected'): ?>
-    <button onclick="openCancelModal(<?= $appointment['id'] ?>)"
-            class="text-red-600 hover:text-red-800 text-sm font-medium flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-        Cancel Appointment
-    </button>
-<?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Cancellation Modal Template -->
-<div id="cancel-modal-template" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
-    <div class="bg-white rounded-lg shadow-xl transform transition-all max-w-md w-full">
-        <div class="p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Cancel Appointment</h3>
-            <form method="POST" class="space-y-4">
-                <input type="hidden" name="appointment_id" id="modal-appointment-id">
-                
-                <div>
-                    <label for="cancel-reason" class="block text-sm font-medium text-gray-700 mb-1">
-                        Reason for cancellation <span class="text-red-500">*</span>
-                    </label>
-                    <textarea id="cancel-reason" name="cancel_reason" rows="4"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        required placeholder="Please explain why you need to cancel this appointment"></textarea>
-                </div>
-                
-                <div class="flex justify-end space-x-3 pt-4">
-                    <button type="button" onclick="closeCancelModal()"
-                        class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-                        Go Back
-                    </button>
-                    <button type="submit" name="cancel_appointment"
-                        class="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                        Confirm Cancellation
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const dateSelect = document.getElementById('appointment_date');
-    const slotSelect = document.getElementById('appointment_slot');
-    
-    // Load time slots immediately if date is preselected
-    if (dateSelect && dateSelect.value && slotSelect) {
-        loadTimeSlots(dateSelect.value);
-    }
-    
-    dateSelect?.addEventListener('change', function() {
-        const selectedDate = this.value;
-        if (selectedDate && slotSelect) {
-            loadTimeSlots(selectedDate);
-        }
-    });
-    
-    function loadTimeSlots(selectedDate) {
-        slotSelect.innerHTML = '<option value="">Loading available slots...</option>';
-        slotSelect.disabled = true;
-        
-        fetch(`/community-health-tracker/api/appointments.php?available=1&date=${selectedDate}`, {
-            headers: {
-                'Accept': 'application/json'
+            // If "Other" was checked, replace with user input
+            if (in_array('Other', $healthConcerns) && !empty($_POST['other_concern_specify'])) {
+                $other = trim($_POST['other_concern_specify']);
+                $healthConcerns = array_diff($healthConcerns, ['Other']); 
+                $healthConcerns[] = $other;
             }
-        })
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) throw new Error(data.error);
-            
-            if (data.slots && data.slots.length > 0) {
-                slotSelect.innerHTML = data.slots.map(slot => 
-                    `<option value="${slot.id}" ${slot.booked_slots >= slot.max_slots ? 'disabled' : ''}>
-                        ${slot.start_time} - ${slot.end_time} 
-                        (${slot.max_slots - slot.booked_slots} slot${slot.max_slots - slot.booked_slots !== 1 ? 's' : ''} available)
-                    </option>`
-                ).join('');
+
+            $healthConcernsStr = implode(', ', $healthConcerns);
+
+            // Consent (required)
+            $consentGiven = isset($_POST['consent']) ? 1 : 0;
+
+            try {
+                // Generate invoice number (timestamp + random digits)
+                $invoiceNumber = 'INV-' . time() . '-' . rand(100, 999);
                 
-                // Show visual feedback for available slots
-                const availableSlots = data.slots.filter(slot => slot.booked_slots < slot.max_slots);
-                if (availableSlots.length === 0) {
-                    slotSelect.innerHTML = '<option value="">No available slots for this date</option>';
-                }
-            } else {
-                slotSelect.innerHTML = '<option value="">No available slots for this date</option>';
+                // Generate priority number (date + sequential number)
+                $priorityStmt = $pdo->prepare("SELECT COUNT(*) FROM user_appointments WHERE DATE(created_at) = CURDATE()");
+                $priorityStmt->execute();
+                $todayAppointments = $priorityStmt->fetchColumn();
+                $priorityNumber = 'P-' . date('Ymd') . '-' . ($todayAppointments + 1);
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO user_appointments 
+                        (user_id, appointment_id, service_id, status, notes, health_concerns, 
+                         service_type, consent, invoice_number, priority_number, created_at) 
+                    VALUES 
+                        (:user_id, :appointment_id, :service_id, 'pending', :notes, :health_concerns, 
+                         :service_type, :consent, :invoice_number, :priority_number, NOW())
+                ");
+
+                $stmt->execute([
+                    ':user_id'         => $userId,
+                    ':appointment_id'  => $appointmentId,
+                    ':service_id'      => $serviceId,
+                    ':notes'           => $notes,
+                    ':health_concerns' => $healthConcernsStr,
+                    ':service_type'    => $serviceType,
+                    ':consent'         => $consentGiven,
+                    ':invoice_number'  => $invoiceNumber,
+                    ':priority_number' => $priorityNumber
+                ]);
+
+                $_SESSION['notification'] = [
+                    'type' => 'success',
+                    'message' => 'Appointment booked successfully with consent given.'
+                ];
+                header('Location: ' . $_SERVER['HTTP_REFERER']);
+                exit();
+            } catch (PDOException $e) {
+                $error = 'Error booking appointment: ' . $e->getMessage();
             }
-            slotSelect.disabled = false;
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            slotSelect.innerHTML = `<option value="">Error loading slots. Please try again.</option>`;
-        });
-    }
-
-    // Handle form submission
-    const appointmentForm = document.querySelector('.ajax-form');
-    if (appointmentForm) {
-        appointmentForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const submitButton = this.querySelector('button[type="submit"]');
-            const originalText = submitButton.textContent;
-            
-            submitButton.disabled = true;
-            submitButton.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing...
-            `;
-            
-            fetch(this.action, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    appointment_id: formData.get('appointment_id'),
-                    notes: formData.get('notes')
-                })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-                if (data.success) {
-                    // Show success modal
-                    showModal('success', 'Appointment successfully applied!');
-                    
-                    // Hide modal after 2 seconds and reload
-                    setTimeout(() => {
-                        hideModal('success');
-                        window.location.reload();
-                    }, 2000);
-                }
-            })
-            .catch(error => {
-                // Show error modal
-                showModal('error', error.message);
-                submitButton.disabled = false;
-                submitButton.textContent = originalText;
-                
-                // Hide error modal after 3 seconds
-                setTimeout(() => {
-                    hideModal('error');
-                }, 3000);
-            });
-        });
-    }
-
-
-    
-
-    // Handle session notification modal
-    const sessionModal = document.getElementById('session-modal');
-    if (sessionModal) {
-        const backdrop = document.getElementById('session-modal-backdrop');
-        const content = document.getElementById('session-modal-content');
-        
-        // Show modal with animation
-        setTimeout(() => {
-            backdrop.classList.add('opacity-100');
-            content.classList.add('opacity-100', 'scale-100');
-        }, 10);
-        
-        // Auto-hide after 3 seconds
-        setTimeout(() => {
-            hideModal('session');
-        }, 3000);
-    }
-
-    // Modal control functions
-    function showModal(type, message) {
-        const modal = document.getElementById(`${type}-modal`);
-        const messageElement = document.getElementById(`${type}-message`);
-        
-        if (messageElement) {
-            messageElement.textContent = message;
-        }
-        
-        modal.classList.remove('hidden');
-        
-        setTimeout(() => {
-            document.getElementById(`${type}-modal-backdrop`).classList.add('opacity-100');
-            document.getElementById(`${type}-modal-content`).classList.add('opacity-100', 'scale-100');
-        }, 10);
-    }
-
-    function hideModal(type) {
-        const modal = document.getElementById(`${type}-modal`);
-        const backdrop = document.getElementById(`${type}-modal-backdrop`);
-        const content = document.getElementById(`${type}-modal-content`);
-        
-        if (backdrop && content) {
-            backdrop.classList.remove('opacity-100');
-            content.classList.remove('opacity-100', 'scale-100');
-            
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
         }
     }
-});
-</script>
+}
 
-
-<?php
-
-// Handle appointment cancellation with reason
+// Handle appointment cancellation
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])) {
     $appointmentId = $_POST['appointment_id'];
     $cancelReason = trim($_POST['cancel_reason'] ?? '');
@@ -961,15 +169,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
         $stmt->execute([$appointmentId, $userId]);
         
         if (!$stmt->fetch()) {
-            throw new Exception('Appointment cannot be cancelled');
+            throw new Exception('Appointment cannot be cancelled. It may have already been processed or is in the past.');
         }
         
         // Update with cancellation reason and timestamp
         $stmt = $pdo->prepare("
             UPDATE user_appointments 
-            SET status = 'rejected', 
+            SET status = 'cancelled', 
                 cancel_reason = ?,
-                cancelled_at = NOW()
+                cancelled_at = NOW(),
+                processed_at = NOW()
             WHERE id = ? AND user_id = ?
         ");
         $stmt->execute([$cancelReason, $appointmentId, $userId]);
@@ -982,36 +191,1273 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
         exit();
     } catch (Exception $e) {
         $error = 'Error cancelling appointment: ' . $e->getMessage();
+        $_SESSION['notification'] = [
+            'type' => 'error',
+            'message' => $error
+        ];
+        header('Location: ' . $_SERVER['HTTP_REFERER']);
+        exit();
     }
 }
 
+// Get available dates with slots and staff information
+$availableDates = [];
+$calendarDays = [];
+
+try {
+    // Get holidays
+    $holidays = [];
+    $holidayStmt = $pdo->query("SELECT date, description FROM sitio1_holidays WHERE date >= CURDATE()");
+    $holidays = $holidayStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    
+    $stmt = $pdo->query("
+        SELECT 
+            a.date, 
+            a.id as slot_id,
+            a.start_time, 
+            a.end_time,
+            a.max_slots,
+            s.full_name as staff_name,
+            s.specialization,
+            COUNT(ua.id) as booked_slots,
+            (a.max_slots - COUNT(ua.id)) as available_slots
+        FROM sitio1_appointments a
+        JOIN sitio1_staff s ON a.staff_id = s.id
+        LEFT JOIN user_appointments ua ON ua.appointment_id = a.id AND ua.status IN ('pending', 'approved')
+        WHERE a.date >= CURDATE()
+        GROUP BY a.id
+        ORDER BY a.date, a.start_time
+    ");
+    $availableSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($availableSlots as $slot) {
+        $date = $slot['date'];
+        if (!isset($availableDates[$date])) {
+            $availableDates[$date] = [
+                'date' => $date,
+                'slots' => [],
+                'total_slots' => 0,
+                'available_slots' => 0,
+                'is_holiday' => isset($holidays[$date])
+            ];
+        }
+        $availableDates[$date]['slots'][] = $slot;
+        $availableDates[$date]['total_slots'] += $slot['max_slots'];
+        $availableDates[$date]['available_slots'] += $slot['available_slots'];
+    }
+    $availableDates = array_values($availableDates);
+    
+    // Generate calendar days for the current and next month
+    $currentMonth = date('Y-m');
+    $nextMonth = date('Y-m', strtotime('+1 month'));
+    
+    // Get first and last day of current month
+    $firstDayCurrent = date('Y-m-01');
+    $lastDayCurrent = date('Y-m-t');
+    
+    // Get first and last day of next month
+    $firstDayNext = date('Y-m-01', strtotime('+1 month'));
+    $lastDayNext = date('Y-m-t', strtotime('+1 month'));
+    
+    // Create calendar array
+    $startDate = $firstDayCurrent;
+    $endDate = $lastDayNext;
+    
+    $currentDate = $startDate;
+    while ($currentDate <= $endDate) {
+        $dateInfo = [
+            'date' => $currentDate,
+            'day' => date('j', strtotime($currentDate)),
+            'month' => date('n', strtotime($currentDate)),
+            'year' => date('Y', strtotime($currentDate)),
+            'is_current_month' => date('Y-m', strtotime($currentDate)) === $currentMonth,
+            'is_next_month' => date('Y-m', strtotime($currentDate)) === $nextMonth,
+            'is_today' => $currentDate === date('Y-m-d'),
+            'is_past' => $currentDate < date('Y-m-d'),
+            'has_slots' => false,
+            'is_holiday' => isset($holidays[$currentDate]),
+            'slots_available' => 0,
+            'slots_total' => 0
+        ];
+        
+        // Check if this date has available slots
+        foreach ($availableDates as $availDate) {
+            if ($availDate['date'] === $currentDate) {
+                $dateInfo['has_slots'] = true;
+                $dateInfo['slots_available'] = $availDate['available_slots'];
+                $dateInfo['slots_total'] = $availDate['total_slots'];
+                break;
+            }
+        }
+        
+        $calendarDays[] = $dateInfo;
+        $currentDate = date('Y-m-d', strtotime($currentDate . ' +1 day'));
+    }
+} catch (PDOException $e) {
+    $error = 'Error fetching available dates: ' . $e->getMessage();
+}
+
+// Get user's appointments
+$appointments = [];
+
+try {
+    $query = "
+        SELECT ua.*, a.date, a.start_time, a.end_time, s.full_name as staff_name, s.specialization
+        FROM user_appointments ua
+        JOIN sitio1_appointments a ON ua.appointment_id = a.id
+        JOIN sitio1_staff s ON a.staff_id = s.id
+        WHERE ua.user_id = ?
+    ";
+    
+    if ($appointmentTab === 'upcoming') {
+        $query .= " AND ua.status IN ('pending', 'approved') AND a.date >= CURDATE()";
+    } elseif ($appointmentTab === 'past') {
+        $query .= " AND (ua.status = 'completed' OR (a.date < CURDATE() AND ua.status NOT IN ('rejected', 'cancelled')))";
+    } elseif ($appointmentTab === 'cancelled') {
+        $query .= " AND ua.status IN ('rejected', 'cancelled')";
+    }
+    
+    $query .= " ORDER BY a.date " . ($appointmentTab === 'past' ? 'DESC' : 'ASC') . ", a.start_time";
+    
+    $stmt = $pdo->prepare($query);
+    $stmt->execute([$userId]);
+    $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $error = 'Error fetching appointments: ' . $e->getMessage();
+}
+
+// Handle invoice download
+if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
+    $appointmentId = intval($_GET['download_invoice']);
+    
+    // Verify the user owns this appointment
+    $stmt = $pdo->prepare("SELECT ua.*, u.full_name, u.email, u.contact, u.address,
+                          a.date, a.start_time, a.end_time,
+                          s.full_name as staff_name, s.specialization, s.license_number
+                          FROM user_appointments ua 
+                          JOIN sitio1_users u ON ua.user_id = u.id 
+                          JOIN sitio1_appointments a ON ua.appointment_id = a.id 
+                          JOIN sitio1_staff s ON a.staff_id = s.id 
+                          WHERE ua.id = ? AND ua.user_id = ?");
+    $stmt->execute([$appointmentId, $_SESSION['user']['id']]);
+    $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($appointment && !empty($appointment['invoice_number'])) {
+        // Generate PDF invoice
+        require_once __DIR__ . '/../vendor/autoload.php'; // For TCPDF
+        
+        // Create new PDF document
+        $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+        
+        // Set document information
+        $pdf->SetCreator('Community Health Tracker');
+        $pdf->SetAuthor('Community Health Tracker');
+        $pdf->SetTitle('Invoice #' . $appointment['invoice_number']);
+        $pdf->SetSubject('Appointment Invoice');
+        
+        // Add a page
+        $pdf->AddPage();
+        
+        // Set content
+        $html = '
+            <h1 style="text-align: center; color: #3b82f6;">Community Health Tracker</h1>
+            <h2 style="text-align: center; color: #6b7280;">Appointment Invoice</h2>
+            
+            <table border="0" cellpadding="5">
+                <tr>
+                    <td width="30%"><strong>Invoice Number:</strong></td>
+                    <td width="70%">' . $appointment['invoice_number'] . '</td>
+                </tr>
+                <tr>
+                    <td><strong>Issue Date:</strong></td>
+                    <td>' . date('M d, Y') . '</td>
+                </tr>
+                <tr>
+                    <td><strong>Priority Number:</strong></td>
+                    <td>' . $appointment['priority_number'] . '</td>
+                </tr>
+            </table>
+            
+            <h3 style="color: #3b82f6; margin-top: 20px;">Appointment Details</h3>
+            <table border="0" cellpadding="5">
+                <tr>
+                    <td width="30%"><strong>Patient Name:</strong></td>
+                    <td width="70%">' . $appointment['full_name'] . '</td>
+                </tr>
+                <tr>
+                    <td><strong>Contact:</strong></td>
+                    <td>' . $appointment['contact'] . '</td>
+                </tr>
+                <tr>
+                    <td><strong>Address:</strong></td>
+                    <td>' . $appointment['address'] . '</td>
+                </tr>
+                <tr>
+                    <td><strong>Appointment Date:</strong></td>
+                    <td>' . date('M d, Y', strtotime($appointment['date'])) . '</td>
+                </tr>
+                <tr>
+                    <td><strong>Appointment Time:</strong></td>
+                    <td>' . date('h:i A', strtotime($appointment['start_time'])) . ' - ' . date('h:i A', strtotime($appointment['end_time'])) . '</td>
+                </tr>
+                <tr>
+                    <td><strong>Health Worker:</strong></td>
+                    <td>' . $appointment['staff_name'] . ' (' . $appointment['specialization'] . ')</td>
+                </tr>
+                <tr>
+                    <td><strong>License Number:</strong></td>
+                    <td>' . $appointment['license_number'] . '</td>
+                </tr>
+            </table>
+            
+            <h3 style="color: #3b82f6; margin-top: 20px;">Health Concerns</h3>
+            <p>' . $appointment['health_concerns'] . '</p>
+            
+            <h3 style="color: #3b82f6; margin-top: 20px;">Notes</h3>
+            <p>' . ($appointment['notes'] ?: 'No additional notes') . '</p>
+            
+            <hr style="margin: 20px 0;">
+            <p style="text-align: center; color: #6b7280;">Thank you for choosing Community Health Tracker.</p>
+        ';
+        
+        // Output HTML content
+        $pdf->writeHTML($html, true, false, true, false, '');
+        
+        // Close and output PDF document
+        $pdf->Output('invoice_' . $appointment['invoice_number'] . '.pdf', 'D');
+        exit;
+    } else {
+        // Redirect if invoice doesn't exist or user doesn't have permission
+        header('Location: /community-health-tracker/user/appointments.php');
+        exit;
+    }
+}
 ?>
 
-<script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Health Appointments</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Calendar Styles - Redesigned */
+        .calendar-wrapper {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
 
-// Add to your existing JavaScript
-function openCancelModal(appointmentId) {
-    const modal = document.getElementById('cancel-modal-template');
-    const clone = modal.cloneNode(true);
-    clone.id = 'cancel-modal-active';
-    clone.classList.remove('hidden');
-    document.getElementById('modal-appointment-id').value = appointmentId;
-    document.body.appendChild(clone);
-}
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #3b82f6;
+            color: white;
+        }
 
-function closeCancelModal() {
-    const modal = document.getElementById('cancel-modal-active');
-    if (modal) {
-        modal.remove();
+        .calendar-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .calendar-nav {
+            display: flex;
+            gap: 10px;
+        }
+
+        .calendar-nav button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .calendar-nav button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .calendar-weekdays div {
+            text-align: center;
+            padding: 12px 0;
+            font-weight: 600;
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: #e2e8f0;
+        }
+
+        .calendar-day {
+            background: white;
+            min-height: 100px;
+            padding: 10px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .calendar-day.other-month {
+            background: #f8fafc;
+            color: #cbd5e1;
+        }
+
+        .calendar-day-number {
+            align-self: flex-end;
+            font-weight: 500;
+            margin-bottom: 8px;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .calendar-day.today .calendar-day-number {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .calendar-day-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .calendar-day.past {
+            background: #f8fafc;
+            color: #cbd5e1;
+            cursor: not-allowed;
+        }
+
+        .calendar-day.past .calendar-day-button {
+            display: none;
+        }
+
+        .calendar-day-button {
+            margin-top: 8px;
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .calendar-day-button.available {
+            background: #10b981;
+            color: white;
+        }
+
+        .calendar-day-button.available:hover {
+            background: #059669;
+        }
+
+        .calendar-day-button.fully-booked {
+            background: #ef4444;
+            color: white;
+            cursor: not-allowed;
+        }
+
+        .calendar-day-button.no-slots {
+            background: #3b82f6;
+            color: white;
+            cursor: not-allowed;
+        }
+
+        .calendar-day.holiday {
+            background: #fdf4ff;
+        }
+
+        .calendar-day.holiday .calendar-day-button {
+            background: #a855f7;
+            color: white;
+            cursor: not-allowed;
+        }
+
+        .calendar-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .legend-available {
+            background: #10b981;
+        }
+
+        .legend-fully-booked {
+            background: #ef4444;
+        }
+
+        .legend-no-slots {
+            background: #3b82f6;
+        }
+
+        .legend-holiday {
+            background: #a855f7;
+        }
+
+        /* Slot selection styling */
+        .time-slots-container {
+            margin-top: 20px;
+        }
+
+        .time-slot {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        .time-slot.available {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .time-slot.available:hover {
+            background: #dcfce7;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .time-slot.unavailable {
+            border-color: #fecaca;
+            background: #fef2f2;
+            opacity: 0.7;
+        }
+
+        .slot-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .slot-time {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .slot-staff {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        .slot-availability {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+
+        .slot-availability.available {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .slot-availability.unavailable {
+            background: #fecaca;
+            color: #991b1b;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        /* Health concerns checkboxes */
+        .health-concerns-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .health-concern-item {
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Success Modal -->
+        <div id="success-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="text-center p-6">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                        <i class="fa-solid fa-check text-green-600 text-xl"></i>
+                    </div>
+                    <h3 class="mt-3 text-lg font-medium text-gray-900">Appointment Successfully Booked</h3>
+                    <div class="mt-2 px-4 py-3">
+                        <p class="text-sm text-gray-500" id="success-message"></p>
+                    </div>
+                    <div class="mt-4">
+                        <button onclick="hideModal('success')" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Modal -->
+        <div id="error-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="text-center p-6">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                        <i class="fa-solid fa-xmark text-red-600 text-xl"></i>
+                    </div>
+                    <h3 class="mt-3 text-lg font-medium text-gray-900">You have an active appointment.</h3>
+                    <div class="mt-2 px-4 py-3">
+                        <p class="text-sm text-gray-500" id="error-message"></p>
+                    </div>
+                    <div class="mt-4">
+                        <button onclick="hideModal('error')" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Notification -->
+        <?php if (isset($_SESSION['notification'])): ?>
+            <div id="session-modal" class="modal-overlay" style="display: flex;">
+                <div class="modal-content">
+                    <div class="text-center p-6">
+                        <?php if ($_SESSION['notification']['type'] === 'success'): ?>
+                            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                                <i class="fa-solid fa-check text-green-600 text-xl"></i>
+                            </div>
+                            <h3 class="mt-3 text-lg font-medium text-gray-900">Success!</h3>
+                        <?php else: ?>
+                            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                                <i class="fa-solid fa-xmark text-red-600 text-xl"></i>
+                            </div>
+                            <h3 class="mt-3 text-lg font-medium text-gray-900">Error!</h3>
+                        <?php endif; ?>
+                        <div class="mt-2 px-4 py-3">
+                            <p class="text-sm text-gray-500"><?= htmlspecialchars($_SESSION['notification']['message']) ?></p>
+                        </div>
+                        <div class="mt-4">
+                            <button onclick="hideModal('session')" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php unset($_SESSION['notification']); ?>
+        <?php endif; ?>
+
+        <h1 class="text-2xl font-bold mb-6 flex items-center">
+            <i class="fa-solid fa-calendar-check text-blue-600 mr-2 text-2xl"></i>
+            Community Health Appointments
+        </h1>
+
+        <?php if ($error): ?>
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">
+                <i class="fa-solid fa-circle-exclamation mr-2"></i>
+                <?= htmlspecialchars($error) ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if ($success): ?>
+            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 flex items-center">
+                <i class="fa-solid fa-circle-check mr-2"></i>
+                <?= htmlspecialchars($success) ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Enhanced Tabs with Counts and Icons -->
+        <div class="flex border-b border-gray-200 mb-6">
+            <a href="?tab=upcoming" class="<?= $activeTab === 'upcoming' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
+                <i class="fa-solid fa-calendar-days mr-1"></i>
+                Upcoming
+                <span class="ml-1 bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full"><?= $stats['upcoming_appointments'] ?></span>
+            </a>
+            <a href="?tab=past" class="<?= $activeTab === 'past' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
+                <i class="fa-solid fa-check-circle mr-1"></i>
+                Completed
+                <span class="ml-1 bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full"><?= $stats['pending_consultations'] ?></span>
+            </a>
+            <a href="?tab=cancelled" class="<?= $activeTab === 'cancelled' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
+                <i class="fa-solid fa-ban mr-1"></i>
+                Cancelled
+                <span class="ml-1 bg-red-100 text-red-800 text-xs font-semibold px-2 py-0.5 rounded-full">0</span>
+            </a>
+        </div>
+
+        <div class="flex flex-col lg:flex-row gap-6">
+            <!-- Left Side - Schedule Health Check-up -->
+            <div class="lg:w-1/2">
+                <div id="book-appointment" class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="calendar-wrapper">
+                        <div class="calendar-header">
+                            <h2 id="current-month-display"><?= date('F Y') ?></h2>
+                            <div class="calendar-nav">
+                                <button id="prev-year">
+                                    <i class="fa-solid fa-angles-left"></i>
+                                </button>
+                                <button id="prev-month">
+                                    <i class="fa-solid fa-chevron-left"></i>
+                                </button>
+                                <button id="today">Today</button>
+                                <button id="next-month">
+                                    <i class="fa-solid fa-chevron-right"></i>
+                                </button>
+                                <button id="next-year">
+                                    <i class="fa-solid fa-angles-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="calendar-weekdays">
+                            <div>Sun</div>
+                            <div>Mon</div>
+                            <div>Tue</div>
+                            <div>Wed</div>
+                            <div>Thu</div>
+                            <div>Fri</div>
+                            <div>Sat</div>
+                        </div>
+                        
+                        <div class="calendar-days" id="calendar-days-container">
+                            <!-- Calendar days will be populated by JavaScript -->
+                        </div>
+                        
+                        <div class="calendar-legend">
+                            <div class="legend-item">
+                                <div class="legend-color legend-available"></div>
+                                <span>Available Slots</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color legend-fully-booked"></div>
+                                <span>Fully Booked</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color legend-no-slots"></div>
+                                <span>No Slots Scheduled</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color legend-holiday"></div>
+                                <span>Holiday</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Time slots section (appears when a date is selected) -->
+                    <?php if (isset($_GET['date'])): ?>
+                        <div class="time-slots-container p-6">
+                            <h3 class="font-semibold text-lg mb-4 flex items-center">
+                                <i class="fa-solid fa-clock text-green-600 mr-2"></i>
+                                Time Slots for <?= date('M d, Y', strtotime($_GET['date'])) ?>
+                            </h3>
+                            
+                            <div class="space-y-3 mb-4">
+                                <?php 
+                                $selectedDate = $_GET['date'];
+                                $selectedDateInfo = null;
+                                foreach ($availableDates as $dateInfo) {
+                                    if ($dateInfo['date'] === $selectedDate) {
+                                        $selectedDateInfo = $dateInfo;
+                                        break;
+                                    }
+                                }
+                                ?>
+                                
+                                <?php if ($selectedDateInfo && !empty($selectedDateInfo['slots'])): ?>
+                                    <?php foreach ($selectedDateInfo['slots'] as $slot): 
+                                        $isAvailable = $slot['available_slots'] > 0;
+                                    ?>
+                                        <div class="time-slot <?= $isAvailable ? 'available' : 'unavailable' ?>">
+                                            <div class="slot-info">
+                                                <div>
+                                                    <div class="slot-time">
+                                                        <?= date('h:i A', strtotime($slot['start_time'])) ?> - <?= date('h:i A', strtotime($slot['end_time'])) ?>
+                                                    </div>
+                                                    <div class="slot-staff">
+                                                        <span class="font-medium">Health Worker:</span> <?= htmlspecialchars($slot['staff_name']) ?>
+                                                        <?php if (!empty($slot['specialization'])): ?>
+                                                            (<?= htmlspecialchars($slot['specialization']) ?>)
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                                <div class="slot-availability <?= $isAvailable ? 'available' : 'unavailable' ?>">
+                                                    <?= $isAvailable ? 
+                                                        "{$slot['available_slots']} slot" . ($slot['available_slots'] > 1 ? 's' : '') : 
+                                                        'Fully booked' ?>
+                                                </div>
+                                            </div>
+                                            
+                                            <?php if ($isAvailable): ?>
+                                                <div class="mt-3">
+                                                    <input 
+                                                        type="radio" 
+                                                        id="slot_<?= $slot['slot_id'] ?>" 
+                                                        name="slot" 
+                                                        value="<?= $slot['slot_id'] ?>" 
+                                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500" 
+                                                        onchange="selectSlot(<?= $slot['slot_id'] ?>, '<?= $slot['start_time'] ?>', '<?= $slot['end_time'] ?>', '<?= htmlspecialchars($slot['staff_name']) ?>', '<?= htmlspecialchars($slot['specialization']) ?>')"
+                                                        required
+                                                    >
+                                                    <label for="slot_<?= $slot['slot_id'] ?>" class="ml-2 text-sm text-gray-700">
+                                                        Select this time slot
+                                                    </label>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-center">
+                                        <i class="fa-solid fa-circle-exclamation mr-2"></i>
+                                        No available slots for this date. Please choose another.
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div id="slot-details" class="hidden border-t pt-4 mt-4">
+                                <h4 class="font-medium text-gray-700 mb-2">Selected Time Slot:</h4>
+                                <div id="slot-info" class="text-sm text-gray-600"></div>
+                                
+                                <form method="POST" action="" class="mt-4" onsubmit="return validateHealthConcerns()">
+                                    <input type="hidden" name="appointment_id" id="selected_slot_id">
+                                    <input type="hidden" name="selected_date" value="<?= $selectedDate ?>">
+                                    <input type="hidden" name="service_id" value="<?= $serviceId ?>">
+                                    <input type="hidden" name="service_type" value="General Checkup">
+
+                                    <!-- Health Concerns Section -->
+                                    <div class="mb-4">
+                                        <h4 class="font-medium text-gray-700 mb-3">Select Health Concerns</h4>
+                                        <div class="health-concerns-grid">
+                                            <?php 
+                                            $healthConcerns = [
+                                                'Asthma', 'Tuberculosis', 'Malnutrition', 'Obesity',
+                                                'Pneumonia', 'Dengue', 'Anemia', 'Arthritis',
+                                                'Stroke', 'Cancer', 'Depression'
+                                            ];
+                                            
+                                            foreach ($healthConcerns as $concern): ?>
+                                                <div class="health-concern-item">
+                                                    <input type="checkbox" 
+                                                           id="concern_<?= strtolower(str_replace(' ', '_', $concern)) ?>" 
+                                                           name="health_concerns[]" 
+                                                           value="<?= $concern ?>"
+                                                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                                    <label for="concern_<?= strtolower(str_replace(' ', '_', $concern)) ?>" 
+                                                           class="ml-2 text-gray-700 text-sm"><?= $concern ?></label>
+                                                </div>
+                                            <?php endforeach; ?>
+                                            
+                                            <!-- Other Concern Option -->
+                                            <div class="health-concern-item">
+                                                <input type="checkbox" id="other_concern" name="health_concerns[]" value="Other"
+                                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                                <label for="other_concern" class="ml-2 text-gray-700 text-sm">Other</label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mt-3" id="other_concern_container" style="display: none;">
+                                            <label for="other_concern_specify" class="block text-gray-700 mb-1 text-sm">Please specify:</label>
+                                            <input type="text" id="other_concern_specify" name="other_concern_specify" 
+                                                   class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Additional Notes -->
+                                    <div class="mb-4">
+                                        <label for="appointment_notes" class="block text-gray-700 mb-2 text-sm font-medium">Health Concerns Details</label>
+                                        <textarea id="appointment_notes" name="notes" rows="3" 
+                                                  class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
+                                                  placeholder="Describe your symptoms, concerns, or any other relevant information"></textarea>
+                                    </div>
+                                    
+                                    <!-- Consent Checkbox -->
+                                    <div class="flex items-center mb-4">
+                                        <input type="checkbox" id="consent" name="consent" required
+                                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="consent" class="ml-2 text-gray-700 text-sm">
+                                            I consent to sharing my health information for this appointment
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- Submit Button -->
+                                    <button type="submit" name="book_appointment" 
+                                            class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center justify-center text-sm">
+                                        <i class="fa-solid fa-calendar-check mr-2"></i>
+                                        Book Appointment
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Right Side - Appointments List -->
+            <div class="lg:w-1/2">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <?php if ($activeTab === 'upcoming'): ?>
+                            <i class="fa-solid fa-calendar-days text-blue-600 mr-2"></i>
+                            Transactions
+                        <?php elseif ($activeTab === 'past'): ?>
+                            <i class="fa-solid fa-check-circle text-green-600 mr-2"></i>
+                            Completed Appointments
+                        <?php else: ?>
+                            <i class="fa-solid fa-ban text-red-600 mr-2"></i>
+                            Cancelled Appointments
+                        <?php endif; ?>
+                    </h2>
+
+                    <?php if (empty($appointments)): ?>
+                        <div class="text-center py-8">
+                            <i class="fa-regular fa-face-frown-open text-gray-400 text-4xl mb-3"></i>
+                            <p class="text-gray-600 mt-2">No <?= $activeTab ?> appointments found.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="space-y-4">
+                            <?php foreach ($appointments as $appointment): ?>
+                                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex items-start">
+                                            <?php if ($appointment['status'] === 'approved'): ?>
+                                                <i class="fa-solid fa-check-circle text-green-500 mr-2 mt-0.5"></i>
+                                            <?php elseif ($appointment['status'] === 'pending'): ?>
+                                                <i class="fa-solid fa-clock text-yellow-500 mr-2 mt-0.5"></i>
+                                            <?php elseif ($appointment['status'] === 'completed'): ?>
+                                                <i class="fa-solid fa-circle-check text-blue-500 mr-2 mt-0.5"></i>
+                                            <?php else: ?>
+                                                <i class="fa-solid fa-ban text-red-500 mr-2 mt-0.5"></i>
+                                            <?php endif; ?>
+                                            <div>
+                                                <h3 class="font-semibold">Health Worker: <?= htmlspecialchars($appointment['staff_name']) ?>
+                                                <?php if (!empty($appointment['specialization'])): ?>
+                                                    (<?= htmlspecialchars($appointment['specialization']) ?>)
+                                                <?php endif; ?>
+                                                </h3>
+                                                <p class="text-sm text-gray-600">
+                                                    <?= date('M d, Y', strtotime($appointment['date'])) ?> 
+                                                    at <?= date('h:i A', strtotime($appointment['start_time'])) ?> - <?= date('h:i A', strtotime($appointment['end_time'])) ?>
+                                                </p>
+                                                
+                                                <?php if (!empty($appointment['invoice_number'])): ?>
+                                                    <p class="text-sm text-blue-600 mt-1">
+                                                        <strong>Invoice #:</strong> <?= htmlspecialchars($appointment['invoice_number']) ?>
+                                                    </p>
+                                                <?php endif; ?>
+                                                
+                                                <?php if (!empty($appointment['priority_number'])): ?>
+                                                    <p class="text-sm text-green-600">
+                                                        <strong>Priority #:</strong> <?= htmlspecialchars($appointment['priority_number']) ?>
+                                                    </p>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <span class="px-2 py-1 text-xs rounded-full 
+                                            <?= $appointment['status'] === 'approved' ? 'bg-green-100 text-green-800' : 
+                                               ($appointment['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                               ($appointment['status'] === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800')) ?>">
+                                            <?= ucfirst($appointment['status']) ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <?php if (!empty($appointment['health_concerns'])): ?>
+                                        <div class="mt-3 pl-7">
+                                            <p class="text-sm text-gray-700">
+                                                <span class="font-medium">Health Concerns:</span> <?= htmlspecialchars($appointment['health_concerns']) ?>
+                                            </p>
+                                        </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (!empty($appointment['notes'])): ?>
+                                        <div class="mt-2 pl-7">
+                                            <p class="text-sm text-gray-700">
+                                                <span class="font-medium">Notes:</span> <?= htmlspecialchars($appointment['notes']) ?>
+                                            </p>
+                                        </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (!empty($appointment['invoice_number'])): ?>
+                                        <div class="mt-3 pl-7">
+                                            <button onclick="downloadInvoice(<?= $appointment['id'] ?>)" 
+                                                    class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium hover:bg-blue-200 flex items-center">
+                                                <i class="fa-solid fa-download mr-1"></i>
+                                                Download Invoice
+                                            </button>
+                                        </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($activeTab === 'upcoming' && $appointment['status'] !== 'cancelled' && $appointment['status'] !== 'rejected'): ?>
+                                        <div class="mt-3 pl-7">
+                                            <button onclick="openCancelModal(<?= $appointment['id'] ?>)"
+                                                    class="text-red-600 hover:text-red-800 text-sm font-medium flex items-center">
+                                                <i class="fa-solid fa-xmark mr-1"></i>
+                                                Cancel Appointment
+                                            </button>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cancellation modal -->
+    <div id="cancel-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Cancel Appointment</h3>
+                <form method="POST" action="" class="space-y-4">
+                    <input type="hidden" name="appointment_id" id="modal-appointment-id">
+                    
+                    <div>
+                        <label for="cancel-reason" class="block text-sm font-medium text-gray-700 mb-1">
+                            Reason for cancellation <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="cancel-reason" name="cancel_reason" rows="4"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            required placeholder="Please explain why you need to cancel this appointment"></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" onclick="closeCancelModal()"
+                            class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            Go Back
+                        </button>
+                        <button type="submit" name="cancel_appointment"
+                            class="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                            Confirm Cancellation
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Calendar navigation and rendering
+    let currentDate = new Date();
+    let currentMonth = currentDate.getMonth();
+    let currentYear = currentDate.getFullYear();
+
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+
+    // Available dates from PHP converted to a format JavaScript can use
+    const availableDates = <?= json_encode($availableDates) ?>;
+    const holidays = <?= json_encode($holidays) ?>;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        renderCalendar(currentMonth, currentYear);
+        
+        // Set up navigation buttons
+        document.getElementById('prev-year').addEventListener('click', () => {
+            currentYear--;
+            renderCalendar(currentMonth, currentYear);
+        });
+        
+        document.getElementById('prev-month').addEventListener('click', () => {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCalendar(currentMonth, currentYear);
+        });
+        
+        document.getElementById('today').addEventListener('click', () => {
+            currentDate = new Date();
+            currentMonth = currentDate.getMonth();
+            currentYear = currentDate.getFullYear();
+            renderCalendar(currentMonth, currentYear);
+        });
+        
+        document.getElementById('next-month').addEventListener('click', () => {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            renderCalendar(currentMonth, currentYear);
+        });
+        
+        document.getElementById('next-year').addEventListener('click', () => {
+            currentYear++;
+            renderCalendar(currentMonth, currentYear);
+        });
+        
+        // Toggle Other field visibility
+        const otherCheckbox = document.getElementById("other_concern");
+        if (otherCheckbox) {
+            otherCheckbox.addEventListener("change", function() {
+                const otherContainer = document.getElementById("other_concern_container");
+                if (otherContainer) {
+                    otherContainer.style.display = this.checked ? "block" : "none";
+                }
+            });
+        }
+        
+        // Handle session notification modal
+        const sessionModal = document.getElementById('session-modal');
+        if (sessionModal && sessionModal.style.display === 'flex') {
+            setTimeout(() => {
+                hideModal('session');
+            }, 3000);
+        }
+    });
+
+    function renderCalendar(month, year) {
+        const calendarContainer = document.getElementById('calendar-days-container');
+        const monthDisplay = document.getElementById('current-month-display');
+        
+        // Update month display
+        monthDisplay.textContent = `${monthNames[month]} ${year}`;
+        
+        // Clear previous calendar
+        calendarContainer.innerHTML = '';
+        
+        // Get first day of month and number of days
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        // Get days from previous month to show
+        const daysInPrevMonth = new Date(year, month, 0).getDate();
+        
+        // Create days from previous month
+        for (let i = firstDay - 1; i >= 0; i--) {
+            const day = daysInPrevMonth - i;
+            const dateStr = formatDate(year, month - 1, day);
+            const dayElement = createDayElement(day, dateStr, true, false);
+            calendarContainer.appendChild(dayElement);
+        }
+        
+        // Create days for current month
+        const today = new Date();
+        for (let i = 1; i <= daysInMonth; i++) {
+            const dateStr = formatDate(year, month, i);
+            const isToday = today.getDate() === i && 
+                           today.getMonth() === month && 
+                           today.getFullYear() === year;
+            const isPast = new Date(dateStr) < new Date().setHours(0, 0, 0, 0);
+            const dayElement = createDayElement(i, dateStr, false, isToday, isPast);
+            calendarContainer.appendChild(dayElement);
+        }
+        
+        // Calculate how many next month days to show (to fill the grid)
+        const totalCells = 42; // 6 rows x 7 columns
+        const daysSoFar = firstDay + daysInMonth;
+        const nextMonthDays = totalCells - daysSoFar;
+        
+        // Create days from next month
+        for (let i = 1; i <= nextMonthDays; i++) {
+            const dateStr = formatDate(year, month + 1, i);
+            const dayElement = createDayElement(i, dateStr, true, false);
+            calendarContainer.appendChild(dayElement);
+        }
     }
-}
 
-// Close modal when clicking outside
-document.addEventListener('click', function(e) {
-    if (e.target.id === 'cancel-modal-active') {
-        closeCancelModal();
+    function formatDate(year, month, day) {
+        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
-});
 
-</script>
+    function createDayElement(day, dateStr, isOtherMonth, isToday = false, isPast = false) {
+        const dayElement = document.createElement('div');
+        
+        // Determine day status
+        const dateInfo = availableDates.find(d => d.date === dateStr);
+        const isHoliday = holidays[dateStr];
+        
+        let dayStatus = 'no-slots';
+        let buttonText = 'No slots';
+        
+        if (isHoliday) {
+            dayStatus = 'holiday';
+            buttonText = 'Holiday';
+        } else if (dateInfo) {
+            if (dateInfo.available_slots > 0) {
+                dayStatus = 'available';
+                buttonText = `${dateInfo.available_slots} slot${dateInfo.available_slots > 1 ? 's' : ''}`;
+            } else {
+                dayStatus = 'fully-booked';
+                buttonText = 'Fully booked';
+            }
+        }
+        
+        // Add appropriate classes
+        let classes = ['calendar-day'];
+        if (isOtherMonth) classes.push('other-month');
+        if (isToday) classes.push('today');
+        if (isPast) classes.push('past');
+        
+        dayElement.className = classes.join(' ');
+        
+        // Create day content
+        dayElement.innerHTML = `
+            <div class="calendar-day-number">${day}</div>
+            <div class="calendar-day-content">
+                ${!isOtherMonth && !isPast ? 
+                    `<button class="calendar-day-button ${dayStatus}" onclick="selectDate('${dateStr}')">
+                        ${buttonText}
+                    </button>` : 
+                    `<div class="text-xs text-center">${isHoliday ? 'Holiday' : (isPast ? 'Past' : '')}</div>`
+                }
+            </div>
+        `;
+        
+        return dayElement;
+    }
 
+    function selectDate(date) {
+        window.location.href = '?date=' + date;
+    }
+
+    function selectSlot(slotId, startTime, endTime, staffName, specialization) {
+        document.getElementById('selected_slot_id').value = slotId;
+        
+        const slotInfo = document.getElementById('slot-info');
+        slotInfo.innerHTML = `
+            <div class="flex items-start mb-1">
+                <i class="fa-regular fa-clock text-gray-500 mr-2 mt-0.5"></i>
+                <div>
+                    <span class="font-medium">Time:</span> ${formatTime(startTime)} - ${formatTime(endTime)}
+                </div>
+            </div>
+            <div class="flex items-start">
+                <i class="fa-solid fa-user-md text-gray-500 mr-2 mt-0.5"></i>
+                <div>
+                    <span class="font-medium">Health Worker:</span> ${staffName} ${specialization ? '(' + specialization + ')' : ''}
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('slot-details').classList.remove('hidden');
+    }
+
+    function formatTime(timeStr) {
+        const time = new Date('1970-01-01T' + timeStr + 'Z');
+        return time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function validateHealthConcerns() {
+        const checkboxes = document.querySelectorAll('input[name="health_concerns[]"]:checked');
+        if (checkboxes.length === 0) {
+            alert("Please select at least one health concern.");
+            return false;
+        }
+
+        const otherChecked = document.getElementById("other_concern").checked;
+        const otherInput = document.getElementById("other_concern_specify").value.trim();
+
+        if (otherChecked && otherInput === "") {
+            alert("Please specify your other health concern.");
+            return false;
+        }
+
+        return true;
+    }
+
+    function openCancelModal(appointmentId) {
+        document.getElementById('modal-appointment-id').value = appointmentId;
+        showModal('cancel');
+    }
+
+    function closeCancelModal() {
+        hideModal('cancel');
+    }
+
+    function downloadInvoice(appointmentId) {
+        window.location.href = '?download_invoice=' + appointmentId;
+    }
+
+    function showModal(type) {
+        const modal = document.getElementById(`${type}-modal`);
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+    }
+
+    function hideModal(type) {
+        const modal = document.getElementById(`${type}-modal`);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    // Close modal when clicking outside
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal-overlay')) {
+            e.target.style.display = 'none';
+        }
+    });
+    </script>
+</body>
+</html>
