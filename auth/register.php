@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $confirmPassword = trim($_POST['confirm_password'] ?? '');
     $fullName = trim($_POST['full_name'] ?? '');
     $age = intval($_POST['age'] ?? 0);
+    $gender = trim($_POST['gender'] ?? ''); // Added gender field
     $address = trim($_POST['address'] ?? '');
     $contact = trim($_POST['contact'] ?? '');
     
@@ -40,6 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if (empty($fullName)) {
         showGlassModal('error', 'Full name is required.');
+        exit();
+    }
+    
+    if (empty($gender)) { // Added gender validation
+        showGlassModal('error', 'Gender is required.');
         exit();
     }
     
@@ -73,8 +79,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Proceed with registration
     try {
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare("INSERT INTO sitio1_users (username, email, password, full_name, age, address, contact, approved) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
-        $stmt->execute([$username, $email, $hashedPassword, $fullName, $age, $address, $contact]);
+        // Updated query to include gender
+        $stmt = $pdo->prepare("INSERT INTO sitio1_users (username, email, password, full_name, age, gender, address, contact, approved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)");
+        $stmt->execute([$username, $email, $hashedPassword, $fullName, $age, $gender, $address, $contact]);
         
         showGlassModal('success', 'Registration Successful', 'Your Account is Pending Approval by Staff. You will receive an email notification once your registration is approved or declined by the staff.');
         exit();
