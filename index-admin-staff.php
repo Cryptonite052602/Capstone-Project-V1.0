@@ -32,55 +32,244 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Healthcare System</title>
+    <title>Login | Barangay Pahina San Nicolas Healthcare</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root {
+            --primary: #3B82F6;
+            --primary-dark: #2563EB;
+            --secondary: #FC566C;
+            --secondary-dark: #e04a5f;
+            --light-bg: #F8FAFC;
+            --text-primary: #1E293B;
+            --text-secondary: #64748B;
+        }
+        
         body {
             font-family: 'Inter', sans-serif;
             margin: 0;
             padding: 0;
+            background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #bae6fd 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            display: flex;
+            width: 100%;
+            max-width: 1000px;
+            min-height: 550px;
+            background: white;
+            border-radius: 16px;
             overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
         }
-        .login-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            height: 100vh;
+        
+        .form-section {
+            flex: 1;
+            padding: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
+        
+        .image-section {
+            flex: 1;
+            position: relative;
+            display: none;
+        }
+        
         @media (min-width: 768px) {
-            .login-grid {
-                grid-template-columns: 1fr 1fr;
+            .image-section {
+                display: block;
             }
         }
-        .form-section {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            width: 100%;
-            background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #bae6fd 100%);
-        }
-        .image-section {
-            position: relative;
-            overflow: hidden;
-            height: 100%;
-            background-color: #f3f4f6;
-        }
+        
         .login-image {
-            position: absolute;
             width: 100%;
             height: 100%;
             object-fit: cover;
-            object-position: center;
-            min-width: 100%;
-            min-height: 100%;
         }
-        .form-container {
+        
+        .image-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            max-width: 400px;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.7));
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
             padding: 2rem;
+            color: white;
         }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .logo {
+            background: var(--secondary);
+            width: 45px;
+            height: 45px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.3rem;
+            box-shadow: 0 4px 6px rgba(252, 86, 108, 0.2);
+        }
+        
+        .logo-text {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--secondary);
+            margin-left: 0.75rem;
+        }
+        
+        .welcome-text {
+            margin-bottom: 2rem;
+        }
+        
+        .welcome-text h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .welcome-text p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .input-container {
+            position: relative;
+        }
+        
+        .input-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            z-index: 10;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.85rem 1rem 0.85rem 2.8rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 0.85rem 2.8rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            appearance: none;
+            background: white;
+            transition: all 0.2s;
+        }
+        
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        
+        .select-arrow {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 0.9rem 1rem;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 0.5rem;
+        }
+        
+        .btn-login:hover {
+            background: var(--secondary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(252, 86, 108, 0.3);
+        }
+        
+        .btn-login:active {
+            transform: translateY(0);
+        }
+        
+        .support-text {
+            text-align: center;
+            margin-top: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        
+        .error-message {
+            background: #FEF2F2;
+            color: #DC2626;
+            padding: 0.85rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+            border-left: 4px solid #DC2626;
+        }
+        
+        .error-icon {
+            margin-right: 0.6rem;
+        }
+        
+        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
@@ -88,244 +277,269 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             left: 0;
             width: 100%;
             height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
             z-index: 1000;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
-        .input-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #64748b;
+        
+        .modal.show {
+            opacity: 1;
         }
-        .input-with-icon {
-            padding-left: 2.5rem;
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 2.5rem 2rem;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
         }
-        .select-icon {
-            position: absolute;
-            right: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #64748b;
-            pointer-events: none;
+        
+        .modal.show .modal-content {
+            transform: translateY(0);
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(59, 130, 246, 0.2);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.2rem;
         }
-        .animate-fade-in {
-            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        
+        .success-check {
+            color: #10B981;
+            font-size: 3.5rem;
+            margin-bottom: 1.2rem;
         }
+        
+        .error-x {
+            color: #EF4444;
+            font-size: 3.5rem;
+            margin-bottom: 1.2rem;
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .animate-spin {
-            animation: spin 1s linear infinite;
+        
+        .modal-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 0.6rem;
+            color: var(--text-primary);
+        }
+        
+        .modal-message {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+        
+        .modal-btn {
+            padding: 0.7rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .modal-btn:hover {
+            background: var(--primary-dark);
         }
     </style>
 </head>
 
 <body>
-    <div class="login-grid">
-
+    <div class="login-container">
         <!-- Form Section -->
         <div class="form-section">
-            <div class="form-container">
-                <div class="flex justify-center mb-8">
-                    <div class="flex items-center">
-                        <div class="bg-[#FC566C] p-2 rounded-lg">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                            </svg>
+            <div class="logo-container">
+                <div class="logo">
+                    <i class="fas fa-hospital"></i>
+                </div>
+                <div class="logo-text">Barangay Pahina San Nicolas</div>
+            </div>
+
+            <div class="welcome-text">
+                <h2>Welcome Back</h2>
+                <p>Sign in to your Admin/Staff account</p>
+            </div>
+
+            <?php if ($error): ?>
+                <div class="error-message">
+                    <i class="fas fa-exclamation-circle error-icon"></i>
+                    <?php echo htmlspecialchars($error); ?>
+                </div>
+            <?php endif; ?>
+
+            <form id="loginForm" method="POST" action="">
+                <div class="form-group">
+                    <label for="role" class="form-label">Role</label>
+                    <div class="input-container">
+                        <div class="input-icon">
+                            <i class="fas fa-user-tag"></i>
                         </div>
-                        <h1 class="text-4xl font-bold text-[#FC566C] ml-3">CHTMS</h1>
+                        <select id="role" name="role" class="form-select" required>
+                            <option value="">Select Role</option>
+                            <option value="admin">Admin</option>
+                            <option value="staff">Staff</option>
+                        </select>
+                        <div class="select-arrow">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
                     </div>
                 </div>
 
-                <div class="text-center mb-8">
-                    <h2 class="text-2xl font-semibold text-gray-800">Welcome Back</h2>
-                    <p class="text-sm text-gray-600 mt-1">Sign in to your Admin / Staff Account</p>
+                <div class="form-group">
+                    <label for="username" class="form-label">Username</label>
+                    <div class="input-container">
+                        <div class="input-icon">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <input type="text" id="username" name="username" class="form-input" placeholder="Enter your username" required>
+                    </div>
                 </div>
 
-                <?php if ($error): ?>
-                    <div class="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm flex items-center">
-                        <i class="fas fa-exclamation-circle mr-2"></i>
-                        <?php echo htmlspecialchars($error); ?>
-                    </div>
-                <?php endif; ?>
-
-                <form id="loginForm" method="POST" action="" class="space-y-6">
-                    <div>
-                        <label for="role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                        <div class="relative">
-                            <div class="input-icon">
-                                <i class="fas fa-user-tag"></i>
-                            </div>
-                            <select id="role" name="role" required
-                                class="block w-full px-4 py-2.5 pl-10 text-sm border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent appearance-none">
-                                <option value="">Select Role</option>
-                                <option value="admin">Admin</option>
-                                <option value="staff">Staff</option>
-                            </select>
-                            <div class="select-icon">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </div>
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <div class="input-container">
+                        <div class="input-icon">
+                            <i class="fas fa-lock"></i>
                         </div>
+                        <input type="password" id="password" name="password" class="form-input" placeholder="Enter your password" required>
                     </div>
-
-                    <div>
-                        <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                        <div class="relative">
-                            <div class="input-icon">
-                                <i class="fas fa-user"></i>
-                            </div>
-                            <input type="text" name="username" id="username" placeholder="Enter username" required
-                                class="block w-full px-4 py-2.5 pl-10 text-sm border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent input-with-icon">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                        <div class="relative">
-                            <div class="input-icon">
-                                <i class="fas fa-lock"></i>
-                            </div>
-                            <input type="password" name="password" id="password" placeholder="Enter password" required
-                                class="block w-full px-4 py-2.5 pl-10 text-sm border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent input-with-icon">
-                        </div>
-                    </div>
-
-                    <div class="pt-2">
-                        <button type="submit" 
-                            class="w-full px-4 py-2.5 bg-[#FC566C] text-white font-medium rounded-lg hover:bg-[#e04a5f] focus:outline-none focus:ring-2 focus:ring-[#FC566C] focus:ring-opacity-50 transition-colors flex items-center justify-center">
-                            <i class="fas fa-sign-in-alt mr-2"></i> Sign in
-                        </button>
-                    </div>
-                </form>
-                
-                <div class="mt-6 text-center text-sm text-gray-500">
-                    <p>Need help? Contact support@chtms.org</p>
                 </div>
+
+                <button type="submit" class="btn-login">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Sign In
+                </button>
+            </form>
+
+            <div class="support-text">
+                <p>Need help? Contact support@chtms.org</p>
             </div>
         </div>
 
         <!-- Image Section -->
-        <div class="hidden md:block image-section">
+        <div class="image-section">
             <img src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80" 
-                 alt="Healthcare professional" class="login-image">
-            <div class="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-                <div class="text-white text-center p-8 max-w-md">
-                    <h2 class="text-3xl font-bold mb-4">Comprehensive Healthcare Management</h2>
-                    <p class="text-lg">Streamlined system for medical professionals to provide exceptional patient care</p>
-                </div>
+                 alt="Healthcare professionals" class="login-image">
+            <div class="image-overlay">
+                <h2 class="text-2xl font-bold mb-2">Comprehensive Healthcare Management</h2>
+                <p class="text-lg">Streamlined system for medical professionals to provide exceptional patient care</p>
             </div>
         </div>
     </div>
 
     <!-- Validation Modal -->
     <div id="validationModal" class="modal">
-        <div class="absolute inset-0 bg-black bg-opacity-20 backdrop-blur-sm"></div>
-        <div class="relative bg-white/50 backdrop-blur-lg rounded-xl p-8 max-w-md w-full shadow-lg border border-white/30 animate-fade-in">
-            <div class="flex flex-col items-center">
-                <div class="relative w-16 h-16 mb-4">
-                    <div id="successSpinner" class="absolute inset-0 rounded-full border-4 border-green-500/80 border-t-transparent animate-spin hidden"></div>
-                    <div id="successSpinnerInner" class="absolute inset-2 rounded-full border-4 border-green-500/80 border-t-transparent animate-spin hidden" style="animation-delay: -0.3s"></div>
-                    <div id="errorSpinner" class="absolute inset-0 rounded-full border-4 border-red-500/80 border-t-transparent animate-spin hidden"></div>
-                    <div id="errorSpinnerInner" class="absolute inset-2 rounded-full border-4 border-red-500/80 border-t-transparent animate-spin hidden" style="animation-delay: -0.3s"></div>
-                    <div id="loadingSpinner" class="absolute inset-0 rounded-full border-4 border-blue-500/80 border-t-transparent animate-spin"></div>
-                    <div id="loadingSpinnerInner" class="absolute inset-2 rounded-full border-4 border-blue-500/80 border-t-transparent animate-spin" style="animation-delay: -0.3s"></div>
-                    <div class="absolute inset-1 flex items-center justify-center">
-                        <svg id="successIcon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-500/90 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <svg id="errorIcon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-500/90 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        <div id="loadingIcon" class="loader w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                    </div>
-                </div>
-                <h3 id="modalTitle" class="text-xl font-semibold text-gray-800 mb-2">Authenticating...</h3>
-                <p id="modalMessage" class="text-gray-600 text-center">Please wait while we verify your credentials</p>
+        <div class="modal-content">
+            <div id="loadingSpinner" class="spinner"></div>
+            <div id="successIcon" class="success-check" style="display: none;">
+                <i class="fas fa-check-circle"></i>
             </div>
+            <div id="errorIcon" class="error-x" style="display: none;">
+                <i class="fas fa-times-circle"></i>
+            </div>
+            
+            <h3 id="modalTitle" class="modal-title">Authenticating...</h3>
+            <p id="modalMessage" class="modal-message">Please wait while we verify your credentials</p>
+            
+            <button id="modalButton" class="modal-btn" style="display: none;">Try Again</button>
         </div>
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.getElementById('loginForm');
             const modal = document.getElementById('validationModal');
-            modal.style.display = 'flex';
+            const modalButton = document.getElementById('modalButton');
             
-            const formData = new FormData(this);
+            // Function to show modal with smooth animation
+            function showModal() {
+                modal.style.display = 'flex';
+                setTimeout(() => {
+                    modal.classList.add('show');
+                }, 10);
+            }
             
-            fetch('', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Show success state
-                    document.getElementById('loadingSpinner').classList.add('hidden');
-                    document.getElementById('loadingSpinnerInner').classList.add('hidden');
-                    document.getElementById('loadingIcon').classList.add('hidden');
-                    
-                    document.getElementById('successSpinner').classList.remove('hidden');
-                    document.getElementById('successSpinnerInner').classList.remove('hidden');
-                    document.getElementById('successIcon').classList.remove('hidden');
-                    
-                    document.getElementById('modalTitle').textContent = 'Login Successful!';
-                    document.getElementById('modalMessage').textContent = `Redirecting to ${data.role} dashboard...`;
-                    
-                    setTimeout(() => {
-                        if (data.role === 'admin') {
-                            window.location.href = 'admin/dashboard.php';
-                        } else if (data.role === 'staff') {
-                            window.location.href = 'staff/dashboard.php';
-                        }
-                    }, 1000);
-                } else {
-                    // Show error state
-                    document.getElementById('loadingSpinner').classList.add('hidden');
-                    document.getElementById('loadingSpinnerInner').classList.add('hidden');
-                    document.getElementById('loadingIcon').classList.add('hidden');
-                    
-                    document.getElementById('errorSpinner').classList.remove('hidden');
-                    document.getElementById('errorSpinnerInner').classList.remove('hidden');
-                    document.getElementById('errorIcon').classList.remove('hidden');
-                    
-                    document.getElementById('modalTitle').textContent = 'Login Failed';
-                    document.getElementById('modalMessage').textContent = 'Invalid credentials. Please try again.';
-                    
-                    setTimeout(() => {
-                        modal.style.display = 'none';
-                        window.location.reload();
-                    }, 2000);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                // Show error state
-                document.getElementById('loadingSpinner').classList.add('hidden');
-                document.getElementById('loadingSpinnerInner').classList.add('hidden');
-                document.getElementById('loadingIcon').classList.add('hidden');
-                
-                document.getElementById('errorSpinner').classList.remove('hidden');
-                document.getElementById('errorSpinnerInner').classList.remove('hidden');
-                document.getElementById('errorIcon').classList.remove('hidden');
-                
-                document.getElementById('modalTitle').textContent = 'Error';
-                document.getElementById('modalMessage').textContent = 'An error occurred. Please try again.';
-                
+            // Function to hide modal with smooth animation
+            function hideModal() {
+                modal.classList.remove('show');
                 setTimeout(() => {
                     modal.style.display = 'none';
-                    window.location.reload();
-                }, 2000);
+                }, 300);
+            }
+            
+            // Handle login form submission
+            loginForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                showModal();
+                
+                const formData = new FormData(this);
+                
+                fetch('', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Show success state
+                        document.getElementById('loadingSpinner').style.display = 'none';
+                        document.getElementById('successIcon').style.display = 'block';
+                        
+                        document.getElementById('modalTitle').textContent = 'Login Successful!';
+                        document.getElementById('modalMessage').textContent = `Redirecting to ${data.role} dashboard...`;
+                        
+                        setTimeout(() => {
+                            if (data.role === 'admin') {
+                                window.location.href = 'admin/dashboard.php';
+                            } else if (data.role === 'staff') {
+                                window.location.href = 'staff/dashboard.php';
+                            }
+                        }, 1500);
+                    } else {
+                        // Show error state
+                        document.getElementById('loadingSpinner').style.display = 'none';
+                        document.getElementById('errorIcon').style.display = 'block';
+                        modalButton.style.display = 'block';
+                        
+                        document.getElementById('modalTitle').textContent = 'Login Failed';
+                        document.getElementById('modalMessage').textContent = data.message || 'Invalid credentials. Please try again.';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Show error state
+                    document.getElementById('loadingSpinner').style.display = 'none';
+                    document.getElementById('errorIcon').style.display = 'block';
+                    modalButton.style.display = 'block';
+                    
+                    document.getElementById('modalTitle').textContent = 'Error';
+                    document.getElementById('modalMessage').textContent = 'An error occurred. Please try again.';
+                });
+            });
+            
+            // Handle modal button click
+            modalButton.addEventListener('click', function() {
+                hideModal();
             });
         });
     </script>
