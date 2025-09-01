@@ -518,7 +518,7 @@ function closeLearnMoreModal() {
     <?php endif; ?>
     
     <?php if (!empty($success)): ?>
-        <div class="mb-6 bg-green-100 border border-green-400 text-green-700 px-极 py-3 rounded text-sm" role="alert">
+        <div class="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded text-sm" role="alert">
             <span><?php echo htmlspecialchars($success); ?></span>
         </div>
     <?php endif; ?>
@@ -536,7 +536,7 @@ function closeLearnMoreModal() {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1" for="age">Age</label>
-                <input type="number" id="age极 name="age" placeholder="Age" min="1" max="120"
+                <input type="number" id="age" name="age" placeholder="Age" min="1" max="120"
                     value="<?php echo isset($_POST['age']) ? htmlspecialchars($_POST['age']) : ''; ?>"
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
             </div>
@@ -565,7 +565,7 @@ function closeLearnMoreModal() {
             <label class="block text-sm font-medium text-gray-700 mb-1" for="address">Address</label>
             <input type="text" id="address" name="address" placeholder="Address"
                 value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>"
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2极 focus:ring-[#3C96极1] focus:border-transparent" required />
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
         </div>
 
         <!-- Continue Button -->
