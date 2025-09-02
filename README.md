@@ -1,6 +1,6 @@
 Hello Team!
 
-Thank you for you cooperation for this project, even we're struggling we always fight for this obligation as a student because we know everything gonna be okay and successfully passed soon. God always guide us for this project always trust your self and pray always. 
+Thank you for your cooperation for this project, even we're struggling we always fight for this obligation as a student because we know everything gonna be okay and successfully passed soon. God always guide us for this project always trust your self and pray always. 
 
 Researchers:
 
