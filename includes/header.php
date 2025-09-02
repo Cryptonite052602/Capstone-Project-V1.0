@@ -514,9 +514,9 @@ require_once __DIR__ . '/header.php';
 
                        <!-- First Registration Modal -->
 <div id="registerFormModal" class="hidden animate__animated animate__fadeInRight">
-    <div class="items-center text-center my-4 md:my-12 px-4">
-        <h2 class="text-xl md:text-[25px] font-bold text-[#FC566C] font-semibold">Register Your Account</h2>
-        <p class="text-sm md:text-base">Sign up to your resident account</p>
+    <div class="items-center text-center pt-4 md:pt-6 pb-2 md:pb-4 px-4">
+        <h2 class="text-xl md:text-[25px] font-bold text-[#FC566C]">Register Your Account</h2>
+        <p class="text-sm md:text-base mt-1">Sign up to your resident account</p>
     </div>
     
     <?php if (!empty($error)): ?>
@@ -532,49 +532,60 @@ require_once __DIR__ . '/header.php';
     <?php endif; ?>
     
     <form id="firstRegisterForm" class="space-y-4">
-        <div class="my-4 md:my-8 mx-auto w-full max-w-lg px-4 md:px-0">
-            <div class="mb-3">
-                <label for="full_name" class="text-sm md:text-base">Full Name <span class="text-red-500">*</span></label>
+        <div class="mx-auto w-full max-w-lg px-4 md:px-6 pb-4">
+            <div class="mb-4">
+                <label for="full_name" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
                 <input type="text" id="full_name" name="full_name" placeholder="Full Name" 
                     value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>"
-                    class="w-full p-3 md:p-4 mt-1 md:mt-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#3C96E1] text-sm md:text-base" required />
+                    class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base" required />
             </div>
 
-            <div class="flex flex-col md:flex-row gap-4 mb-3">
-                <div class="w-full md:w-1/2">
-                    <label for="age" class="text-sm md:text-base">Age <span class="text-red-500">*</span></label>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label for="age" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Age <span class="text-red-500">*</span></label>
                     <input type="number" id="age" name="age" placeholder="Age" min="1" max="120"
                         value="<?php echo isset($_POST['age']) ? htmlspecialchars($_POST['age']) : ''; ?>"
-                        class="w-full mt-1 md:mt-2 p-3 md:p-4 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#3C96E1] text-sm md:text-base" required />
+                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base" required />
                 </div>
 
-                <div class="w-full md:w-1/2">
-                    <label for="contact" class="text-sm md:text-base">Contact Number <span class="text-red-500">*</span></label>
+                <div>
+                    <label for="gender" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Gender <span class="text-red-500">*</span></label>
+                    <select id="gender" name="gender" 
+                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base" required>
+                        <option value="" disabled selected>Select Gender</option>
+                        <option value="male" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'male') ? 'selected' : ''; ?>>Male</option>
+                        <option value="female" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'female') ? 'selected' : ''; ?>>Female</option>
+                        <option value="other" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'other') ? 'selected' : ''; ?>>Other</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="contact" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Contact Number <span class="text-red-500">*</span></label>
                     <input type="tel" id="contact" name="contact" placeholder="Contact Number"
                         value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>"
-                        class="w-full mt-1 md:mt-2 p-3 md:p-4 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#3C96E1] text-sm md:text-base" required />
+                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base" required />
                 </div>
             </div>
 
-            <div class="mb-3">
-                <label for="address" class="text-sm md:text-base">Address<span class="text-red-500">*</span></label>
+            <div class="mb-6">
+                <label for="address" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Address<span class="text-red-500">*</span></label>
                 <input type="text" id="address" name="address" placeholder="Address"
                     value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>"
-                    class="w-full mt-1 md:mt-2 p-3 md:p-4 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#3C96E1] text-sm md:text-base" required />
+                    class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base" required />
             </div>
 
             <button type="button" id="openSecondRegister"
-                class="bg-[#FC566C] w-full p-3 md:p-4 rounded text-white hover:bg-[#f1233f] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
+                class="bg-[#FC566C] w-full p-3 rounded-md text-white hover:bg-[#f1233f] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base font-medium transition-colors duration-200"
                 disabled>
                 Continue
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mt-1 ml-2" fill="none"
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2" fill="none"
                     viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M9 5l7 7-7 7" />
                 </svg>
             </button>
 
-            <div class="flex flex-col md:flex-row justify-center mt-4 md:mt-5 text-sm md:text-md font-semibold space-y-1 md:space-y-0 md:space-x-1">
+            <div class="flex flex-col md:flex-row justify-center mt-4 text-sm md:text-base font-medium space-y-1 md:space-y-0 md:space-x-1">
                 <p>Already have an account?</p>
                 <button id="registerToLogin" type="button"
                     class="text-[#FC566C] hover:underline">Login</button>
@@ -584,60 +595,61 @@ require_once __DIR__ . '/header.php';
 </div>
 
 <!-- Second Registration Modal -->
-<div id="secondRegisterFormModal" class="hidden animate__animated animate__fadeInRight pb-4 md:pb-8">
-    <button class="h-6 w-6 rounded mt-4 ml-4" id="backToFirstRegister" aria-label="Back">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-[#FC566C]">
+<div id="secondRegisterFormModal" class="hidden animate__animated animate__fadeInRight">
+    <button class="h-8 w-8 rounded-full mt-4 ml-4 flex items-center justify-center hover:bg-gray-100 transition-colors" id="backToFirstRegister" aria-label="Back">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-[#FC566C]">
             <path d="M15.75 19.5L8.25 12l7.5-7.5v15z" />
         </svg>
     </button>
 
-    <div class="items-center text-center my-4 md:my-8 px-4">
+    <div class="items-center text-center pt-2 md:pt-4 pb-2 md:pb-4 px-4">
         <h2 class="text-xl md:text-2xl font-bold text-[#FC566C]">Complete Your Registration</h2>
-        <p class="text-gray-600 mt-1 md:mt-2 text-sm md:text-base">Add your account credentials</p>
+        <p class="text-gray-600 mt-1 text-sm md:text-base">Add your account credentials</p>
     </div>
 
-    <form method="POST" action="/community-health-tracker/auth/register.php" class="px-4 pb-4 md:pb-6" id="secondRegisterForm">
-        <div class="mx-auto w-full max-w-md space-y-3 md:space-y-4">
+    <form method="POST" action="/community-health-tracker/auth/register.php" class="px-4 pb-6" id="secondRegisterForm">
+        <div class="mx-auto w-full max-w-md space-y-4">
             <!-- Hidden fields to pass data from first form -->
             <input type="hidden" name="full_name" id="hidden_full_name" value="">
             <input type="hidden" name="age" id="hidden_age" value="">
+            <input type="hidden" name="gender" id="hidden_gender" value="">
             <input type="hidden" name="contact" id="hidden_contact" value="">
             <input type="hidden" name="address" id="hidden_address" value="">
             
-            <div class="space-y-3 md:space-y-4">
+            <div class="space-y-4">
                 <div>
-                    <label for="username" class="block text-sm md:text-base font-medium text-gray-700">Username <span class="text-red-500">*</span></label>
+                    <label for="username" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Username <span class="text-red-500">*</span></label>
                     <input type="text" id="username" name="username" placeholder="Username"
                         value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>"
-                        class="w-full p-2 md:p-3 mt-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#3C96E1] text-sm md:text-base" required />
+                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base" required />
                 </div>
                 
                 <div>
-                    <label for="email" class="block text-sm md:text-base font-medium text-gray-700">Email <span class="text-red-500">*</span></label>
+                    <label for="email" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
                     <input type="email" id="email" name="email" placeholder="Email"
                         value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"
-                        class="w-full p-2 md:p-3 mt-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#3C96E1] text-sm md:text-base" required />
+                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base" required />
                 </div>
 
                 <div>
-                    <label for="password" class="block text-sm md:text-base font-medium text-gray-700">Password <span class="text-red-500">*</span></label>
+                    <label for="password" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Password <span class="text-red-500">*</span></label>
                     <input type="password" id="password" name="password" placeholder="Password (min 8 characters)"
-                        class="w-full p-2 md:p-3 mt-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#3C96E1] text-sm md:text-base" 
+                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base" 
                         minlength="8" required />
                     <p class="text-xs text-gray-500 mt-1">Password must be at least 8 characters</p>
                 </div>
 
                 <div>
-                    <label for="confirm_password" class="block text-sm md:text-base font-medium text-gray-700">Confirm Password <span class="text-red-500">*</span></label>
+                    <label for="confirm_password" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Confirm Password <span class="text-red-500">*</span></label>
                     <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password"
-                        class="w-full p-2 md:p-3 mt-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#3C96E1] text-sm md:text-base" 
+                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base" 
                         minlength="8" required />
                     <p id="passwordMatchError" class="text-xs text-red-500 mt-1 hidden">Passwords do not match</p>
                 </div>
             </div>
 
             <button type="submit" id="submitButton"
-                class="bg-[#FC566C] w-full p-3 rounded-md mt-4 md:mt-6 text-white hover:bg-[#f1233f] transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base">
+                class="bg-[#FC566C] w-full p-3 rounded-md mt-2 text-white hover:bg-[#f1233f] transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base">
                 Complete Registration
             </button>
         </div>
@@ -677,6 +689,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add event listeners to first form fields
     firstFormRequiredFields.forEach(field => {
         field.addEventListener('input', checkFirstFormCompletion);
+        field.addEventListener('change', checkFirstFormCompletion);
     });
     
     // Initial check
@@ -689,6 +702,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Transfer data to hidden fields in second form
         document.getElementById('hidden_full_name').value = document.getElementById('full_name').value;
         document.getElementById('hidden_age').value = document.getElementById('age').value;
+        document.getElementById('hidden_gender').value = document.getElementById('gender').value;
         document.getElementById('hidden_contact').value = document.getElementById('contact').value;
         document.getElementById('hidden_address').value = document.getElementById('address').value;
         
@@ -756,6 +770,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 checkSecondFormCompletion();
             }
         });
+        
+        field.addEventListener('change', function() {
+            if (field.id === 'password' || field.id === 'confirm_password') {
+                validatePasswordMatch();
+            } else {
+                checkSecondFormCompletion();
+            }
+        });
     });
 
     // Initial check for second form
@@ -774,7 +796,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle mobile virtual keyboard issues
     if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        const inputs = document.querySelectorAll('input');
+        const inputs = document.querySelectorAll('input, select');
         inputs.forEach(input => {
             input.addEventListener('focus', function() {
                 // Scroll the input into view with some padding
