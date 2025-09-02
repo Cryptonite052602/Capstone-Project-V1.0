@@ -290,9 +290,6 @@ try {
     </div>
     
     <div class="mt-6 flex justify-end space-x-4">
-        <button type="button" onclick="closeViewModal()" class="bg-gray-500 text-white py-2 px-6 rounded-lg hover:bg-gray-600 transition">
-            <i class="fas fa-times mr-2"></i>Cancel
-        </button>
         <button type="submit" name="save_health_info" class="bg-primary text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition">
             <i class="fas fa-save mr-2"></i>Save ' . ($isRegisteredUser ? 'Medical Information' : 'Changes') . '
         </button>
