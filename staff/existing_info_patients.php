@@ -11,10 +11,10 @@ if (!isStaff()) {
 $message = '';
 $error = '';
 
-// Handle form submission for editing health info
+// Handle form submission for editing health info - MODIFIED VALIDATION
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_health_info'])) {
-    // Validate required fields
-    $required = ['patient_id', 'height', 'weight', 'blood_type', 'gender'];
+    // Validate required fields but allow gender to be auto-populated from patient table if empty
+    $required = ['patient_id', 'height', 'weight', 'blood_type'];
     $missing = array();
     
     foreach ($required as $field) {
@@ -23,12 +23,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_health_info'])) 
         }
     }
     
+    // Get patient gender from database if not provided in form
+    $gender = $_POST['gender'];
+    if (empty($gender)) {
+        try {
+            $stmt = $pdo->prepare("SELECT gender FROM sitio1_patients WHERE id = ?");
+            $stmt->execute([$_POST['patient_id']]);
+            $patient = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($patient && !empty($patient['gender'])) {
+                $gender = $patient['gender'];
+            }
+        } catch (PDOException $e) {
+            // If we can't get gender from database, add it to missing fields
+            $missing[] = 'gender';
+        }
+    }
+    
     if (!empty($missing)) {
         $error = "Please fill in all required fields: " . implode(', ', str_replace('_', ' ', $missing));
     } else {
         try {
             $patient_id = $_POST['patient_id'];
-            $gender = $_POST['gender'];
             $height = $_POST['height'];
             $weight = $_POST['weight'];
             $blood_type = $_POST['blood_type'];
@@ -155,7 +170,7 @@ if (isset($_SESSION['success_message'])) {
     unset($_SESSION['success_message']);
 }
 
-// Handle patient deletion
+// Handle patient deletion - MODIFIED TO PRESERVE USER_ID
 if (isset($_GET['delete_patient'])) {
     $patientId = $_GET['delete_patient'];
     
@@ -163,20 +178,27 @@ if (isset($_GET['delete_patient'])) {
         // Start transaction
         $pdo->beginTransaction();
         
-        // Get patient data
+        // Get patient data including user_id
         $stmt = $pdo->prepare("SELECT * FROM sitio1_patients WHERE id = ? AND added_by = ?");
         $stmt->execute([$patientId, $_SESSION['user']['id']]);
         $patient = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($patient) {
-            // Insert into deleted_patients table
+            // Insert into deleted_patients table - preserve the user_id
             $stmt = $pdo->prepare("INSERT INTO deleted_patients 
-                (original_id, full_name, age, gender, address, contact, last_checkup, added_by, deleted_at, deleted_by) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)");
+                (original_id, full_name, age, gender, address, contact, last_checkup, added_by, user_id, deleted_at, deleted_by) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)");
             $stmt->execute([
-                $patient['id'], $patient['full_name'], $patient['age'], $patient['gender'], 
-                $patient['address'], $patient['contact'], $patient['last_checkup'], 
-                $patient['added_by'], $_SESSION['user']['id']
+                $patient['id'], 
+                $patient['full_name'], 
+                $patient['age'], 
+                $patient['gender'], 
+                $patient['address'], 
+                $patient['contact'], 
+                $patient['last_checkup'], 
+                $patient['added_by'],
+                $patient['user_id'], // This preserves the user linkage for restoration
+                $_SESSION['user']['id']
             ]);
             
             // Delete from main table
@@ -201,7 +223,117 @@ if (isset($_GET['delete_patient'])) {
     }
 }
 
-// Handle converting user to patient
+
+
+// Handle patient restoration - MODIFIED TO ENSURE GENDER IS PRESERVED
+if (isset($_GET['restore_patient'])) {
+    $patientId = $_GET['restore_patient'];
+    
+    try {
+        // Start transaction
+        $pdo->beginTransaction();
+        
+        // Get archived patient data including user_id
+        $stmt = $pdo->prepare("SELECT * FROM deleted_patients WHERE original_id = ? AND deleted_by = ?");
+        $stmt->execute([$patientId, $_SESSION['user']['id']]);
+        $archivedPatient = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($archivedPatient) {
+            // Restore to main patients table - preserve the user_id
+            $stmt = $pdo->prepare("INSERT INTO sitio1_patients 
+                (id, full_name, age, gender, address, contact, last_checkup, added_by, user_id, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->execute([
+                $archivedPatient['original_id'], 
+                $archivedPatient['full_name'], 
+                $archivedPatient['age'], 
+                $archivedPatient['gender'], 
+                $archivedPatient['address'], 
+                $archivedPatient['contact'], 
+                $archivedPatient['last_checkup'], 
+                $archivedPatient['added_by'],
+                $archivedPatient['user_id'] // This preserves the user linkage
+            ]);
+            
+            // Also restore health info with gender
+            $stmt = $pdo->prepare("INSERT INTO existing_info_patients 
+                (patient_id, gender, height, weight, blood_type) 
+                VALUES (?, ?, 0, 0, '') 
+                ON DUPLICATE KEY UPDATE gender = VALUES(gender)");
+            $stmt->execute([$patientId, $archivedPatient['gender']]);
+            
+            // Delete from archive
+            $stmt = $pdo->prepare("DELETE FROM deleted_patients WHERE original_id = ?");
+            $stmt->execute([$patientId]);
+            
+            $pdo->commit();
+            
+            $_SESSION['success_message'] = 'Patient record restored successfully!';
+            header('Location: deleted_patients.php');
+            exit();
+        } else {
+            $error = 'Archived patient not found!';
+        }
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        $error = 'Error restoring patient record: ' . $e->getMessage();
+    }
+}
+
+// Handle patient restoration - ADD THIS CODE AFTER THE DELETION HANDLING
+if (isset($_GET['restore_patient'])) {
+    $patientId = $_GET['restore_patient'];
+    
+    try {
+        // Start transaction
+        $pdo->beginTransaction();
+        
+        // Get archived patient data including user_id
+        $stmt = $pdo->prepare("SELECT * FROM deleted_patients WHERE original_id = ? AND deleted_by = ?");
+        $stmt->execute([$patientId, $_SESSION['user']['id']]);
+        $archivedPatient = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($archivedPatient) {
+            // Restore to main patients table - preserve the user_id
+            $stmt = $pdo->prepare("INSERT INTO sitio1_patients 
+                (id, full_name, age, gender, address, contact, last_checkup, added_by, user_id, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->execute([
+                $archivedPatient['original_id'], 
+                $archivedPatient['full_name'], 
+                $archivedPatient['age'], 
+                $archivedPatient['gender'], 
+                $archivedPatient['address'], 
+                $archivedPatient['contact'], 
+                $archivedPatient['last_checkup'], 
+                $archivedPatient['added_by'],
+                $archivedPatient['user_id'] // This preserves the user linkage
+            ]);
+            
+            // Also restore health info if it exists in archive (you might need to implement this)
+            // For now, we'll just create an empty health record
+            $stmt = $pdo->prepare("INSERT IGNORE INTO existing_info_patients (patient_id) VALUES (?)");
+            $stmt->execute([$patientId]);
+            
+            // Delete from archive
+            $stmt = $pdo->prepare("DELETE FROM deleted_patients WHERE original_id = ?");
+            $stmt->execute([$patientId]);
+            
+            $pdo->commit();
+            
+            $_SESSION['success_message'] = 'Patient record restored successfully!';
+            header('Location: deleted_patients.php');
+            exit();
+        } else {
+            $error = 'Archived patient not found!';
+        }
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        $error = 'Error restoring patient record: ' . $e->getMessage();
+    }
+}
+
+// Handle converting user to patient - MODIFIED TO ENSURE GENDER IS SET
 if (isset($_GET['convert_to_patient'])) {
     $userId = $_GET['convert_to_patient'];
     
@@ -233,9 +365,10 @@ if (isset($_GET['convert_to_patient'])) {
                 ]);
                 $patientId = $pdo->lastInsertId();
                 
-                // Insert medical info with gender from user
+                // Insert medical info with gender from user - ADD ALL REQUIRED FIELDS
                 $stmt = $pdo->prepare("INSERT INTO existing_info_patients 
-                    (patient_id, gender) VALUES (?, ?)");
+                    (patient_id, gender, height, weight, blood_type) 
+                    VALUES (?, ?, 0, 0, '')");
                 $stmt->execute([$patientId, $user['gender']]);
                 
                 $pdo->commit();
@@ -311,9 +444,7 @@ try {
     $error = "Error fetching patient records: " . $e->getMessage();
 }
 
-// Get existing health info if patient is selected
-$health_info = [];
-$patient_details = [];
+// Get existing health info if patient is selected - MODIFIED TO GET GENDER
 if (!empty($selectedPatientId)) {
     try {
         // Get basic patient info - FIXED: added gender field
@@ -335,6 +466,9 @@ if (!empty($selectedPatientId)) {
             // If health info exists but doesn't have gender, use the one from patient table
             if ($health_info && empty($health_info['gender']) && !empty($patient_details['gender'])) {
                 $health_info['gender'] = $patient_details['gender'];
+            } elseif (!$health_info && !empty($patient_details['gender'])) {
+                // If no health info exists yet, create a temporary array with patient gender
+                $health_info = ['gender' => $patient_details['gender']];
             }
         }
     } catch (PDOException $e) {
