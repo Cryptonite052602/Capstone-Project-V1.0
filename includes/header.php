@@ -254,7 +254,7 @@ require_once __DIR__ . '/header.php';
                     <div class="container mx-auto px-4">
                         <ul class="flex space-x-6">
                             <li><a href="/community-health-tracker/staff/dashboard.php" class="hover:bg-red-800 px-3 py-1 rounded">Dashboard</a></li>
-                            <li><a href="/community-health-tracker/staff/existing_info_patients.php" class="hover:bg-red-800 px-3 py-1 rounded">Patient Profile</a></li>
+                            <li><a href="/community-health-tracker/staff/existing_info_patients.php" class="hover:bg-red-800 px-3 py-1 rounded">Medical Records</a></li>
                             <li><a href="/community-health-tracker/staff/announcements.php" class="hover:bg-red-800 px-3 py-1 rounded">Announcements</a></li>
                             <!-- <li><a href="/community-health-tracker/staff/appointments.php" class="hover:bg-red-800 px-3 py-1 rounded">Appointments</a></li> -->
                         </ul>
