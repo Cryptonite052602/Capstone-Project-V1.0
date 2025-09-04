@@ -5,9 +5,92 @@ require_once __DIR__ . '/includes/header.php';
 if (isLoggedIn()) {
     redirectBasedOnRole();
 }
+
+// Fetch public announcements from database
+$publicAnnouncements = [];
+try {
+    $stmt = $pdo->prepare("SELECT title, message, priority, post_date 
+                          FROM sitio1_announcements 
+                          WHERE status = 'active' AND audience_type = 'public' 
+                          AND (expiry_date IS NULL OR expiry_date >= CURDATE())
+                          ORDER BY post_date DESC 
+                          LIMIT 10");
+    $stmt->execute();
+    $publicAnnouncements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // Silently fail - announcements are not critical for page load
+    error_log("Error fetching public announcements: " . $e->getMessage());
+}
 ?>
 
 <div class="min-h-screen bg-gray-100">
+    <!-- Public Announcements Banner -->
+    <?php if (!empty($publicAnnouncements)): ?>
+    <div class="bg-blue-600 text-white py-3 overflow-hidden">
+        <div class="relative">
+            <div class="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-blue-600 to-transparent z-10"></div>
+            <div class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-blue-600 to-transparent z-10"></div>
+            
+            <div class="announcement-container whitespace-nowrap animate-scroll">
+                <?php foreach ($publicAnnouncements as $announcement): ?>
+                    <span class="inline-flex items-center mx-8 text-sm md:text-base">
+                        <?php if ($announcement['priority'] == 'urgent'): ?>
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-red-500 text-white mr-2 animate-pulse">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                                URGENT
+                            </span>
+                        <?php elseif ($announcement['priority'] == 'high'): ?>
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-orange-500 text-white mr-2">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                IMPORTANT
+                            </span>
+                        <?php endif; ?>
+                        
+                        <span class="font-semibold mr-2"><?= htmlspecialchars($announcement['title']) ?>:</span>
+                        <span class="truncate max-w-xs md:max-w-md lg:max-w-lg"><?= htmlspecialchars($announcement['message']) ?></span>
+                        
+                        <span class="ml-4 text-blue-200 text-xs hidden md:inline">
+                            <?= date('M d, Y', strtotime($announcement['post_date'])) ?>
+                        </span>
+                    </span>
+                <?php endforeach; ?>
+                
+                <!-- Duplicate content for seamless looping -->
+                <?php foreach ($publicAnnouncements as $announcement): ?>
+                    <span class="inline-flex items-center mx-8 text-sm md:text-base">
+                        <?php if ($announcement['priority'] == 'urgent'): ?>
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-red-500 text-white mr-2 animate-pulse">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                                URGENT
+                            </span>
+                        <?php elseif ($announcement['priority'] == 'high'): ?>
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-orange-500 text-white mr-2">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                IMPORTANT
+                            </span>
+                        <?php endif; ?>
+                        
+                        <span class="font-semibold mr-2"><?= htmlspecialchars($announcement['title']) ?>:</span>
+                        <span class="truncate max-w-xs md:max-w-md lg:max-w-lg"><?= htmlspecialchars($announcement['message']) ?></span>
+                        
+                        <span class="ml-4 text-blue-200 text-xs hidden md:inline">
+                            <?= date('M d, Y', strtotime($announcement['post_date'])) ?>
+                        </span>
+                    </span>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Hero Section - Adjusted to start right below header -->
     <div class="bg-[#0073D3] py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden mt-0">
         <!-- Animated background circles -->
@@ -397,6 +480,57 @@ if (isLoggedIn()) {
     </div>
 </div>
 
+<style>
+@keyframes scroll {
+    0% {
+        transform: translateX(0%);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+.animate-scroll {
+    animation: scroll 40s linear infinite;
+    display: inline-block;
+}
+
+.announcement-container:hover .animate-scroll {
+    animation-play-state: paused;
+}
+
+/* Ensure proper text rendering during animation */
+.announcement-container {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+</style>
+
+<script>
+// Pause animation when user hovers over announcements
+document.addEventListener('DOMContentLoaded', function() {
+    const announcementContainer = document.querySelector('.announcement-container');
+    if (announcementContainer) {
+        announcementContainer.addEventListener('mouseenter', function() {
+            this.style.animationPlayState = 'paused';
+        });
+        
+        announcementContainer.addEventListener('mouseleave', function() {
+            this.style.animationPlayState = 'running';
+        });
+        
+        // Click to pause/play
+        announcementContainer.addEventListener('click', function() {
+            if (this.style.animationPlayState === 'paused') {
+                this.style.animationPlayState = 'running';
+            } else {
+                this.style.animationPlayState = 'paused';
+            }
+        });
+    }
+});
+</script>
+
 <script>
 function openLearnMoreModal() {
     document.getElementById('learnMoreModal').classList.remove('hidden');
@@ -409,474 +543,4 @@ function closeLearnMoreModal() {
     document.body.style.overflow = 'auto';
     document.body.style.position = 'static';
 }
-</script>
-
-<!-- Login Modal - Redesigned with wider dimensions -->
-<div id="loginModal" class="fixed inset-0 hidden z-50 h-full w-full backdrop-blur-sm bg-black/30 flex justify-center items-center p-4">
-    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-y-auto">
-        <!-- Close Icon (X) -->
-        <button onclick="closeModal()" class="absolute top-4 right-4 z-50 text-gray-500 hover:text-gray-700 bg-white rounded-full p-2 shadow-md">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
-
-        <div id="mainModal" class="p-8">
-            <div class="flex items-start gap-4 mb-8">
-                <img src="./asssets/images/check-icon.png" alt="check-icon" class="h-12 w-12 flex-shrink-0">
-                <p class="text-base text-gray-700">
-                    To access records and appointments, please log in with your authorized account or register for a new account to securely continue using the system today online.
-                </p>
-            </div>
-
-            <div class="flex flex-col sm:flex-row gap-4 mb-8">
-                <button id="openLogin" class="bg-[#FC566C] text-white hover:bg-[#f1233f] px-6 py-3 rounded-lg transition text-base font-medium flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                    </svg>
-                    Login
-                </button>
-
-                <button id="openRegister" class="bg-[#FC566C] text-white hover:bg-[#f1233f] px-6 py-3 rounded-lg transition text-base font-medium flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                    </svg>
-                    Register
-                </button>
-            </div>
-
-            <div class="h-64 rounded-lg overflow-hidden">
-                <img src="./asssets/images/healthcare.png" alt="" class="w-full h-full object-cover">
-            </div>
-        </div>
-
-        <!-- Login Form Modal -->
-        <div id="loginFormModal" class="hidden p-8">
-            <div class="text-center mb-8">
-                <h2 class="text-2xl font-bold text-[#FC566C]">Access Your Account</h2>
-                <p class="text-gray-600 mt-2">Sign in to your resident account</p>
-            </div>
-
-            <form method="POST" action="/community-health-tracker/auth/login.php" class="space-y-4">
-                <input type="hidden" name="role" value="user">
-                
-                <!-- Username -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="login_username">Username</label>
-                    <input type="text" name="username" id="login_username" placeholder="Enter Username" 
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" />
-                </div>
-
-                <!-- Password -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="login_password">Password</label>
-                    <div class="relative">
-                        <input id="login_password" name="password" type="password" placeholder="Password" 
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent pr-10" />
-                        <button type="button" onclick="toggleLoginPassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
-                            <i id="loginEyeIcon" class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Forgot Password -->
-                <div class="flex justify-end">
-                    <a href="#" class="text-sm font-medium text-gray-600 hover:text-[#FC566C] hover:underline">Forgot your password?</a>
-                </div>
-
-                <!-- Login Button -->
-                <div class="pt-2">
-                    <button type="submit" class="w-full bg-[#FC566C] text-white py-3 px-4 rounded-lg hover:bg-[#f1233f] transition flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                        </svg>
-                        Login
-                    </button>
-                </div>
-
-                <!-- Register Link -->
-                <div class="text-center pt-4">
-                    <p class="text-sm text-gray-600">
-                        Don't have an account? 
-                        <button id="loginToRegister" type="button" class="font-medium text-[#FC566C] hover:underline">Register here</button>
-                    </p>
-                </div>
-            </form>
-        </div>
-
-        <!-- First Registration Modal -->
-<div id="registerFormModal" class="hidden p-6">
-    <div class="text-center mb-8">
-        <h2 class="text-2xl font-bold text-[#FC566C]">Register Your Account</h2>
-        <p class="text-gray-600 mt-2">Sign up to your resident account</p>
-    </div>
-    
-    <?php if (!empty($error)): ?>
-        <div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm" role="alert">
-            <span><?php echo htmlspecialchars($error); ?></span>
-        </div>
-    <?php endif; ?>
-    
-    <?php if (!empty($success)): ?>
-        <div class="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded text-sm" role="alert">
-            <span><?php echo htmlspecialchars($success); ?></span>
-        </div>
-    <?php endif; ?>
-    
-    <form id="firstRegisterForm" class="space-y-4">
-        <!-- Full Name -->
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1" for="full_name">Full Name</label>
-            <input type="text" id="full_name" name="full_name" placeholder="Full Name" 
-                value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>"
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-        </div>
-
-        <!-- Age and Gender - Now side by side -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1" for="age">Age</label>
-                <input type="number" id="age" name="age" placeholder="Age" min="1" max="120"
-                    value="<?php echo isset($_POST['age']) ? htmlspecialchars($_POST['age']) : ''; ?>"
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-            </div>
-
-            <!-- Gender Field -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1" for="gender">Gender</label>
-                <select id="gender" name="gender" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent">
-                    <option value="">Select Gender</option>
-                    <option value="Male" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Male') ? 'selected' : ''; ?>>Male</option>
-                    <option value="Female" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Female') ? 'selected' : ''; ?>>Female</option>
-                    <option value="Other" <?php echo (isset($_POST['gender']) && $_POST['gender'] === 'Other') ? 'selected' : ''; ?>>Other</option>
-                </select>
-            </div>
-        </div>
-
-        <!-- Contact and Address -->
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1" for="contact">Contact Number</label>
-            <input type="tel" id="contact" name="contact" placeholder="Contact Number"
-                value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>"
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1" for="address">Address</label>
-            <input type="text" id="address" name="address" placeholder="Address"
-                value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>"
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-        </div>
-
-        <!-- Continue Button -->
-        <div class="pt-2">
-            <button type="button" id="openSecondRegister"
-                class="w-full bg-[#FC566C] text-white py-3 px-4 rounded-lg hover:bg-[#f1233f] transition flex items-center justify-center gap-2">
-                Continue
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-            </button>
-        </div>
-
-        <!-- Login Link -->
-        <div class="text-center pt-4">
-            <p class="text-sm text-gray-600">
-                Already have an account? 
-                <button id="registerToLogin" type="button" class="font-medium text-[#FC566C] hover:underline">Login here</button>
-            </p>
-        </div>
-    </form>
-</div>
-
-<!-- Second Registration Modal - Redesigned -->
-<div id="secondRegisterFormModal" class="hidden p-8">
-    <button class="text-[#FC566C] hover:text-[#f1233f] mb-6 flex items-center gap-1" id="backToFirstRegister">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-            <path d="M15.75 19.5L8.25 12l7.5-7.5v15z" />
-        </svg>
-        <span>Back to Personal Information</span>
-    </button>
-
-    <div class="text-center mb-8">
-        <h2 class="text-2xl font-bold text-[#FC566C]">Complete Your Registration</h2>
-        <p class="text-gray-600 mt-2">Add your account credentials</p>
-    </div>
-
-    <form method="POST" action="/community-health-tracker/auth/register.php" id="secondRegisterForm">
-        <!-- Hidden fields to pass data from first form -->
-        <input type="hidden" name="full_name" id="hidden_full_name" value="">
-        <input type="hidden" name="age" id="hidden_age" value="">
-        <input type="hidden" name="gender" id="hidden_gender" value="">
-        <input type="hidden" name="contact" id="hidden_contact" value="">
-        <input type="hidden" name="address" id="hidden_address" value="">
-        
-        <div class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Username -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="reg_username">Username *</label>
-                    <input type="text" id="reg_username" name="username" placeholder="Username"
-                        value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                </div>
-                
-                <!-- Email -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="email">Email *</label>
-                    <input type="email" id="email" name="email" placeholder="Email"
-                        value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent" required />
-                </div>
-
-                <!-- Password -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="reg_password">Password *</label>
-                    <div class="relative">
-                        <input type="password" id="reg_password" name="password" placeholder="Password (min 8 characters)"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent pr-10" 
-                            minlength="8" required />
-                        <button type="button" onclick="toggleRegPassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
-                            <i id="regEyeIcon" class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                    <p class="mt-1 text-xs text-gray-500">Password must be at least 8 characters</p>
-                </div>
-
-                <!-- Confirm Password -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="confirm_password">Confirm Password *</label>
-                    <div class="relative">
-                        <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] focus:border-transparent pr-10" 
-                            minlength="8" required />
-                        <button type="button" onclick="toggleConfirmPassword()" class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
-                            <i id="confirmEyeIcon" class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                    <p id="passwordMatchError" class="mt-1 text-xs text-red-500 hidden">Passwords do not match</p>
-                </div>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="pt-4">
-                <button type="submit" id="submitButton"
-                    class="w-full bg-[#FC566C] text-white py-3 px-4 rounded-lg hover:bg-[#f1233f] transition flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    Complete Registration
-                </button>
-            </div>
-        </div>
-    </form>
-</div>
-    </div>
-</div>
-
-<script>
-// Modal functions
-function openModal() {
-    document.getElementById('loginModal').classList.remove('hidden');
-    document.getElementById('mainModal').classList.remove('hidden');
-    document.getElementById('loginFormModal').classList.add('hidden');
-    document.getElementById('registerFormModal').classList.add('hidden');
-    document.getElementById('secondRegisterFormModal').classList.add('hidden');
-    document.body.style.overflow = 'hidden';
-}
-
-function closeModal() {
-    document.getElementById('loginModal').classList.add('hidden');
-    document.body.style.overflow = 'auto';
-}
-
-function openLearnMoreModal() {
-    document.getElementById('learnMoreModal').classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-}
-
-function closeLearnMoreModal() {
-    document.getElementById('learnMoreModal').classList.add('hidden');
-    document.body.style.overflow = 'auto';
-}
-
-function toggleLoginPassword() {
-    const password = document.getElementById('login_password');
-    const eyeIcon = document.getElementById('loginEyeIcon');
-    if (password.type === 'password') {
-        password.type = 'text';
-        eyeIcon.classList.remove('fa-eye');
-        eyeIcon.classList.add('fa-eye-slash');
-    } else {
-        password.type = 'password';
-        eyeIcon.classList.remove('fa-eye-slash');
-        eyeIcon.classList.add('fa-eye');
-    }
-}
-
-function toggleRegPassword() {
-    const password = document.getElementById('reg_password');
-    const eyeIcon = document.getElementById('regEyeIcon');
-    if (password.type === 'password') {
-        password.type = 'text';
-        eyeIcon.classList.remove('fa-eye');
-        eyeIcon.classList.add('fa-eye-slash');
-    } else {
-        password.type = 'password';
-        eyeIcon.classList.remove('fa-eye-slash');
-        eyeIcon.classList.add('fa-eye');
-    }
-}
-
-function toggleConfirmPassword() {
-    const password = document.getElementById('confirm_password');
-    const eyeIcon = document.getElementById('confirmEyeIcon');
-    if (password.type === 'password') {
-        password.type = 'text';
-        eyeIcon.classList.remove('fa-eye');
-        eyeIcon.classList.add('fa-eye-slash');
-    } else {
-        password.type = 'password';
-        eyeIcon.classList.remove('fa-eye-slash');
-        eyeIcon.classList.add('fa-eye');
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Modal navigation
-    document.getElementById('openLogin').addEventListener('click', function() {
-        document.getElementById('mainModal').classList.add('hidden');
-        document.getElementById('loginFormModal').classList.remove('hidden');
-    });
-
-    document.getElementById('openRegister').addEventListener('click', function() {
-        document.getElementById('mainModal').classList.add('hidden');
-        document.getElementById('registerFormModal').classList.remove('hidden');
-    });
-
-    document.getElementById('loginToRegister').addEventListener('click', function() {
-        document.getElementById('loginFormModal').classList.add('hidden');
-        document.getElementById('registerFormModal').classList.remove('hidden');
-    });
-
-    document.getElementById('registerToLogin').addEventListener('click', function() {
-        document.getElementById('registerFormModal').classList.add('hidden');
-        document.getElementById('loginFormModal').classList.remove('hidden');
-    });
-
-    // Form elements
-    const firstRegisterForm = document.getElementById('firstRegisterForm');
-    const secondRegisterForm = document.getElementById('secondRegisterForm');
-    const openSecondRegister = document.getElementById('openSecondRegister');
-    const backToFirstRegister = document.getElementById('backToFirstRegister');
-    const registerFormModal = document.getElementById('registerFormModal');
-    const secondRegisterFormModal = document.getElementById('secondRegisterFormModal');
-    const password = document.getElementById('reg_password');
-    const confirmPassword = document.getElementById('confirm_password');
-    const passwordMatchError = document.getElementById('passwordMatchError');
-    const submitButton = document.getElementById('submitButton');
-
-    // Store form data when moving to second form
-    openSecondRegister.addEventListener('click', function(e) {
-        e.preventDefault();
-        
-        // Validate first form
-        const requiredFields = firstRegisterForm.querySelectorAll('[required]');
-        let isValid = true;
-        
-        requiredFields.forEach(field => {
-            if (!field.value.trim()) {
-                isValid = false;
-                field.classList.add('border-red-500');
-            } else {
-                field.classList.remove('border-red-500');
-            }
-        });
-        
-        if (!isValid) {
-            alert('Please fill in all required fields in the first form.');
-            return;
-        }
-        
-        // Transfer data to hidden fields in second form
-        document.getElementById('hidden_full_name').value = document.getElementById('full_name').value;
-        document.getElementById('hidden_age').value = document.getElementById('age').value;
-        document.getElementById('hidden_gender').value = document.getElementById('gender').value;
-        document.getElementById('hidden_contact').value = document.getElementById('contact').value;
-        document.getElementById('hidden_address').value = document.getElementById('address').value;
-        
-        // Hide first modal, show second modal
-        registerFormModal.classList.add('hidden');
-        secondRegisterFormModal.classList.remove('hidden');
-    });
-    
-    // Go back to first form
-    backToFirstRegister.addEventListener('click', function() {
-        secondRegisterFormModal.classList.add('hidden');
-        registerFormModal.classList.remove('hidden');
-    });
-    
-    // Password matching validation
-    function validatePasswordMatch() {
-        if (password && confirmPassword && password.value && confirmPassword.value && password.value !== confirmPassword.value) {
-            confirmPassword.classList.add('border-red-500');
-            passwordMatchError.classList.remove('hidden');
-            submitButton.disabled = true;
-            submitButton.classList.add('opacity-50', 'cursor-not-allowed');
-            return false;
-        } else {
-            confirmPassword.classList.remove('border-red-500');
-            passwordMatchError.classList.add('hidden');
-            submitButton.disabled = false;
-            submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
-            return true;
-        }
-    }
-
-    // Real-time validation
-    if (password && confirmPassword) {
-        password.addEventListener('input', validatePasswordMatch);
-        confirmPassword.addEventListener('input', validatePasswordMatch);
-    }
-
-    // Form submission validation
-    if (secondRegisterForm) {
-        secondRegisterForm.addEventListener('submit', function(e) {
-            if (!validatePasswordMatch()) {
-                e.preventDefault();
-                return false;
-            }
-            return true;
-        });
-    }
-    
-    // Handle viewport changes
-    function handleViewport() {
-        const modal = document.getElementById('loginModal');
-        const learnMoreModal = document.getElementById('learnMoreModal');
-        
-        if (modal) {
-            if (window.innerWidth < 640) {
-                modal.classList.add('items-start');
-                modal.classList.remove('items-center');
-            } else {
-                modal.classList.remove('items-start');
-                modal.classList.add('items-center');
-            }
-        }
-        
-        if (learnMoreModal) {
-            if (window.innerWidth < 640) {
-                learnMoreModal.classList.add('items-start');
-                learnMoreModal.classList.remove('items-center');
-            } else {
-                learnMoreModal.classList.remove('items-start');
-                learnMoreModal.classList.add('items-center');
-            }
-        }
-    }
-    
-    window.addEventListener('resize', handleViewport);
-    handleViewport();
-});
 </script>
