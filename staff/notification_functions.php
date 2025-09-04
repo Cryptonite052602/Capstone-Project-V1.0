@@ -43,4 +43,20 @@ function markAnnouncementNotificationsAsRead($announcementId) {
         return false;
     }
 }
+
+function createTargetedAnnouncementNotification($announcementId, $title, $userIds) {
+    global $pdo;
+    
+    try {
+        foreach ($userIds as $userId) {
+            $stmt = $pdo->prepare("INSERT INTO notifications (user_id, type, title, message, related_id, is_read) 
+                                  VALUES (?, 'announcement', ?, ?, ?, 0)");
+            $stmt->execute([$userId, 'New Announcement', $title, $announcementId]);
+        }
+        return true;
+    } catch (PDOException $e) {
+        error_log("Error creating targeted announcement notification: " . $e->getMessage());
+        return false;
+    }
+}
 ?>
