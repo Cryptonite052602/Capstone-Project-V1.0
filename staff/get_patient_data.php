@@ -15,6 +15,16 @@ if ($patientId <= 0) {
     exit();
 }
 
+// Check if health info is already saved
+$healthInfoExists = false;
+try {
+    $stmt = $pdo->prepare("SELECT * FROM existing_info_patients WHERE patient_id = ?");
+    $stmt->execute([$patientId]);
+    $healthInfoExists = $stmt->fetch() !== false;
+} catch (PDOException $e) {
+    // Error handling
+}
+
 try {
     // Get basic patient info with COALESCE for gender
     $stmt = $pdo->prepare("SELECT p.*, 
@@ -57,10 +67,15 @@ try {
     // Format last checkup date for input field
     $lastCheckupValue = $patient['last_checkup'] ? date('Y-m-d', strtotime($patient['last_checkup'])) : '';
     
+    // Check if health info is complete
+    $healthInfoComplete = !empty($healthInfo['height']) && !empty($healthInfo['weight']) && 
+                         !empty($healthInfo['blood_type']) && (!empty($healthInfo['gender']) || $isRegisteredUser);
+    
     // Display patient information with enhanced layout
     echo '
-    <form id="healthInfoForm" method="POST" action="existing_info_patients.php" class="bg-gray-50 p-6 rounded-lg">
+    <form id="healthInfoForm" method="POST" action="staff/save_patient_data.php" class="bg-gray-50 p-6 rounded-lg">
         <input type="hidden" name="patient_id" value="' . $patientId . '">
+        <input type="hidden" name="save_health_info" value="1">
         
         <!-- Header with Edit Button -->
         <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
@@ -154,8 +169,8 @@ try {
                         <option value="B-" ' . (($healthInfo['blood_type'] ?? '') == 'B-' ? 'selected' : '') . '>B-</option>
                         <option value="AB+" ' . (($healthInfo['blood_type'] ?? '') == 'AB+' ? 'selected' : '') . '>AB+</option>
                         <option value="AB-" ' . (($healthInfo['blood_type'] ?? '') == 'AB-' ? 'selected' : '') . '>AB-</option>
-                        <option value="O+" ' . (($healthInfo['blood_type'] || '') == 'O+' ? 'selected' : '') . '>O+</option>
-                        <option value="O-" ' . (($healthInfo['blood_type'] || '') == 'O-' ? 'selected' : '') . '>O-</option>
+                        <option value="O+" ' . (($healthInfo['blood_type'] ?? '') == 'O+' ? 'selected' : '') . '>O+</option>
+                        <option value="O-" ' . (($healthInfo['blood_type'] ?? '') == 'O-' ? 'selected' : '') . '>O-</option>
                     </select>
                 </div>
                 
@@ -249,8 +264,8 @@ try {
                         <option value="B-" ' . (($healthInfo['blood_type'] ?? '') == 'B-' ? 'selected' : '') . '>B-</option>
                         <option value="AB+" ' . (($healthInfo['blood_type'] ?? '') == 'AB+' ? 'selected' : '') . '>AB+</option>
                         <option value="AB-" ' . (($healthInfo['blood_type'] ?? '') == 'AB-' ? 'selected' : '') . '>AB-</option>
-                        <option value="O+" ' . (($healthInfo['blood_type'] || '') == 'O+' ? 'selected' : '') . '>O+</option>
-                        <option value="O-" ' . (($healthInfo['blood_type'] || '') == 'O-' ? 'selected' : '') . '>O-</option>
+                        <option value="O+" ' . (($healthInfo['blood_type'] ?? '') == 'O+' ? 'selected' : '') . '>O+</option>
+                        <option value="O-" ' . (($healthInfo['blood_type'] ?? '') == 'O-' ? 'selected' : '') . '>O-</option>
                     </select>
                 </div>
                 
@@ -287,14 +302,197 @@ try {
                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" 
                       placeholder="Detail family medical history (parents, siblings, grandparents - include conditions like diabetes, heart disease, cancer, etc.)">' . htmlspecialchars($healthInfo['family_history'] ?? '') . '</textarea>
         </div>
-    </div>
+    </div>';
     
+    // Only show visits section if health info is complete
+    if ($healthInfoComplete) {
+        echo '
+        <!-- Visits Tab -->
+        <div class="mt-8 border-t border-gray-200 pt-6">
+            <h3 class="text-lg font-semibold text-secondary mb-4">Patient Visits</h3>
+            
+            <!-- Add New Visit Form -->
+            <div class="bg-white p-4 rounded-lg shadow-sm mb-6">
+                <h4 class="font-medium text-gray-700 mb-3">Record New Visit</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="visit_date" class="block text-gray-700 mb-2 text-sm font-medium">Visit Date & Time <span class="text-danger">*</span></label>
+                        <input type="datetime-local" id="visit_date" name="visit_date" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" required
+                               value="' . date('Y-m-d\TH:i') . '">
+                    </div>
+                    
+                    <div>
+                        <label for="visit_type" class="block text-gray-700 mb-2 text-sm font-medium">Visit Type <span class="text-danger">*</span></label>
+                        <select id="visit_type" name="visit_type" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" required>
+                            <option value="">Select Type</option>
+                            <option value="checkup">Checkup</option>
+                            <option value="consultation">Consultation</option>
+                            <option value="emergency">Emergency</option>
+                            <option value="followup">Follow-up</option>
+                        </select>
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                        <label for="diagnosis" class="block text-gray-700 mb-2 text-sm font-medium">Diagnosis</label>
+                        <textarea id="diagnosis" name="diagnosis" rows="2" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" 
+                                  placeholder="Primary diagnosis or reason for visit"></textarea>
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                        <label for="treatment" class="block text-gray-700 mb-2 text-sm font-medium">Treatment Provided</label>
+                        <textarea id="treatment" name="treatment" rows="2" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" 
+                                  placeholder="Treatment provided during this visit"></textarea>
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                        <label for="prescription" class="block text-gray-700 mb-2 text-sm font-medium">Prescription</label>
+                        <textarea id="prescription" name="prescription" rows="2" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" 
+                                  placeholder="Medications prescribed (include dosage and instructions)"></textarea>
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                        <label for="notes" class="block text-gray-700 mb-2 text-sm font-medium">Additional Notes</label>
+                        <textarea id="notes" name="notes" rows="2" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" 
+                                  placeholder="Any additional notes or observations"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label for="next_visit_date" class="block text-gray-700 mb-2 text-sm font-medium">Next Visit Date</label>
+                        <input type="date" id="next_visit_date" name="next_visit_date" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                    </div>
+                </div>
+            </div>';
+            
+        // Show visit history if it exists
+        try {
+            $stmt = $pdo->prepare("SELECT pv.*, u.full_name as staff_name 
+                                  FROM patient_visits pv 
+                                  LEFT JOIN sitio1_users u ON pv.staff_id = u.id 
+                                  WHERE pv.patient_id = ? 
+                                  ORDER BY pv.visit_date DESC");
+            $stmt->execute([$patientId]);
+            $visits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            if (!empty($visits)) {
+                echo '
+                <div>
+                    <h4 class="font-medium text-gray-700 mb-3">Visit History</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-gray-700">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                                <tr>
+                                    <th class="px-4 py-2">Date</th>
+                                    <th class="px-4 py-2">Type</th>
+                                    <th class="px-4 py-2">Diagnosis</th>
+                                    <th class="px-4 py-2">Staff</th>
+                                    <th class="px-4 py-2">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>';
+                
+                foreach ($visits as $visit) {
+                    $visitDate = date('M j, Y g:i A', strtotime($visit['visit_date']));
+                    $visitType = ucfirst($visit['visit_type']);
+                    $diagnosis = !empty($visit['diagnosis']) ? 
+                        (strlen($visit['diagnosis']) > 30 ? substr($visit['diagnosis'], 0, 30) . '...' : $visit['diagnosis']) : 
+                        'N/A';
+                    
+                    // Determine CSS class based on visit type
+                    $typeClass = 'visit-type-' . $visit['visit_type'];
+                    
+                    echo '<tr class="border-b hover:bg-gray-50">
+                            <td class="px-4 py-2">' . $visitDate . '</td>
+                            <td class="px-4 py-2"><span class="visit-type-badge ' . $typeClass . '">' . $visitType . '</span></td>
+                            <td class="px-4 py-2">' . htmlspecialchars($diagnosis) . '</td>
+                            <td class="px-4 py-2">' . htmlspecialchars($visit['staff_name'] ?? 'N/A') . '</td>
+                            <td class="px-4 py-2">
+                                <button onclick="viewVisitDetails(' . $visit['id'] . ')" class="text-primary hover:text-blue-700 mr-2">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button onclick="editVisit(' . $visit['id'] . ')" class="text-warning hover:text-orange-700 mr-2">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="deleteVisit(' . $visit['id'] . ')" class="text-danger hover:text-red-700">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                          </tr>';
+                }
+                
+                echo '</tbody></table></div></div>';
+            }
+        } catch (PDOException $e) {
+            echo '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                    Error loading visit history: ' . htmlspecialchars($e->getMessage()) . '
+                  </div>';
+        }
+        
+        echo '</div>'; // Close visits tab
+    } else {
+        echo '
+        <div class="mt-8 border-t border-gray-200 pt-6">
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                <i class="fas fa-exclamation-circle text-yellow-500 text-2xl mb-2"></i>
+                <h3 class="font-medium text-yellow-700">Complete Health Information Required</h3>
+                <p class="text-sm text-yellow-600 mt-1">Please fill out all required health information fields to enable patient visit tracking.</p>
+                <p class="text-xs text-yellow-500 mt-2">Required fields: Height, Weight, Blood Type' . (!$isRegisteredUser ? ', Gender' : '') . '</p>
+            </div>
+        </div>';
+    }
+    
+    echo '
     <div class="mt-6 flex justify-end space-x-4">
         <button type="submit" name="save_health_info" class="bg-primary text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition">
             <i class="fas fa-save mr-2"></i>Save ' . ($isRegisteredUser ? 'Medical Information' : 'Changes') . '
         </button>
     </div>
-    
+    </form>';
+
+    // Add the CSS for visit types
+    echo '
+    <style>
+    .visit-type-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .visit-type-checkup {
+        background-color: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .visit-type-consultation {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+
+    .visit-type-emergency {
+        background-color: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .visit-type-followup {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+
+    .readonly-field {
+        background-color: #f9fafb;
+        cursor: not-allowed;
+    }
+    </style>';
+
+    // Add JavaScript for form validation and visit functionality
+    echo '
     <script>
     function validateForm() {
         const requiredFields = ["height", "weight", "blood_type"];
@@ -329,9 +527,57 @@ try {
                     e.target.classList.remove("border-red-500");
                 }
             });
+            
+            // Handle form submission
+            form.addEventListener("submit", function(e) {
+                if (!validateForm()) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
         }
     });
     
+    function viewVisitDetails(visitId) {
+        fetch("get_visit_details.php?id=" + visitId)
+            .then(response => response.text())
+            .then(data => {
+                // Create a modal to display visit details
+                const modal = document.createElement("div");
+                modal.className = "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50";
+                modal.innerHTML = data;
+                document.body.appendChild(modal);
+            })
+            .catch(error => {
+                alert("Error loading visit details: " + error);
+            });
+    }
+
+    function editVisit(visitId) {
+        alert("Edit functionality for visit ID: " + visitId + " would be implemented here");
+    }
+
+    function deleteVisit(visitId) {
+        if (confirm("Are you sure you want to delete this visit record?")) {
+            fetch("delete_visit.php?id=" + visitId, {
+                method: "DELETE"
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showModalMessage("success", data.message);
+                    // Reload the page to refresh the visit history
+                    location.reload();
+                } else {
+                    showModalMessage("error", data.message);
+                }
+            })
+            .catch(error => {
+                showModalMessage("error", "Network error: " + error);
+            });
+        }
+    }
+
     function showModalMessage(type, message) {
         // Remove any existing messages
         const existingMessages = document.querySelectorAll(".modal-message");
@@ -351,8 +597,7 @@ try {
             messageDiv.remove();
         }, 5000);
     }
-    </script>
-    ';
+    </script>';
     
 } catch (PDOException $e) {
     echo '<div class="text-center py-8 text-danger">
