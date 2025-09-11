@@ -46,7 +46,7 @@ if ($userData) {
         // Upcoming appointments
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM user_appointments ua 
                               JOIN sitio1_appointments a ON ua.appointment_id = a.id 
-                              WHERE ua.user_id = ? AND ua.status = 'approved' AND a.date >= CURDATE()");
+                              WHERE ua.user_id = ? AND ua.status IN ('pending', 'approved') AND a.date >= CURDATE()");
         $stmt->execute([$userId]);
         $stats['upcoming_appointments'] = $stmt->fetchColumn();
 
@@ -101,21 +101,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
 
             try {
                 $stmt = $pdo->prepare("
-    INSERT INTO user_appointments 
-        (user_id, appointment_id, service_id, status, notes, health_concerns, service_type, consent) 
-    VALUES 
-        (:user_id, :appointment_id, :service_id, 'pending', :notes, :health_concerns, :service_type, :consent)
-");
-
-$stmt->execute([
-    ':user_id'         => $userId,
-    ':appointment_id'  => $appointmentId,
-    ':service_id'      => $serviceId,
-    ':notes'           => $notes,
-    ':health_concerns' => $healthConcernsStr,
-    ':service_type'    => $serviceType,
-    ':consent'         => $consentGiven
-]);
+                    INSERT INTO user_appointments 
+                        (user_id, appointment_id, service_id, status, notes, health_concerns, service_type, consent) 
+                    VALUES 
+                        (:user_id, :appointment_id, :service_id, 'pending', :notes, :health_concerns, :service_type, :consent)
+                ");
+                $stmt->execute([
+                    ':user_id'         => $userId,
+                    ':appointment_id'  => $appointmentId,
+                    ':service_id'      => $serviceId,
+                    ':notes'           => $notes,
+                    ':health_concerns' => $healthConcernsStr,
+                    ':service_type'    => $serviceType,
+                    ':consent'         => $consentGiven
+                ]);
 
                 $_SESSION['notification'] = [
                     'type' => 'success',
@@ -135,22 +134,51 @@ $stmt->execute([
 // -------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])) {
     $appointmentId = $_POST['appointment_id'];
+    $cancelReason = trim($_POST['cancel_reason'] ?? '');
     
-    try {
-        $stmt = $pdo->prepare("UPDATE user_appointments SET status = 'rejected', cancel_reason = :reason, cancelled_at = NOW() WHERE id = :id AND user_id = :user_id");
-        $stmt->execute([
-            ':reason'   => $_POST['cancel_reason'] ?? 'User cancelled',
-            ':id'       => $appointmentId,
-            ':user_id'  => $userId
-        ]);
-        
+    // Validate cancellation reason
+    if (empty($cancelReason)) {
         $_SESSION['notification'] = [
-            'type' => 'success',
-            'message' => 'Appointment cancelled successfully!'
+            'type' => 'error',
+            'message' => 'Please provide a reason for cancellation'
         ];
         header('Location: ' . $_SERVER['HTTP_REFERER']);
         exit();
-    } catch (PDOException $e) {
+    }
+    
+    try {
+        // Check if appointment belongs to user and is cancellable
+        $stmt = $pdo->prepare("
+            SELECT ua.id 
+            FROM user_appointments ua
+            JOIN sitio1_appointments a ON ua.appointment_id = a.id
+            WHERE ua.id = ? AND ua.user_id = ? 
+            AND ua.status IN ('pending', 'approved')
+            AND a.date >= CURDATE()
+        ");
+        $stmt->execute([$appointmentId, $userId]);
+        
+        if (!$stmt->fetch()) {
+            throw new Exception('Appointment cannot be cancelled');
+        }
+        
+        // Update with cancellation reason and timestamp
+        $stmt = $pdo->prepare("
+            UPDATE user_appointments 
+            SET status = 'cancelled', 
+                cancel_reason = ?,
+                cancelled_at = NOW()
+            WHERE id = ? AND user_id = ?
+        ");
+        $stmt->execute([$cancelReason, $appointmentId, $userId]);
+        
+        $_SESSION['notification'] = [
+            'type' => 'success',
+            'message' => 'Appointment cancelled successfully'
+        ];
+        header('Location: ' . $_SERVER['HTTP_REFERER']);
+        exit();
+    } catch (Exception $e) {
         $error = 'Error cancelling appointment: ' . $e->getMessage();
     }
 }
@@ -230,7 +258,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT COUNT(*) as count
         FROM user_appointments ua
-        WHERE ua.user_id = ? AND ua.status = 'rejected'
+        WHERE ua.user_id = ? AND ua.status = 'cancelled'
     ");
     $stmt->execute([$userId]);
     $appointmentCounts['cancelled'] = $stmt->fetch()['count'];
@@ -257,7 +285,7 @@ try {
     } elseif ($appointmentTab === 'past') {
         $query .= " AND (ua.status = 'completed' OR a.date < CURDATE())";
     } elseif ($appointmentTab === 'cancelled') {
-        $query .= " AND ua.status = 'rejected'";
+        $query .= " AND ua.status = 'cancelled'";
     }
     
     $query .= " ORDER BY a.date " . ($appointmentTab === 'past' ? 'DESC' : 'ASC') . ", a.start_time";
@@ -763,156 +791,127 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                         }
                         
                         if ($selectedSlot): ?>
-            <div class="border border-gray-200 rounded-lg p-6 mb-6">
-                <h3 class="font-semibold text-lg mb-4 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    Confirm Health Visit
-                </h3>
-                <div class="space-y-3">
-                    <div class="flex items-start">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        <div>
-                            <p class="font-medium text-gray-700">Health Worker</p>
-                            <p><?= htmlspecialchars($selectedSlot['staff_name']) ?>
-                            <?php if (!empty($selectedSlot['specialization'])): ?>
-                                (<?= htmlspecialchars($selectedSlot['specialization']) ?>)
-                            <?php endif; ?>
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex items-start">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <div>
-                            <p class="font-medium text-gray-700">Date & Time</p>
-                            <p><?= date('M d, Y', strtotime($selectedDate)) ?> at <?= date('h:i A', strtotime($selectedSlot['start_time'])) ?> - <?= date('h:i A', strtotime($selectedSlot['end_time'])) ?></p>
-                        </div>
-                    </div>
-                    <div class="flex items-start">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        <div>
-                            <p class="font-medium text-gray-700">Availability</p>
-                            <p><?= $selectedSlot['available_slots'] ?> slot<?= $selectedSlot['available_slots'] > 1 ? 's' : '' ?> remaining (out of <?= $selectedSlot['max_slots'] ?>)</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <form method="POST" action="/community-health-tracker/api/appointments.php" 
-              class="ajax-form mt-6" onsubmit="return validateHealthConcerns()">
-            <input type="hidden" name="appointment_id" value="<?= $selectedSlot['slot_id'] ?>">
-            <input type="hidden" name="selected_date" value="<?= $selectedDate ?>">
-            <input type="hidden" name="service_id" value="<?= $serviceId ?>"> <!-- Added service_id -->
-            <input type="hidden" name="service_type" value="General Checkup">
+                            <div class="border border-gray-200 rounded-lg p-6 mb-6">
+                                <h3 class="font-semibold text-lg mb-4 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Confirm Health Visit
+                                </h3>
+                                <div class="space-y-3">
+                                    <div class="flex items-start">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        <div>
+                                            <p class="font-medium text-gray-700">Health Worker</p>
+                                            <p><?= htmlspecialchars($selectedSlot['staff_name']) ?>
+                                            <?php if (!empty($selectedSlot['specialization'])): ?>
+                                                (<?= htmlspecialchars($selectedSlot['specialization']) ?>)
+                                            <?php endif; ?>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        <div>
+                                            <p class="font-medium text-gray-700">Date & Time</p>
+                                            <p><?= date('M d, Y', strtotime($selectedDate)) ?> at <?= date('h:i A', strtotime($selectedSlot['start_time'])) ?> - <?= date('h:i A', strtotime($selectedSlot['end_time'])) ?></p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        </svg>
+                                        <div>
+                                            <p class="font-medium text-gray-700">Availability</p>
+                                            <p><?= $selectedSlot['available_slots'] ?> slot<?= $selectedSlot['available_slots'] > 1 ? 's' : '' ?> remaining (out of <?= $selectedSlot['max_slots'] ?>)</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <form method="POST" action="" class="mt-6" onsubmit="return validateHealthConcerns()">
+                                    <input type="hidden" name="appointment_id" value="<?= $selectedSlot['slot_id'] ?>">
+                                    <input type="hidden" name="selected_date" value="<?= $selectedDate ?>">
+                                    <input type="hidden" name="service_id" value="<?= $serviceId ?>">
+                                    <input type="hidden" name="service_type" value="General Checkup">
 
-
-            <!-- Health Concerns Section -->
-            <div class="mb-6">
-                <h4 class="font-medium text-gray-700 mb-3">Select Health Concerns</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <?php 
-                    $healthConcerns = [
-                        'Asthma', 'Tuberculosis', 'Malnutrition', 'Obesity',
-                        'Pneumonia', 'Dengue', 'Anemia', 'Arthritis',
-                        'Stroke', 'Cancer', 'Depression'
-                    ];
-                    
-                    foreach ($healthConcerns as $concern): ?>
-                        <div class="flex items-center">
-                            <input type="checkbox" 
-                                   id="concern_<?= strtolower(str_replace(' ', '_', $concern)) ?>" 
-                                   name="health_concerns[]" 
-                                   value="<?= $concern ?>"
-                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="concern_<?= strtolower(str_replace(' ', '_', $concern)) ?>" 
-                                   class="ml-2 text-gray-700"><?= $concern ?></label>
-                        </div>
-                    <?php endforeach; ?>
-                    
-                    <!-- Other Concern Option -->
-                    <div class="flex items-center">
-                        <input type="checkbox" id="other_concern" name="health_concerns[]" value="Other"
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label for="other_concern" class="ml-2 text-gray-700">Other</label>
-                    </div>
-                </div>
-                
-                <div class="mt-3" id="other_concern_container" style="display: none;">
-                    <label for="other_concern_specify" class="block text-gray-700 mb-1 text-sm">Please specify:</label>
-                    <input type="text" id="other_concern_specify" name="other_concern_specify" 
-                           class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-            </div>
-            
-            <!-- Additional Notes -->
-            <div class="mb-4">
-                <label for="appointment_notes" class="block text-gray-700 mb-2 font-medium">Health Concerns Details</label>
-                <textarea id="appointment_notes" name="notes" rows="3" 
-                          class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                          placeholder="Describe your symptoms, concerns, or any other relevant information"></textarea>
-            </div>
-            
-            <!-- Consent Checkbox -->
-            <div class="flex items-center mb-4">
-                <input type="checkbox" id="consent" name="consent" required
-                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                <label for="consent" class="ml-2 text-gray-700">
-                    I consent to sharing my health information for this appointment
-                </label>
-            </div>
-            
-            <!-- Submit Button -->
-            <button type="submit" name="book_appointment" 
-                    class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center justify-center" 
-                    <?= $selectedSlot['available_slots'] <= 0 ? 'disabled' : '' ?>>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-                <?= $selectedSlot['available_slots'] > 0 ? 'Book Appointment' : 'Slot Full' ?>
-            </button>
-        </form>
-
-
-        <script>
-            function validateHealthConcerns() {
-            const checkboxes = document.querySelectorAll('input[name="health_concerns[]"]:checked');
-            if (checkboxes.length === 0) {
-                alert("Please select at least one health concern.");
-                return false;
-            }
-
-            const otherChecked = document.getElementById("other_concern").checked;
-            const otherInput = document.getElementById("other_concern_specify").value.trim();
-
-            if (otherChecked && otherInput === "") {
-                alert("Please specify your other health concern.");
-                return false;
-            }
-
-            return true;
-        }
-
-        // Toggle Other field visibility
-        document.getElementById("other_concern").addEventListener("change", function () {
-            document.getElementById("other_concern_container").style.display = this.checked ? "block" : "none";
-        });
-
-        </script>
-            </div>
-        <?php else: ?>
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                </svg>
-                Selected slot is no longer available. Please choose another.
-            </div>
-        <?php endif; ?>
+                                    <!-- Health Concerns Section -->
+                                    <div class="mb-6">
+                                        <h4 class="font-medium text-gray-700 mb-3">Select Health Concerns</h4>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <?php 
+                                            $healthConcerns = [
+                                                'Asthma', 'Tuberculosis', 'Malnutrition', 'Obesity',
+                                                'Pneumonia', 'Dengue', 'Anemia', 'Arthritis',
+                                                'Stroke', 'Cancer', 'Depression'
+                                            ];
+                                            
+                                            foreach ($healthConcerns as $concern): ?>
+                                                <div class="flex items-center">
+                                                    <input type="checkbox" 
+                                                           id="concern_<?= strtolower(str_replace(' ', '_', $concern)) ?>" 
+                                                           name="health_concerns[]" 
+                                                           value="<?= $concern ?>"
+                                                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                                    <label for="concern_<?= strtolower(str_replace(' ', '_', $concern)) ?>" 
+                                                           class="ml-2 text-gray-700"><?= $concern ?></label>
+                                                </div>
+                                            <?php endforeach; ?>
+                                            
+                                            <!-- Other Concern Option -->
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="other_concern" name="health_concerns[]" value="Other"
+                                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                                <label for="other_concern" class="ml-2 text-gray-700">Other</label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mt-3" id="other_concern_container" style="display: none;">
+                                            <label for="other_concern_specify" class="block text-gray-700 mb-1 text-sm">Please specify:</label>
+                                            <input type="text" id="other_concern_specify" name="other_concern_specify" 
+                                                   class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Additional Notes -->
+                                    <div class="mb-4">
+                                        <label for="appointment_notes" class="block text-gray-700 mb-2 font-medium">Health Concerns Details</label>
+                                        <textarea id="appointment_notes" name="notes" rows="3" 
+                                                  class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                  placeholder="Describe your symptoms, concerns, or any other relevant information"></textarea>
+                                    </div>
+                                    
+                                    <!-- Consent Checkbox -->
+                                    <div class="flex items-center mb-4">
+                                        <input type="checkbox" id="consent" name="consent" required
+                                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="consent" class="ml-2 text-gray-700">
+                                            I consent to sharing my health information for this appointment
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- Submit Button -->
+                                    <button type="submit" name="book_appointment" 
+                                            class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center justify-center" 
+                                            <?= $selectedSlot['available_slots'] <= 0 ? 'disabled' : '' ?>>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        <?= $selectedSlot['available_slots'] > 0 ? 'Book Appointment' : 'Slot Full' ?>
+                                    </button>
+                                </form>
+                            </div>
+                        <?php else: ?>
+                            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                </svg>
+                                Selected slot is no longer available. Please choose another.
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -958,7 +957,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                                 </svg>
                                             <?php elseif ($appointment['status'] === 'pending'): ?>
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 01118 0z" />
                                                 </svg>
                                             <?php elseif ($appointment['status'] === 'completed'): ?>
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1017,6 +1016,22 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                         </div>
                                     <?php endif; ?>
                                     
+                                    <?php if ($appointmentTab === 'cancelled' && !empty($appointment['cancel_reason'])): ?>
+                                        <div class="mt-2 pl-7">
+                                            <p class="text-sm text-gray-700">
+                                                <span class="font-medium">Cancellation Reason:</span> <?= htmlspecialchars($appointment['cancel_reason']) ?>
+                                            </p>
+                                        </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($appointmentTab === 'cancelled' && !empty($appointment['cancelled_at'])): ?>
+                                        <div class="mt-2 pl-7">
+                                            <p class="text-sm text-gray-700">
+                                                <span class="font-medium">Cancelled On:</span> <?= date('M d, Y h:i A', strtotime($appointment['cancelled_at'])) ?>
+                                            </p>
+                                        </div>
+                                    <?php endif; ?>
+                                    
                                     <?php if (!empty($appointment['invoice_number'])): ?>
                                         <div class="mt-3 pl-7">
                                             <button onclick="downloadInvoice(<?= $appointment['id'] ?>)" 
@@ -1029,7 +1044,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                         </div>
                                     <?php endif; ?>
                                     
-                                    <?php if ($appointmentTab === 'upcoming' && $appointment['status'] !== 'rejected'): ?>
+                                    <?php if ($appointmentTab === 'upcoming' && $appointment['status'] !== 'cancelled'): ?>
                                         <div class="mt-3 pl-7">
                                             <button onclick="openCancelModal(<?= $appointment['id'] ?>)"
                                                     class="text-red-600 hover:text-red-800 text-sm font-medium flex items-center">
@@ -1089,6 +1104,52 @@ function downloadInvoice(appointmentId) {
     window.location.href = '<?= $_SERVER['PHP_SELF'] ?>?tab=appointments&download_invoice=' + appointmentId;
 }
 
+function validateHealthConcerns() {
+    const checkboxes = document.querySelectorAll('input[name="health_concerns[]"]:checked');
+    if (checkboxes.length === 0) {
+        alert("Please select at least one health concern.");
+        return false;
+    }
+
+    const otherChecked = document.getElementById("other_concern").checked;
+    const otherInput = document.getElementById("other_concern_specify").value.trim();
+
+    if (otherChecked && otherInput === "") {
+        alert("Please specify your other health concern.");
+        return false;
+    }
+
+    return true;
+}
+
+// Toggle Other field visibility
+document.getElementById("other_concern").addEventListener("change", function () {
+    document.getElementById("other_concern_container").style.display = this.checked ? "block" : "none";
+});
+
+function openCancelModal(appointmentId) {
+    const modal = document.getElementById('cancel-modal-template');
+    const clone = modal.cloneNode(true);
+    clone.id = 'cancel-modal-active';
+    clone.classList.remove('hidden');
+    document.getElementById('modal-appointment-id').value = appointmentId;
+    document.body.appendChild(clone);
+}
+
+function closeCancelModal() {
+    const modal = document.getElementById('cancel-modal-active');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(e) {
+    if (e.target.id === 'cancel-modal-active') {
+        closeCancelModal();
+    }
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     const dateSelect = document.getElementById('appointment_date');
     const slotSelect = document.getElementById('appointment_slot');
@@ -1145,71 +1206,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Handle form submission
-    const appointmentForm = document.querySelector('.ajax-form');
-    if (appointmentForm) {
-        appointmentForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const submitButton = this.querySelector('button[type="submit"]');
-            const originalText = submitButton.textContent;
-            
-            submitButton.disabled = true;
-            submitButton.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing...
-            `;
-            
-            fetch(this.action, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    appointment_id: formData.get('appointment_id'),
-                    notes: formData.get('notes')
-                })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-                if (data.success) {
-                    // Show success modal
-                    showModal('success', 'Appointment successfully applied!');
-                    
-                    // Hide modal after 2 seconds and reload
-                    setTimeout(() => {
-                        hideModal('success');
-                        window.location.reload();
-                    }, 2000);
-                }
-            })
-            .catch(error => {
-                // Show error modal
-                showModal('error', error.message);
-                submitButton.disabled = false;
-                submitButton.textContent = originalText;
-                
-                // Hide error modal after 3 seconds
-                setTimeout(() => {
-                    hideModal('error');
-                }, 3000);
-            });
-        });
-    }
-
     // Handle session notification modal
     const sessionModal = document.getElementById('session-modal');
     if (sessionModal) {
@@ -1260,83 +1256,4 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
-
-// Add to your existing JavaScript
-function openCancelModal(appointmentId) {
-    const modal = document.getElementById('cancel-modal-template');
-    const clone = modal.cloneNode(true);
-    clone.id = 'cancel-modal-active';
-    clone.classList.remove('hidden');
-    document.getElementById('modal-appointment-id').value = appointmentId;
-    document.body.appendChild(clone);
-}
-
-function closeCancelModal() {
-    const modal = document.getElementById('cancel-modal-active');
-    if (modal) {
-        modal.remove();
-    }
-}
-
-// Close modal when clicking outside
-document.addEventListener('click', function(e) {
-    if (e.target.id === 'cancel-modal-active') {
-        closeCancelModal();
-    }
-});
 </script>
-
-<?php
-// Handle appointment cancellation with reason
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])) {
-    $appointmentId = $_POST['appointment_id'];
-    $cancelReason = trim($_POST['cancel_reason'] ?? '');
-    
-    // Validate cancellation reason
-    if (empty($cancelReason)) {
-        $_SESSION['notification'] = [
-            'type' => 'error',
-            'message' => 'Please provide a reason for cancellation'
-        ];
-        header('Location: ' . $_SERVER['HTTP_REFERER']);
-        exit();
-    }
-    
-    try {
-        // Check if appointment belongs to user and is cancellable
-        $stmt = $pdo->prepare("
-            SELECT ua.id 
-            FROM user_appointments ua
-            JOIN sitio1_appointments a ON ua.appointment_id = a.id
-            WHERE ua.id = ? AND ua.user_id = ? 
-            AND ua.status IN ('pending', 'approved')
-            AND a.date >= CURDATE()
-        ");
-        $stmt->execute([$appointmentId, $userId]);
-        
-        if (!$stmt->fetch()) {
-            throw new Exception('Appointment cannot be cancelled');
-        }
-        
-        // Update with cancellation reason and timestamp
-        $stmt = $pdo->prepare("
-            UPDATE user_appointments 
-            SET status = 'rejected', 
-                cancel_reason = ?,
-                cancelled_at = NOW()
-            WHERE id = ? AND user_id = ?
-        ");
-        $stmt->execute([$cancelReason, $appointmentId, $userId]);
-        
-        $_SESSION['notification'] = [
-            'type' => 'success',
-            'message' => 'Appointment cancelled successfully'
-        ];
-        header('Location: ' . $_SERVER['HTTP_REFERER']);
-        exit();
-    } catch (Exception $e) {
-        $error = 'Error cancelling appointment: ' . $e->getMessage();
-    }
-}
-?>
-
