@@ -552,6 +552,40 @@ if (!empty($selectedPatientId)) {
             font-size: 0.75rem;
             font-weight: 600;
         }
+        /* Custom button styles */
+        .btn-view {
+            background-color: #3498db;
+            color: white;
+            border-radius: 8px;
+            padding: 8px 16px;
+            transition: all 0.3s ease;
+        }
+        .btn-view:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+        .btn-archive {
+            background-color: #e74c3c;
+            color: white;
+            border-radius: 8px;
+            padding: 8px 16px;
+            transition: all 0.3s ease;
+        }
+        .btn-archive:hover {
+            background-color: #c0392b;
+            transform: translateY(-2px);
+        }
+        .btn-add-patient {
+            background-color: #2ecc71;
+            color: white;
+            border-radius: 8px;
+            padding: 8px 16px;
+            transition: all 0.3s ease;
+        }
+        .btn-add-patient:hover {
+            background-color: #27ae60;
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -664,10 +698,10 @@ if (!empty($selectedPatientId)) {
                                                         <td><?= isset($patient['gender']) && $patient['gender'] ? htmlspecialchars($patient['gender']) : 'N/A' ?></td>
                                                         <td class="font-semibold text-primary"><?= htmlspecialchars($patient['blood_type'] ?? 'N/A') ?></td>
                                                         <td>
-                                                            <button onclick="openViewModal(<?= $patient['id'] ?>)" class="text-primary hover:text-blue-700 transition px-3 py-1 rounded-md">
+                                                            <button onclick="openViewModal(<?= $patient['id'] ?>)" class="btn-view inline-flex items-center mr-2">
                                                                 <i class="fas fa-eye mr-1"></i> View
                                                             </button>
-                                                            <a href="?delete_patient=<?= $patient['id'] ?>" class="text-danger hover:text-red-700 transition px-3 py-1 rounded-md" onclick="return confirm('Are you sure you want to archive this patient record?')">
+                                                            <a href="?delete_patient=<?= $patient['id'] ?>" class="btn-archive inline-flex items-center" onclick="return confirm('Are you sure you want to archive this patient record?')">
                                                                 <i class="fas fa-trash-alt mr-1"></i> Archive
                                                             </a>
                                                         </td>
@@ -708,7 +742,7 @@ if (!empty($selectedPatientId)) {
                                                         <td><?= htmlspecialchars($user['contact'] ?? 'N/A') ?></td>
                                                         <td class="font-semibold text-primary"><?= htmlspecialchars($user['unique_number'] ?? 'N/A') ?></td>
                                                         <td>
-                                                            <a href="?convert_to_patient=<?= $user['id'] ?>" class="text-success hover:text-green-700 transition px-3 py-1 rounded-md" onclick="return confirm('Are you sure you want to add this user as a patient?')">
+                                                            <a href="?convert_to_patient=<?= $user['id'] ?>" class="btn-add-patient inline-flex items-center" onclick="return confirm('Are you sure you want to add this user as a patient?')">
                                                                 <i class="fas fa-user-plus mr-1"></i> Add as Patient
                                                             </a>
                                                         </td>
@@ -770,10 +804,10 @@ if (!empty($selectedPatientId)) {
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <button onclick="openViewModal(<?= $patient['id'] ?>)" class="text-primary hover:text-blue-700 transition px-3 py-1 rounded-md">
+                                                <button onclick="openViewModal(<?= $patient['id'] ?>)" class="btn-view inline-flex items-center mr-2">
                                                     <i class="fas fa-eye mr-1"></i> View
                                                 </button>
-                                                <a href="?delete_patient=<?= $patient['id'] ?>" class="text-danger hover:text-red-700 transition px-3 py-1 rounded-md" onclick="return confirm('Are you sure you want to archive this patient record?')">
+                                                <a href="?delete_patient=<?= $patient['id'] ?>" class="btn-archive inline-flex items-center" onclick="return confirm('Are you sure you want to archive this patient record?')">
                                                     <i class="fas fa-trash-alt mr-1"></i> Archive
                                                 </a>
                                             </td>
