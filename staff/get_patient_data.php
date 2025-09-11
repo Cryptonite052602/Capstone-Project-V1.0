@@ -73,7 +73,7 @@ try {
     
     // Display patient information with enhanced layout
     echo '
-    <form id="healthInfoForm" method="POST" action="staff/save_patient_data.php" class="bg-gray-50 p-6 rounded-lg">
+    <form id="healthInfoForm" method="POST" action="../staff/save_patient_data.php" class="bg-gray-50 p-6 rounded-lg">
         <input type="hidden" name="patient_id" value="' . $patientId . '">
         <input type="hidden" name="save_health_info" value="1">
         
@@ -539,7 +539,7 @@ try {
     });
     
     function viewVisitDetails(visitId) {
-        fetch("get_visit_details.php?id=" + visitId)
+        fetch("staff/get_visit_details.php?id=" + visitId)
             .then(response => response.text())
             .then(data => {
                 // Create a modal to display visit details
@@ -559,7 +559,7 @@ try {
 
     function deleteVisit(visitId) {
         if (confirm("Are you sure you want to delete this visit record?")) {
-            fetch("delete_visit.php?id=" + visitId, {
+            fetch("staff/delete_visit.php?id=" + visitId, {
                 method: "DELETE"
             })
             .then(response => response.json())
