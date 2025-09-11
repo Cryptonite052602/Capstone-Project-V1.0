@@ -228,7 +228,7 @@ try {
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <h3 class="text-lg font-medium text-gray-900">Dr. Michael Chen</h3>
+                            <h3 class="text-lg font-medium text-gray-900">Dr. Lance Christine L. Gallardo</h3>
                             <p class="text-gray-500">Healthcare Provider</p>
                         </div>
                     </div>
