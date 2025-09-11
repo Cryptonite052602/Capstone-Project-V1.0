@@ -501,13 +501,23 @@ try {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 1.5rem;
-            height: 1.5rem;
+            min-width: 1.8rem;
+            height: 1.8rem;
             border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            padding: 0 0.6rem;
             margin-left: 0.5rem;
+        }
+        .action-button {
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
@@ -522,7 +532,225 @@ try {
                 </svg>
                 Staff Dashboard
             </h1>
+            <!-- Help Button -->
+            <button onclick="openHelpModal()" class="help-icon bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300 transition">
+                <i class="fas fa-question-circle text-xl"></i>
+            </button>
         </div>
+
+         <!-- Help/Guide Modal -->
+    <div id="helpModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl leading-6 font-medium text-gray-900">Staff Dashboard Guide</h3>
+                    <button onclick="closeHelpModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                    <p class="text-blue-800"><strong>Welcome to the Community Health Tracker Staff Dashboard!</strong> This guide will help you understand how to use all the features available to you as a staff member.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="guide-section md:border-r md:pr-6">
+                        <h4 class="text-lg font-semibold text-blue-700 mb-3 flex items-center">
+                            <i class="fas fa-calendar-alt mr-2"></i> Appointment Management
+                        </h4>
+                        
+                        <div class="mb-4">
+                            <h5 class="font-medium text-gray-800 mb-1">1. Adding Time Slots</h5>
+                            <p class="text-gray-600 text-sm">Create available appointment slots by selecting a date, time slot, and maximum number of appointments. Patients can then book these slots.</p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5 class="font-medium text-gray-800 mb-1">2. Managing Available Slots</h5>
+                            <p class="text-gray-600 text-sm">View all your available slots, see how many have been booked, and edit or delete slots as needed. Past slots are marked and cannot be modified.</p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5 class="font-medium text-gray-800 mb-1">3. Processing Pending Appointments</h5>
+                            <p class="text-gray-600 text-sm">Review and approve or reject appointment requests from patients. You can generate invoices with unique numbers for approved appointments.</p>
+                        </div>
+                        
+                        <div>
+                            <h5 class="font-medium text-gray-800 mb-1">4. Viewing All Appointments</h5>
+                            <p class="text-gray-600 text-sm">See a complete history of all appointments with their status (pending, approved, rejected, completed). Mark appointments as completed after serving patients.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="guide-section">
+                        <h4 class="text-lg font-semibold text-blue-700 mb-3 flex items-center">
+                            <i class="fas fa-user-check mr-2"></i> Account Approvals
+                        </h4>
+                        
+                        <div class="mb-4">
+                            <h5 class="font-medium text-gray-800 mb-1">1. Reviewing New Registrations</h5>
+                            <p class="text-gray-600 text-sm">New patients must be approved before they can use the system. Review their information and decide whether to approve or decline their accounts.</p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5 class="font-medium text-gray-800 mb-1">2. Approving Accounts</h5>
+                            <p class="text-gray-600 text-sm">When approving, the system automatically generates a unique identification number for the patient. They will receive an email notification with this number.</p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5 class="font-medium text-gray-800 mb-1">3. Declining Accounts</h5>
+                            <p class="text-gray-600 text-sm">If declining an account, provide a reason for the decision. The applicant will receive an email with this explanation.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="guide-section mt-6">
+                    <h4 class="text-lg font-semibold text-blue-700 mb-3 flex items-center">
+                        <i class="fas fa-chart-bar mr-2"></i> Dashboard Statistics
+                    </h4>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <h5 class="font-medium text-gray-800 mb-1">Your Patients</h5>
+                            <p class="text-gray-600 text-sm">Total number of patients you have registered in the system.</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <h5 class="font-medium text-gray-800 mb-1">Pending Consultations</h5>
+                            <p class="text-gray-600 text-sm">Consultation requests that need your review and response.</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <h5 class="font-medium text-gray-800 mb-1">Pending Appointments</h5>
+                            <p class="text-gray-600 text-sm">Appointment requests awaiting your approval or rejection.</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <h5 class="font-medium text-gray-800 mb-1">Unapproved Users</h5>
+                            <p class="text-gray-600 text-sm">New patient registrations that need your review and approval.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="guide-section mt-6">
+                    <h4 class="text-lg font-semibold text-blue-700 mb-3 flex items-center">
+                        <i class="fas fa-envelope mr-2"></i> Email Notifications
+                    </h4>
+                    
+                    <p class="text-gray-600">The system automatically sends email notifications to patients for:</p>
+                    <ul class="list-disc list-inside text-gray-600 mt-2 pl-4">
+                        <li>Account approval with their unique identification number</li>
+                        <li>Account decline with the reason provided</li>
+                        <li>Appointment approval with invoice details</li>
+                        <li>Appointment rejection with explanation</li>
+                    </ul>
+                </div>
+                
+                <div class="mt-6 bg-yellow-50 p-4 rounded-lg">
+                    <h4 class="font-semibold text-yellow-800 mb-2 flex items-center">
+                        <i class="fas fa-lightbulb mr-2"></i> Tips for Success
+                    </h4>
+                    <ul class="list-disc list-inside text-yellow-700 mt-2 pl-4">
+                        <li>Check pending appointments daily to provide timely responses</li>
+                        <li>Review new patient registrations regularly to maintain system security</li>
+                        <li>Use the invoice generation feature for proper record keeping</li>
+                        <li>Mark appointments as completed after serving patients</li>
+                    </ul>
+                </div>
+                
+                <div class="flex justify-end mt-6">
+                    <button type="button" onclick="closeHelpModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                        Got it, thanks!
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ... [All existing JavaScript functions remain the same] ...
+    
+    // Help modal functions
+    function openHelpModal() {
+        document.getElementById('helpModal').classList.remove('hidden');
+    }
+
+    function closeHelpModal() {
+        document.getElementById('helpModal').classList.add('hidden');
+    }
+
+    // Initialize tabs
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set first tab as active by default
+        switchTab('appointment-management');
+        switchAppointmentTab('add-slot');
+        
+        // Add click event listeners to all tab buttons
+        document.querySelectorAll('#dashboardTabs button').forEach(tabBtn => {
+            tabBtn.addEventListener('click', function() {
+                const targetTab = this.getAttribute('data-tabs-target').replace('#', '');
+                switchTab(targetTab);
+            });
+        });
+        
+        // Add click event listeners to appointment tab buttons
+        document.querySelectorAll('#appointmentTabs button').forEach(tabBtn => {
+            tabBtn.addEventListener('click', function() {
+                const targetTab = this.getAttribute('data-tabs-target').replace('#', '');
+                switchAppointmentTab(targetTab);
+            });
+        });
+        
+        // Show success/error modals if messages exist
+        <?php if ($success): ?>
+            showSuccessModal('<?= addslashes($success) ?>');
+            // Refresh the page after a short delay to update the UI
+            setTimeout(function() {
+                window.location.href = window.location.href.split('?')[0];
+            }, 3000);
+        <?php endif; ?>
+        
+        <?php if ($error): ?>
+            showErrorModal('<?= addslashes($error) ?>');
+        <?php endif; ?>
+    });
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('editModal');
+        if (event.target === modal) {
+            closeEditModal();
+        }
+        
+        const rejectionModal = document.getElementById('rejectionModal');
+        if (event.target === rejectionModal) {
+            closeRejectionModal();
+        }
+        
+        const invoiceModal = document.getElementById('invoiceModal');
+        if (event.target === invoiceModal) {
+            closeInvoiceModal();
+        }
+        
+        const successModal = document.getElementById('successModal');
+        if (event.target === successModal) {
+            closeSuccessModal();
+        }
+        
+        const errorModal = document.getElementById('errorModal');
+        if (event.target === errorModal) {
+            closeErrorModal();
+        }
+        
+        const declineModal = document.getElementById('declineModal');
+        if (event.target === declineModal) {
+            closeDeclineModal();
+        }
+        
+        const helpModal = document.getElementById('helpModal');
+        if (event.target === helpModal) {
+            closeHelpModal();
+        }
+    }
+    </script>
 
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -843,12 +1071,12 @@ try {
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                     <button onclick="openInvoiceModal(<?= $appointment['id'] ?>)" 
-                                                            class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium hover:bg-green-200 mr-2">
-                                                        Approve
+                                                            class="bg-green-500 text-white action-button mr-2">
+                                                        <i class="fas fa-check-circle mr-1"></i> Approve
                                                     </button>
                                                     <button onclick="openRejectionModal(<?= $appointment['id'] ?>)" 
-                                                            class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-medium hover:bg-red-200">
-                                                        Reject
+                                                            class="bg-red-500 text-white action-button">
+                                                        <i class="fas fa-times-circle mr-1"></i> Reject
                                                     </button>
                                                 </td>
                                             </tr>
@@ -930,8 +1158,8 @@ try {
                                                             <input type="hidden" name="appointment_id" value="<?= $appointment['id'] ?>">
                                                             <input type="hidden" name="action" value="complete">
                                                             <button type="submit" name="approve_appointment" 
-                                                                    class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium hover:bg-blue-200">
-                                                                Complete
+                                                                    class="bg-blue-500 text-white action-button">
+                                                                <i class="fas fa-check-circle mr-1"></i> Mark as Completed
                                                             </button>
                                                         </form>
                                                     <?php endif; ?>
