@@ -85,7 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
 
         // Validation: must have at least 1 concern
         if (count($healthConcerns) === 0) {
-            $error = "You must select at least one health concern.";
+            $_SESSION['notification'] = [
+                'type' => 'error',
+                'message' => 'You must select at least one health concern.'
+            ];
+            header('Location: ' . $_SERVER['HTTP_REFERER']);
+            exit();
         } else {
             // If "Other" was checked, replace with user input
             if (in_array('Other', $healthConcerns) && !empty($_POST['other_concern_specify'])) {
@@ -100,6 +105,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
             $consentGiven = isset($_POST['consent']) ? 1 : 0;
 
             try {
+                // Check if the time slot is still available (any user, any status)
+                $checkStmt = $pdo->prepare("
+                    SELECT 
+                        a.max_slots,
+                        COUNT(ua.id) as booked_slots,
+                        (a.max_slots - COUNT(ua.id)) as available_slots
+                    FROM sitio1_appointments a
+                    LEFT JOIN user_appointments ua ON ua.appointment_id = a.id AND ua.status IN ('pending', 'approved', 'completed')
+                    WHERE a.id = ? AND a.date = ?
+                    GROUP BY a.id
+                ");
+                $checkStmt->execute([$appointmentId, $selectedDate]);
+                $slotAvailability = $checkStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$slotAvailability || $slotAvailability['available_slots'] <= 0) {
+                    $_SESSION['notification'] = [
+                        'type' => 'error',
+                        'message' => 'This time slot is no longer available. Please choose a different time.'
+                    ];
+                    header('Location: ' . $_SERVER['HTTP_REFERER']);
+                    exit();
+                }
+
+                // Check if user already has an appointment at the same time on the same day
+                // This includes both active appointments (pending, approved) AND completed appointments
+                $checkStmt = $pdo->prepare("
+                    SELECT COUNT(*) FROM user_appointments ua
+                    JOIN sitio1_appointments a ON ua.appointment_id = a.id
+                    WHERE ua.user_id = ? 
+                    AND a.date = ?
+                    AND a.id = ?
+                    AND ua.status IN ('pending', 'approved', 'completed')
+                ");
+                $checkStmt->execute([$userId, $selectedDate, $appointmentId]);
+                $sameTimeAppointment = $checkStmt->fetchColumn();
+                
+                if ($sameTimeAppointment > 0) {
+                    $_SESSION['notification'] = [
+                        'type' => 'error',
+                        'message' => 'You have already booked this time slot. Please choose a different time.'
+                    ];
+                    header('Location: ' . $_SERVER['HTTP_REFERER']);
+                    exit();
+                }
+
                 $stmt = $pdo->prepare("
                     INSERT INTO user_appointments 
                         (user_id, appointment_id, service_id, status, notes, health_concerns, service_type, consent) 
@@ -118,12 +168,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
 
                 $_SESSION['notification'] = [
                     'type' => 'success',
-                    'message' => 'Appointment booked successfully with consent given.'
+                    'message' => 'Appointment booked successfully! Your health visit has been scheduled.'
                 ];
                 header('Location: ' . $_SERVER['HTTP_REFERER']);
                 exit();
             } catch (PDOException $e) {
-                $error = 'Error booking appointment: ' . $e->getMessage();
+                $_SESSION['notification'] = [
+                    'type' => 'error',
+                    'message' => 'Error booking appointment: ' . $e->getMessage()
+                ];
+                header('Location: ' . $_SERVER['HTTP_REFERER']);
+                exit();
             }
         }
     }
@@ -133,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
 // Handle appointment cancellation
 // -------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])) {
-    $appointmentId = $_POST['appointment_id'];
+    $userAppointmentId = $_POST['appointment_id']; // This is the user_appointments.id
     $cancelReason = trim($_POST['cancel_reason'] ?? '');
     
     // Validate cancellation reason
@@ -156,10 +211,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
             AND ua.status IN ('pending', 'approved')
             AND a.date >= CURDATE()
         ");
-        $stmt->execute([$appointmentId, $userId]);
+        $stmt->execute([$userAppointmentId, $userId]);
         
         if (!$stmt->fetch()) {
-            throw new Exception('Appointment cannot be cancelled');
+            throw new Exception('Appointment cannot be cancelled. It may have already been completed, cancelled, or the date has passed.');
         }
         
         // Update with cancellation reason and timestamp
@@ -170,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
                 cancelled_at = NOW()
             WHERE id = ? AND user_id = ?
         ");
-        $stmt->execute([$cancelReason, $appointmentId, $userId]);
+        $stmt->execute([$cancelReason, $userAppointmentId, $userId]);
         
         $_SESSION['notification'] = [
             'type' => 'success',
@@ -185,11 +240,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
 
 // -------------------------------------------------
 // Get available dates with slots and staff information
+// MODIFIED: Only show slots that have available capacity and are not in the past
 // -------------------------------------------------
 $availableDates = [];
 
 try {
-    $stmt = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT 
             a.date, 
             a.id as slot_id,
@@ -199,14 +255,25 @@ try {
             s.full_name as staff_name,
             s.specialization,
             COUNT(ua.id) as booked_slots,
-            (a.max_slots - COUNT(ua.id)) as available_slots
+            (a.max_slots - COUNT(ua.id)) as available_slots,
+            -- Check if current user has already booked this slot (including completed appointments)
+            EXISTS (
+                SELECT 1 FROM user_appointments ua2 
+                WHERE ua2.appointment_id = a.id 
+                AND ua2.user_id = ? 
+                AND ua2.status IN ('pending', 'approved', 'completed')
+            ) as user_has_booked,
+            -- Check if the appointment time is in the past
+            (a.date < CURDATE() OR (a.date = CURDATE() AND a.end_time < TIME(NOW()))) as is_past
         FROM sitio1_appointments a
         JOIN sitio1_staff s ON a.staff_id = s.id
-        LEFT JOIN user_appointments ua ON ua.appointment_id = a.id AND ua.status IN ('pending', 'approved')
+        LEFT JOIN user_appointments ua ON ua.appointment_id = a.id AND ua.status IN ('pending', 'approved', 'completed')
         WHERE a.date >= CURDATE()
         GROUP BY a.id
+        HAVING available_slots > 0 AND is_past = 0
         ORDER BY a.date, a.start_time
     ");
+    $stmt->execute([$userId]);
     $availableSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     foreach ($availableSlots as $slot) {
@@ -299,7 +366,7 @@ try {
 
 // Handle invoice download
 if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
-    $appointmentId = intval($_GET['download_invoice']);
+    $userAppointmentId = intval($_GET['download_invoice']);
     
     // Verify the user owns this appointment
     $stmt = $pdo->prepare("SELECT ua.*, u.full_name, u.email, u.contact, u.address,
@@ -308,98 +375,131 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                           FROM user_appointments ua 
                           JOIN sitio1_users u ON ua.user_id = u.id 
                           JOIN sitio1_appointments a ON ua.appointment_id = a.id 
-                          JOIN sitio1_users s ON a.staff_id = s.id 
+                          JOIN sitio1_staff s ON a.staff_id = s.id 
                           WHERE ua.id = ? AND ua.user_id = ?");
-    $stmt->execute([$appointmentId, $_SESSION['user']['id']]);
+    $stmt->execute([$userAppointmentId, $_SESSION['user']['id']]);
     $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($appointment && !empty($appointment['invoice_number'])) {
         // Generate PDF invoice
-        require_once __DIR__ . '/../vendor/autoload.php'; // For TCPDF
-        
-        // Create new PDF document
-        $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-        
-        // Set document information
-        $pdf->SetCreator('Community Health Tracker');
-        $pdf->SetAuthor('Community Health Tracker');
-        $pdf->SetTitle('Invoice #' . $appointment['invoice_number']);
-        $pdf->SetSubject('Appointment Invoice');
-        
-        // Add a page
-        $pdf->AddPage();
-        
-        // Set content
-        $html = '
-            <h1 style="text-align: center; color: #3b82f6;">Community Health Tracker</h1>
-            <h2 style="text-align: center; color: #6b7280;">Appointment Invoice</h2>
+        // Check if TCPDF is available via Composer
+        $tcpdfPath = __DIR__ . '/../vendor/tecnickcom/tcpdf/tcpdf.php';
+        if (file_exists($tcpdfPath)) {
+            require_once $tcpdfPath;
             
-            <table border="0" cellpadding="5">
-                <tr>
-                    <td width="30%"><strong>Invoice Number:</strong></td>
-                    <td width="70%">' . $appointment['invoice_number'] . '</td>
-                </tr>
-                <tr>
-                    <td><strong>Issue Date:</strong></td>
-                    <td>' . date('M d, Y') . '</td>
-                </tr>
-                <tr>
-                    <td><strong>Priority Number:</strong></td>
-                    <td>' . $appointment['priority_number'] . '</td>
-                </tr>
-            </table>
+            // Create new PDF document
+            $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
             
-            <h3 style="color: #3b82f6; margin-top: 20px;">Appointment Details</h3>
-            <table border="0" cellpadding="5">
-                <tr>
-                    <td width="30%"><strong>Patient Name:</strong></td>
-                    <td width="70%">' . $appointment['full_name'] . '</td>
-                </tr>
-                <tr>
-                    <td><strong>Contact:</strong></td>
-                    <td>' . $appointment['contact'] . '</td>
-                </tr>
-                <tr>
-                    <td><strong>Address:</strong></td>
-                    <td>' . $appointment['address'] . '</td>
-                </tr>
-                <tr>
-                    <td><strong>Appointment Date:</strong></td>
-                    <td>' . date('M d, Y', strtotime($appointment['date'])) . '</td>
-                </tr>
-                <tr>
-                    <td><strong>Appointment Time:</strong></td>
-                    <td>' . date('h:i A', strtotime($appointment['start_time'])) . ' - ' . date('h:i A', strtotime($appointment['end_time'])) . '</td>
-                </tr>
-                <tr>
-                    <td><strong>Health Worker:</strong></td>
-                    <td>' . $appointment['staff_name'] . ' (' . $appointment['specialization'] . ')</td>
-                </tr>
-                <tr>
-                    <td><strong>License Number:</strong></td>
-                    <td>' . $appointment['license_number'] . '</td>
-                </tr>
-            </table>
+            // Set document information
+            $pdf->SetCreator('Community Health Tracker');
+            $pdf->SetAuthor('Community Health Tracker');
+            $pdf->SetTitle('Invoice #' . $appointment['invoice_number']);
+            $pdf->SetSubject('Appointment Invoice');
             
-            <h3 style="color: #3b82f6; margin-top: 20px;">Health Concerns</h3>
-            <p>' . $appointment['health_concerns'] . '</p>
+            // Add a page
+            $pdf->AddPage();
             
-            <h3 style="color: #3b82f6; margin-top: 20px;">Notes</h3>
-            <p>' . ($appointment['notes'] ?: 'No additional notes') . '</p>
+            // Set content
+            $html = '
+                <h1 style="text-align: center; color: #3b82f6;">Community Health Tracker</h1>
+                <h2 style="text-align: center; color: #6b7280;">Appointment Invoice</h2>
+                
+                <table border="0" cellpadding="5">
+                    <tr>
+                        <td width="30%"><strong>Invoice Number:</strong></td>
+                        <td width="70%">' . $appointment['invoice_number'] . '</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Issue Date:</strong></td>
+                        <td>' . date('M d, Y') . '</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Priority Number:</strong></td>
+                        <td>' . $appointment['priority_number'] . '</td>
+                    </tr>
+                </table>
+                
+                <h3 style="color: #3b82f6; margin-top: 20px;">Appointment Details</h3>
+                <table border="0" cellpadding="5">
+                    <tr>
+                        <td width="30%"><strong>Patient Name:</strong></td>
+                        <td width="70%">' . $appointment['full_name'] . '</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Contact:</strong></td>
+                        <td>' . $appointment['contact'] . '</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Address:</strong></td>
+                        <td>' . $appointment['address'] . '</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Appointment Date:</strong></td>
+                        <td>' . date('M d, Y', strtotime($appointment['date'])) . '</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Appointment Time:</strong></td>
+                        <td>' . date('h:i A', strtotime($appointment['start_time'])) . ' - ' . date('h:i A', strtotime($appointment['end_time'])) . '</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Health Worker:</strong></td>
+                        <td>' . $appointment['staff_name'] . ' (' . $appointment['specialization'] . ')</td>
+                    </tr>
+                    <tr>
+                        <td><strong>License Number:</strong></td>
+                        <td>' . $appointment['license_number'] . '</td>
+                    </tr>
+                </table>
+                
+                <h3 style="color: #3b82f6; margin-top: 20px;">Health Concerns</h3>
+                <p>' . $appointment['health_concerns'] . '</p>
+                
+                <h3 style="color: #3b82f6; margin-top: 20px;">Notes</h3>
+                <p>' . ($appointment['notes'] ?: 'No additional notes') . '</p>
+                
+                <hr style="margin: 20px 0;">
+                <p style="text-align: center; color: #6b7280;">Thank you for choosing Community Health Tracker.</p>
+            ';
             
-            <hr style="margin: 20px 0;">
-            <p style="text-align: center; color: #6b7280;">Thank you for choosing Community Health Tracker.</p>
-        ';
-        
-        // Output HTML content
-        $pdf->writeHTML($html, true, false, true, false, '');
-        
-        // Close and output PDF document
-        $pdf->Output('invoice_' . $appointment['invoice_number'] . '.pdf', 'D');
-        exit;
+            // Output HTML content
+            $pdf->writeHTML($html, true, false, true, false, '');
+            
+            // Close and output PDF document
+            $pdf->Output('invoice_' . $appointment['invoice_number'] . '.pdf', 'D');
+            exit;
+        } else {
+            // Fallback to simple text invoice if TCPDF not available
+            header('Content-Type: text/plain');
+            header('Content-Disposition: attachment; filename="invoice_' . $appointment['invoice_number'] . '.txt"');
+            
+            echo "Community Health Tracker\n";
+            echo "Appointment Invoice\n\n";
+            echo "Invoice Number: " . $appointment['invoice_number'] . "\n";
+            echo "Issue Date: " . date('M d, Y') . "\n";
+            echo "Priority Number: " . $appointment['priority_number'] . "\n\n";
+            
+            echo "Appointment Details:\n";
+            echo "Patient Name: " . $appointment['full_name'] . "\n";
+            echo "Contact: " . $appointment['contact'] . "\n";
+            echo "Address: " . $appointment['address'] . "\n";
+            echo "Appointment Date: " . date('M d, Y', strtotime($appointment['date'])) . "\n";
+            echo "Appointment Time: " . date('h:i A', strtotime($appointment['start_time'])) . " - " . date('h:i A', strtotime($appointment['end_time'])) . "\n";
+            echo "Health Worker: " . $appointment['staff_name'] . " (" . $appointment['specialization'] . ")\n";
+            echo "License Number: " . $appointment['license_number'] . "\n\n";
+            
+            echo "Health Concerns:\n" . $appointment['health_concerns'] . "\n\n";
+            echo "Notes:\n" . ($appointment['notes'] ?: 'No additional notes') . "\n\n";
+            
+            echo "Thank you for choosing Community Health Tracker.\n";
+            exit;
+        }
     } else {
         // Redirect if invoice doesn't exist or user doesn't have permission
-        header('Location: /community-health-tracker/user/appointments.php');
+        $_SESSION['notification'] = [
+            'type' => 'error',
+            'message' => 'Invoice not found or you do not have permission to access it.'
+        ];
+        header('Location: /community-health-tracker/user/dashboard.php?tab=appointments');
         exit;
     }
 }
@@ -433,19 +533,26 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
 </style>
 
 <div class="container mx-auto px-4">
+    <!-- In the HTML section, add the enhanced modal system -->
+<div class="container mx-auto px-4">
     <!-- Success Modal -->
     <div id="success-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
         <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="success-modal-backdrop"></div>
-        <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-sm w-full opacity-0 scale-95" id="success-modal-content">
+        <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full opacity-0 scale-95" id="success-modal-content">
             <div class="p-6 text-center">
                 <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
                     <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
                 </div>
-                <h3 class="mt-3 text-lg font-medium text-gray-900">Appointment Successfully Booked</h3>
+                <h3 class="mt-3 text-lg font-medium text-gray-900">Appointment Booked Successfully!</h3>
                 <div class="mt-2 px-4 py-3">
-                    <p class="text-sm text-gray-500" id="success-message"></p>
+                    <p class="text-sm text-gray-500">Your health visit has been scheduled. You will receive a confirmation shortly.</p>
+                </div>
+                <div class="mt-4">
+                    <button type="button" onclick="hideModal('success')" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        Continue
+                    </button>
                 </div>
             </div>
         </div>
@@ -454,26 +561,31 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
     <!-- Error Modal -->
     <div id="error-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
         <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="error-modal-backdrop"></div>
-        <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-sm w-full opacity-0 scale-95" id="error-modal-content">
+        <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full opacity-0 scale-95" id="error-modal-content">
             <div class="p-6 text-center">
                 <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
                     <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </div>
-                <h3 class="mt-3 text-lg font-medium text-gray-900">You have an active appointment.</h3>
+                <h3 class="mt-3 text-lg font-medium text-gray-900">Booking Error</h3>
                 <div class="mt-2 px-4 py-3">
                     <p class="text-sm text-gray-500" id="error-message"></p>
+                </div>
+                <div class="mt-4">
+                    <button type="button" onclick="hideModal('error')" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        Try Again
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Session Notification -->
+    <!-- Session Notification Modal -->
     <?php if (isset($_SESSION['notification'])): ?>
         <div id="session-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="session-modal-backdrop"></div>
-            <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-sm w-full opacity-0 scale-95" id="session-modal-content">
+            <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full opacity-0 scale-95" id="session-modal-content">
                 <div class="p-6 text-center">
                     <?php if ($_SESSION['notification']['type'] === 'success'): ?>
                         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
@@ -492,6 +604,11 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                     <?php endif; ?>
                     <div class="mt-2 px-4 py-3">
                         <p class="text-sm text-gray-500"><?= htmlspecialchars($_SESSION['notification']['message']) ?></p>
+                    </div>
+                    <div class="mt-4">
+                        <button type="button" onclick="hideModal('session')" class="px-4 py-2 <?= $_SESSION['notification']['type'] === 'success' ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' : 'bg-red-600 hover:bg-red-700 focus:ring-red-500' ?> text-white rounded-md focus:outline-none focus:ring-2">
+                            OK
+                        </button>
                     </div>
                 </div>
             </div>
@@ -652,7 +769,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                     <div class="mb-6">
                         <h3 class="font-medium text-gray-700 mb-3 flex items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             Available Dates
                         </h3>
@@ -661,17 +778,23 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                 <?php foreach ($availableDates as $dateInfo): 
                                     $date = $dateInfo['date'];
                                     $hasAvailableSlots = false;
+                                    $userHasBookings = false;
+                                    
                                     foreach ($dateInfo['slots'] as $slot) {
-                                        if ($slot['available_slots'] > 0) {
+                                        if ($slot['available_slots'] > 0 && !$slot['user_has_booked']) {
                                             $hasAvailableSlots = true;
-                                            break;
+                                        }
+                                        if ($slot['user_has_booked']) {
+                                            $userHasBookings = true;
                                         }
                                     }
                                 ?>
                                     <a href="?tab=appointments&date=<?= $date ?>" class="border rounded-lg p-2 text-center transition <?= ($_GET['date'] ?? '') === $date ? 'border-blue-500 bg-blue-50' : ($hasAvailableSlots ? 'border-gray-200 hover:bg-blue-50' : 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed') ?>">
                                         <div class="font-medium"><?= date('D', strtotime($date)) ?></div>
                                         <div class="text-sm"><?= date('M j', strtotime($date)) ?></div>
-                                        <?php if (!$hasAvailableSlots): ?>
+                                        <?php if ($userHasBookings): ?>
+                                            <div class="text-xs text-blue-500 mt-1">You have booking(s)</div>
+                                        <?php elseif (!$hasAvailableSlots): ?>
                                             <div class="text-xs text-red-500 mt-1">Fully Booked</div>
                                         <?php endif; ?>
                                     </a>
@@ -692,15 +815,20 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                     <?php foreach ($availableDates as $dateInfo): 
                                         $date = $dateInfo['date'];
                                         $hasAvailableSlots = false;
+                                        $userHasBookings = false;
+                                        
                                         foreach ($dateInfo['slots'] as $slot) {
-                                            if ($slot['available_slots'] > 0) {
+                                            if ($slot['available_slots'] > 0 && !$slot['user_has_booked']) {
                                                 $hasAvailableSlots = true;
-                                                break;
+                                            }
+                                            if ($slot['user_has_booked']) {
+                                                $userHasBookings = true;
                                             }
                                         }
                                     ?>
                                         <option value="<?= $date ?>" <?= ($_GET['date'] ?? '') === $date ? 'selected' : '' ?> <?= !$hasAvailableSlots ? 'disabled' : '' ?>>
                                             <?= date('l, F j, Y', strtotime($date)) ?>
+                                            <?= $userHasBookings ? ' (You have bookings)' : '' ?>
                                             <?= !$hasAvailableSlots ? ' (Fully Booked)' : '' ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -723,6 +851,9 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                         <div class="space-y-2">
                                             <?php foreach ($selectedDateInfo['slots'] as $slot): 
                                                 $isAvailable = $slot['available_slots'] > 0;
+                                                $userHasBooked = $slot['user_has_booked'];
+                                                // Hide slots that user has already booked
+                                                if ($userHasBooked) continue;
                                             ?>
                                                 <div class="border rounded-lg p-3 <?= $isAvailable ? 'border-gray-200 hover:bg-blue-50' : 'border-gray-200 bg-gray-100 text-gray-500' ?>">
                                                     <div class="flex items-center">
@@ -790,7 +921,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                             }
                         }
                         
-                        if ($selectedSlot): ?>
+                        if ($selectedSlot && !$selectedSlot['user_has_booked']): ?>
                             <div class="border border-gray-200 rounded-lg p-6 mb-6">
                                 <h3 class="font-semibold text-lg mb-4 flex items-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -909,7 +1040,11 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                                 </svg>
-                                Selected slot is no longer available. Please choose another.
+                                <?php if ($selectedSlot && $selectedSlot['user_has_booked']): ?>
+                                    You have already booked this time slot. Please choose a different time.
+                                <?php else: ?>
+                                    Selected slot is no longer available. Please choose another.
+                                <?php endif; ?>
                             </div>
                         <?php endif; ?>
                     <?php endif; ?>
@@ -927,7 +1062,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                             Upcoming Appointments
                         <?php elseif ($appointmentTab === 'past'): ?>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 01118 0z" />
                             </svg>
                             Completed Appointments
                         <?php else: ?>
@@ -960,8 +1095,8 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 01118 0z" />
                                                 </svg>
                                             <?php elseif ($appointment['status'] === 'completed'): ?>
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 01118 0z" />
                                                 </svg>
                                             <?php else: ?>
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1224,36 +1359,74 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    // Modal control functions
-    function showModal(type, message) {
-        const modal = document.getElementById(`${type}-modal`);
-        const messageElement = document.getElementById(`${type}-message`);
-        
-        if (messageElement) {
-            messageElement.textContent = message;
-        }
-        
-        modal.classList.remove('hidden');
+    // Enhanced modal control functions
+function showModal(type, message) {
+    const modal = document.getElementById(`${type}-modal`);
+    const messageElement = document.getElementById(`${type}-message`);
+    
+    if (messageElement && message) {
+        messageElement.textContent = message;
+    }
+    
+    modal.classList.remove('hidden');
+    
+    setTimeout(() => {
+        document.getElementById(`${type}-modal-backdrop`).classList.add('opacity-100');
+        document.getElementById(`${type}-modal-content`).classList.add('opacity-100', 'scale-100');
+    }, 10);
+}
+
+function hideModal(type) {
+    const modal = document.getElementById(`${type}-modal`);
+    const backdrop = document.getElementById(`${type}-modal-backdrop`);
+    const content = document.getElementById(`${type}-modal-content`);
+    
+    if (backdrop && content) {
+        backdrop.classList.remove('opacity-100');
+        content.classList.remove('opacity-100', 'scale-100');
         
         setTimeout(() => {
-            document.getElementById(`${type}-modal-backdrop`).classList.add('opacity-100');
-            document.getElementById(`${type}-modal-content`).classList.add('opacity-100', 'scale-100');
-        }, 10);
+            modal.classList.add('hidden');
+        }, 300);
     }
+}
 
-    function hideModal(type) {
-        const modal = document.getElementById(`${type}-modal`);
-        const backdrop = document.getElementById(`${type}-modal-backdrop`);
-        const content = document.getElementById(`${type}-modal-content`);
-        
-        if (backdrop && content) {
-            backdrop.classList.remove('opacity-100');
-            content.classList.remove('opacity-100', 'scale-100');
+// Handle form submission with modal feedback
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if there's a specific error to show (like duplicate booking)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('error')) {
+        showModal('error', urlParams.get('error'));
+    }
+    
+    // Handle appointment form submission
+    const appointmentForm = document.querySelector('form[onsubmit="return validateHealthConcerns()"]');
+    if (appointmentForm) {
+        appointmentForm.addEventListener('submit', function(e) {
+            if (!validateHealthConcerns()) {
+                e.preventDefault();
+                return false;
+            }
             
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
-        }
+            // Show loading state
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<svg class="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Booking...';
+            submitBtn.disabled = true;
+        });
+    }
+    
+    // Handle session notification modal
+    const sessionModal = document.getElementById('session-modal');
+    if (sessionModal) {
+        const backdrop = document.getElementById('session-modal-backdrop');
+        const content = document.getElementById('session-modal-content');
+        
+        // Show modal with animation
+        setTimeout(() => {
+            backdrop.classList.add('opacity-100');
+            content.classList.add('opacity-100', 'scale-100');
+        }, 10);
     }
 });
 </script>
