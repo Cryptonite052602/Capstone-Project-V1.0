@@ -7,6 +7,9 @@ require_once __DIR__ . '/header.php';
 
 // Set timezone to Philippine time
 date_default_timezone_set('Asia/Manila');
+
+// Get current page to determine active state
+$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -39,6 +42,7 @@ date_default_timezone_set('Asia/Manila');
         opacity: 0;
         pointer-events: none;
     }
+    
     /* Blinking colon animation */
     @keyframes blink {
         0% { opacity: 1; }
@@ -48,6 +52,115 @@ date_default_timezone_set('Asia/Manila');
     
     .blinking-colon {
         animation: blink 1s infinite;
+    }
+    
+    /* Navigation button styles */
+    .nav-button {
+        position: relative;
+        transition: all 0.3s ease;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+    }
+    
+    .nav-button.active {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .nav-button.active::after {
+        content: '';
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80%;
+        height: 3px;
+        background-color: white;
+        border-radius: 8px;
+    }
+    
+    /* Connection line for navigation */
+    .nav-connection {
+        position: relative;
+    }
+    
+    .nav-connection::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: -12px;
+        width: 24px;
+        height: 2px;
+        background-color: rgba(255, 255, 255, 0.3);
+        transform: translateY(-50%);
+        border-radius: 8px;
+    }
+    
+    .nav-connection:first-child::before {
+        display: none;
+    }
+    
+    /* Curved connection for active states */
+    .nav-button.active ~ .nav-button::before {
+        background-color: white;
+        height: 3px;
+    }
+    
+    /* Hover effects */
+    .nav-button:hover:not(.active) {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Time display containers */
+    .staff-time-container, .user-time-container {
+        display: flex;
+        align-items: center;
+        padding: 0.4rem 0.8rem;
+        border-radius: 0.5rem;
+        margin-left: auto;
+    }
+    
+    .staff-time-container {
+        background-color: rgba(255, 255, 255, 0.15);
+    }
+    
+    .user-time-container {
+        background-color: rgba(255, 255, 255, 0.15);
+    }
+    
+    /* Time zone indicator */
+    .time-zone {
+        font-size: 0.7rem;
+        margin-left: 0.5rem;
+        opacity: 0.8;
+        font-style: italic;
+    }
+    
+    /* Hidden refresh indicator */
+    .refresh-indicator {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        opacity: 0;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 1024px) {
+        .staff-nav-container, .user-nav-container {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .staff-time-container, .user-time-container {
+            margin-left: 0;
+            align-self: flex-end;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .time-zone {
+            display: none; /* Hide time zone on very small screens */
+        }
     }
 </style>
 
@@ -264,13 +377,50 @@ date_default_timezone_set('Asia/Manila');
                 </div>
 
                 <div class="bg-red-700 py-2">
-                    <div class="container mx-auto px-4">
+                    <div class="container mx-auto px-4 flex items-center justify-between staff-nav-container">
                         <ul class="flex space-x-6">
-                            <li><a href="/community-health-tracker/staff/dashboard.php" class="hover:bg-red-800 px-3 py-1 rounded">Dashboard</a></li>
-                            <li><a href="/community-health-tracker/staff/existing_info_patients.php" class="hover:bg-red-800 px-3 py-1 rounded">Medical Records</a></li>
-                            <li><a href="/community-health-tracker/staff/announcements.php" class="hover:bg-red-800 px-3 py-1 rounded">Announcements</a></li>
-                            <!-- <li><a href="/community-health-tracker/staff/appointments.php" class="hover:bg-red-800 px-3 py-1 rounded">Appointments</a></li> -->
+                            <li class="nav-connection">
+                                <a href="/community-health-tracker/staff/dashboard.php" 
+                                   class="nav-button <?= ($current_page == 'dashboard.php') ? 'active' : '' ?>">
+                                    Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-connection">
+                                <a href="/community-health-tracker/staff/existing_info_patients.php" 
+                                   class="nav-button <?= ($current_page == 'existing_info_patients.php') ? 'active' : '' ?>">
+                                    Medical Records
+                                </a>
+                            </li>
+                            <li class="nav-connection">
+                                <a href="/community-health-tracker/staff/announcements.php" 
+                                   class="nav-button <?= ($current_page == 'announcements.php') ? 'active' : '' ?>">
+                                    Announcements
+                                </a>
+                            </li>
                         </ul>
+                        
+                        <!-- Real-time Philippine Date and Time for Staff - Right side -->
+                        <div class="staff-time-container">
+                            <div class="flex items-center">
+                                <i class="fas fa-calendar-day mr-2 text-red-200"></i>
+                                <span id="staff-ph-date" class="font-medium text-sm">
+                                    <?php echo date('M j, Y'); ?>
+                                </span>
+                            </div>
+                            <div class="h-5 w-px bg-red-400 mx-3"></div>
+                            <div class="flex items-center">
+                                <i class="fas fa-clock mr-2 text-red-200"></i>
+                                <span id="staff-ph-time" class="font-mono font-bold tracking-wide text-sm">
+                                    <span id="staff-ph-hours"><?php echo date('h'); ?></span>
+                                    <span class="blinking-colon">:</span>
+                                    <span id="staff-ph-minutes"><?php echo date('i'); ?></span>
+                                    <span class="blinking-colon">:</span>
+                                    <span id="staff-ph-seconds"><?php echo date('s'); ?></span>
+                                    <span id="staff-ph-ampm" class="ml-1"><?php echo date('A'); ?></span>
+                                </span>
+                                <span class="time-zone">PHT</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </nav>
@@ -292,17 +442,17 @@ date_default_timezone_set('Asia/Manila');
 
                     <div class="flex items-center space-x-4">
                         <!-- Real-time Philippine Date and Time - Horizontal Layout -->
-                        <div class="flex items-center space-x-3 bg-purple-700/30 px-4 py-2 rounded-lg">
+                        <div class="user-time-container">
                             <div class="flex items-center">
                                 <i class="fas fa-calendar-day mr-2 text-purple-200"></i>
-                                <span id="ph-date" class="font-medium">
+                                <span id="ph-date" class="font-medium text-sm">
                                     <?php echo date('M j, Y'); ?>
                                 </span>
                             </div>
-                            <div class="h-5 w-px bg-purple-400"></div>
+                            <div class="h-5 w-px bg-purple-400 mx-3"></div>
                             <div class="flex items-center">
                                 <i class="fas fa-clock mr-2 text-purple-200"></i>
-                                <span id="ph-time" class="font-mono font-bold tracking-wide">
+                                <span id="ph-time" class="font-mono font-bold tracking-wide text-sm">
                                     <span id="ph-hours"><?php echo date('h'); ?></span>
                                     <span class="blinking-colon">:</span>
                                     <span id="ph-minutes"><?php echo date('i'); ?></span>
@@ -310,6 +460,7 @@ date_default_timezone_set('Asia/Manila');
                                     <span id="ph-seconds"><?php echo date('s'); ?></span>
                                     <span id="ph-ampm" class="ml-1"><?php echo date('A'); ?></span>
                                 </span>
+                                <span class="time-zone">PHT</span>
                             </div>
                         </div>
                         
@@ -326,15 +477,32 @@ date_default_timezone_set('Asia/Manila');
                 </div>
 
                 <div class="bg-purple-700 py-2">
-                    <div class="container mx-auto px-4">
+                    <div class="container mx-auto px-4 flex items-center justify-between user-nav-container">
                         <ul class="flex space-x-6">
-                            <li><a href="/community-health-tracker/user/dashboard.php"
-                                    class="hover:bg-purple-800 px-3 py-1 rounded">Dashboard</a></li>
-                            <li><a href="/community-health-tracker/user/health_records.php"
-                                    class="hover:bg-purple-800 px-3 py-1 rounded">My Record</a></li>
-                            <li><a href="/community-health-tracker/user/announcements.php"
-                                    class="hover:bg-purple-800 px-3 py-1 rounded">Announcements</a></li>
+                            <li class="nav-connection">
+                                <a href="/community-health-tracker/user/dashboard.php"
+                                   class="nav-button <?= ($current_page == 'dashboard.php') ? 'active' : '' ?>">
+                                    Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-connection">
+                                <a href="/community-health-tracker/user/health_records.php"
+                                   class="nav-button <?= ($current_page == 'health_records.php') ? 'active' : '' ?>">
+                                    My Record
+                                </a>
+                            </li>
+                            <li class="nav-connection">
+                                <a href="/community-health-tracker/user/announcements.php"
+                                   class="nav-button <?= ($current_page == 'announcements.php') ? 'active' : '' ?>">
+                                    Announcements
+                                </a>
+                            </li>
                         </ul>
+                        
+                        <!-- Additional space for balance - could add other elements here if needed -->
+                        <div class="opacity-0 pointer-events-none">
+                            <!-- Invisible spacer for layout balance -->
+                        </div>
                     </div>
                 </div>
             </nav>
@@ -363,17 +531,116 @@ date_default_timezone_set('Asia/Manila');
             const options = { month: 'short', day: 'numeric', year: 'numeric' };
             const dateStr = now.toLocaleDateString('en-US', options);
             
-            // Update the elements
-            document.getElementById('ph-date').textContent = dateStr;
-            document.getElementById('ph-hours').textContent = hoursStr;
-            document.getElementById('ph-minutes').textContent = minutes;
-            document.getElementById('ph-seconds').textContent = seconds;
-            document.getElementById('ph-ampm').textContent = ampm;
+            // Update the elements for user
+            if (document.getElementById('ph-date')) {
+                document.getElementById('ph-date').textContent = dateStr;
+                document.getElementById('ph-hours').textContent = hoursStr;
+                document.getElementById('ph-minutes').textContent = minutes;
+                document.getElementById('ph-seconds').textContent = seconds;
+                document.getElementById('ph-ampm').textContent = ampm;
+            }
+            
+            // Update the elements for staff
+            if (document.getElementById('staff-ph-date')) {
+                document.getElementById('staff-ph-date').textContent = dateStr;
+                document.getElementById('staff-ph-hours').textContent = hoursStr;
+                document.getElementById('staff-ph-minutes').textContent = minutes;
+                document.getElementById('staff-ph-seconds').textContent = seconds;
+                document.getElementById('staff-ph-ampm').textContent = ampm;
+            }
+            
+            // Update the hidden refresh indicator (for debugging/verification)
+            document.getElementById('refreshIndicator').textContent = `Last refresh: ${now.toLocaleTimeString()}`;
         }
         
         // Update time immediately and then every second
         updatePhilippineTime();
-        setInterval(updatePhilippineTime, 1000);
+        const timeInterval = setInterval(updatePhilippineTime, 1000);
+        
+        // Advanced time synchronization function
+        function synchronizeTime() {
+            const now = new Date();
+            const milliseconds = now.getMilliseconds();
+            
+            // Calculate delay to sync with the next second change
+            const delay = 1000 - milliseconds;
+            
+            // Clear existing interval
+            clearInterval(timeInterval);
+            
+            // Set new interval that starts at the next second
+            setTimeout(() => {
+                updatePhilippineTime();
+                setInterval(updatePhilippineTime, 1000);
+            }, delay);
+        }
+        
+        // Start synchronized timekeeping
+        synchronizeTime();
+        
+        // Navigation button interaction
+        document.addEventListener('DOMContentLoaded', function() {
+            const navButtons = document.querySelectorAll('.nav-button');
+            
+            navButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Remove active class from all buttons
+                    navButtons.forEach(btn => btn.classList.remove('active'));
+                    
+                    // Add active class to clicked button
+                    this.classList.add('active');
+                    
+                    // Store active state in sessionStorage
+                    sessionStorage.setItem('activeNav', this.getAttribute('href'));
+                });
+            });
+            
+            // Check if there's an active nav stored
+            const activeNav = sessionStorage.getItem('activeNav');
+            if (activeNav) {
+                const activeButton = document.querySelector(`.nav-button[href="${activeNav}"]`);
+                if (activeButton) {
+                    // Remove active class from all buttons first
+                    navButtons.forEach(btn => btn.classList.remove('active'));
+                    // Add active class to stored button
+                    activeButton.classList.add('active');
+                }
+            }
+            
+            // Background time synchronization (hidden from user)
+            function backgroundTimeSync() {
+                // Check time accuracy every 30 seconds
+                setInterval(() => {
+                    const now = new Date();
+                    const expectedSeconds = (now.getSeconds() + 1) % 60;
+                    
+                    // Schedule a check for the next second
+                    setTimeout(() => {
+                        const checkTime = new Date();
+                        if (checkTime.getSeconds() !== expectedSeconds) {
+                            // Time is out of sync, resynchronize
+                            synchronizeTime();
+                        }
+                    }, 1000 - now.getMilliseconds());
+                }, 30000); // Check every 30 seconds
+            }
+            
+            // Start background time synchronization
+            backgroundTimeSync();
+        });
+        
+        // Page visibility API to optimize time updates
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Page is hidden, reduce update frequency to save resources
+                clearInterval(timeInterval);
+                timeInterval = setInterval(updatePhilippineTime, 5000); // Update every 5 seconds when tab is hidden
+            } else {
+                // Page is visible, resume normal update frequency
+                clearInterval(timeInterval);
+                synchronizeTime(); // Resync time when returning to the tab
+            }
+        });
         
         // ... (rest of your existing JavaScript code) ...
     </script>
