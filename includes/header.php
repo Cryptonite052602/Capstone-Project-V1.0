@@ -1287,3 +1287,6 @@ document.addEventListener('DOMContentLoaded', function() {
     </script>
 </body>
 </html>
+
+<!-- What is Lorem Ipsum?
+Lorem Ipsum is simply dummy text of the printing and typesetting industry. -->
