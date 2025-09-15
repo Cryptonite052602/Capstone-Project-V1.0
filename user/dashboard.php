@@ -14,7 +14,7 @@ $userId = $_SESSION['user']['id'];
 $userData = null;
 $error = '';
 $success = '';
-$activeTab = $_GET['tab'] ?? 'dashboard'; // Default to dashboard tab
+$activeTab = $_GET['tab'] ?? 'dashboard';
 
 // Get user data
 try {
@@ -36,6 +36,9 @@ $stats = [
     'unread_announcements' => 0
 ];
 
+// Get recent activities (appointments and consultations)
+$recentActivities = [];
+
 if ($userData) {
     try {
         // Pending consultations
@@ -56,6 +59,41 @@ if ($userData) {
                               WHERE ua.id IS NULL");
         $stmt->execute([$userId]);
         $stats['unread_announcements'] = $stmt->fetchColumn();
+        
+        // Get recent activities (appointments and consultations from the last 30 days)
+        $stmt = $pdo->prepare("
+            (SELECT 
+                'appointment' as type,
+                ua.status,
+                a.date as activity_date,
+                CONCAT('Appointment with ', s.full_name) as title,
+                CONCAT('Status: ', ua.status) as description,
+                a.date,
+                NULL as created_at
+            FROM user_appointments ua
+            JOIN sitio1_appointments a ON ua.appointment_id = a.id
+            JOIN sitio1_staff s ON a.staff_id = s.id
+            WHERE ua.user_id = ? AND a.date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY))
+            
+            UNION ALL
+            
+            (SELECT 
+                'consultation' as type,
+                status,
+                created_at as activity_date,
+                'Health Consultation' as title,
+                CONCAT('Status: ', status) as description,
+                NULL as date,
+                created_at
+            FROM sitio1_consultations 
+            WHERE user_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY))
+            
+            ORDER BY activity_date DESC
+            LIMIT 10
+        ");
+        $stmt->execute([$userId, $userId]);
+        $recentActivities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
     } catch (PDOException $e) {
         $error = 'Error fetching statistics: ' . $e->getMessage();
     }
@@ -66,6 +104,8 @@ $appointmentTab = $_GET['appointment_tab'] ?? 'upcoming';
 
 // -------------------------------------------------
 // Handle appointment booking (with health info + consent)
+// MODIFIED: Enhanced validation to prevent booking past or fully booked slots
+// AND prevent multiple appointments on the same day
 // -------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) {
     if (!isset($_POST['appointment_id'], $_POST['selected_date'], $_POST['consent'])) {
@@ -110,7 +150,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
                     SELECT 
                         a.max_slots,
                         COUNT(ua.id) as booked_slots,
-                        (a.max_slots - COUNT(ua.id)) as available_slots
+                        (a.max_slots - COUNT(ua.id)) as available_slots,
+                        (a.date < CURDATE() OR (a.date = CURDATE() AND a.end_time < TIME(NOW()))) as is_past
                     FROM sitio1_appointments a
                     LEFT JOIN user_appointments ua ON ua.appointment_id = a.id AND ua.status IN ('pending', 'approved', 'completed')
                     WHERE a.id = ? AND a.date = ?
@@ -119,7 +160,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
                 $checkStmt->execute([$appointmentId, $selectedDate]);
                 $slotAvailability = $checkStmt->fetch(PDO::FETCH_ASSOC);
                 
-                if (!$slotAvailability || $slotAvailability['available_slots'] <= 0) {
+                // Check if slot exists, is available, and is not in the past
+                if (!$slotAvailability || $slotAvailability['available_slots'] <= 0 || $slotAvailability['is_past']) {
                     $_SESSION['notification'] = [
                         'type' => 'error',
                         'message' => 'This time slot is no longer available. Please choose a different time.'
@@ -128,23 +170,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
                     exit();
                 }
 
-                // Check if user already has an appointment at the same time on the same day
-                // This includes both active appointments (pending, approved) AND completed appointments
+                // NEW: Check if user already has an appointment on the same day (any time slot)
                 $checkStmt = $pdo->prepare("
                     SELECT COUNT(*) FROM user_appointments ua
                     JOIN sitio1_appointments a ON ua.appointment_id = a.id
                     WHERE ua.user_id = ? 
                     AND a.date = ?
-                    AND a.id = ?
-                    AND ua.status IN ('pending', 'approved', 'completed')
+                    AND ua.status IN ('pending', 'approved')
                 ");
-                $checkStmt->execute([$userId, $selectedDate, $appointmentId]);
-                $sameTimeAppointment = $checkStmt->fetchColumn();
+                $checkStmt->execute([$userId, $selectedDate]);
+                $sameDayAppointment = $checkStmt->fetchColumn();
                 
-                if ($sameTimeAppointment > 0) {
+                if ($sameDayAppointment > 0) {
                     $_SESSION['notification'] = [
                         'type' => 'error',
-                        'message' => 'You have already booked this time slot. Please choose a different time.'
+                        'message' => 'You already have an appointment scheduled for ' . date('M d, Y', strtotime($selectedDate)) . '. Please choose a different date.'
                     ];
                     header('Location: ' . $_SERVER['HTTP_REFERER']);
                     exit();
@@ -188,7 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
 // Handle appointment cancellation
 // -------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])) {
-    $userAppointmentId = $_POST['appointment_id']; // This is the user_appointments.id
+    $userAppointmentId = $_POST['appointment_id'];
     $cancelReason = trim($_POST['cancel_reason'] ?? '');
     
     // Validate cancellation reason
@@ -241,10 +281,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
 // -------------------------------------------------
 // Get available dates with slots and staff information
 // MODIFIED: Only show slots that have available capacity and are not in the past
+// FIXED: Added proper check for fully booked slots
+// ENHANCED: Check if user already has appointment on each date
 // -------------------------------------------------
 $availableDates = [];
 
 try {
+    // First, get all dates where user has appointments
+    $userAppointmentDates = [];
+    $stmt = $pdo->prepare("
+        SELECT DISTINCT a.date 
+        FROM user_appointments ua
+        JOIN sitio1_appointments a ON ua.appointment_id = a.id
+        WHERE ua.user_id = ? 
+        AND ua.status IN ('pending', 'approved')
+        AND a.date >= CURDATE()
+    ");
+    $stmt->execute([$userId]);
+    $userAppointmentDates = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    
+    // Then get available slots
     $stmt = $pdo->prepare("
         SELECT 
             a.date, 
@@ -264,13 +320,15 @@ try {
                 AND ua2.status IN ('pending', 'approved', 'completed')
             ) as user_has_booked,
             -- Check if the appointment time is in the past
-            (a.date < CURDATE() OR (a.date = CURDATE() AND a.end_time < TIME(NOW()))) as is_past
+            (a.date < CURDATE() OR (a.date = CURDATE() AND a.end_time < TIME(NOW()))) as is_past,
+            -- Check if slot is fully booked (considering all statuses)
+            (COUNT(ua.id) >= a.max_slots) as is_fully_booked
         FROM sitio1_appointments a
         JOIN sitio1_staff s ON a.staff_id = s.id
         LEFT JOIN user_appointments ua ON ua.appointment_id = a.id AND ua.status IN ('pending', 'approved', 'completed')
         WHERE a.date >= CURDATE()
         GROUP BY a.id
-        HAVING available_slots > 0 AND is_past = 0
+        HAVING available_slots > 0 AND is_past = 0 AND is_fully_booked = 0
         ORDER BY a.date, a.start_time
     ");
     $stmt->execute([$userId]);
@@ -281,7 +339,8 @@ try {
         if (!isset($availableDates[$date])) {
             $availableDates[$date] = [
                 'date' => $date,
-                'slots' => []
+                'slots' => [],
+                'user_has_appointment' => in_array($date, $userAppointmentDates)
             ];
         }
         $availableDates[$date]['slots'][] = $slot;
@@ -348,9 +407,9 @@ try {
     ";
     
     if ($appointmentTab === 'upcoming') {
-        $query .= " AND ua.status IN ('pending', 'approved') AND a.date >= CURDATE()";
+        $query .= " AND ua.status IN ('pending', 'approved') AND (a.date > CURDATE() OR (a.date = CURDATE() AND a.end_time > TIME(NOW())))";
     } elseif ($appointmentTab === 'past') {
-        $query .= " AND (ua.status = 'completed' OR a.date < CURDATE())";
+        $query .= " AND (ua.status = 'completed' OR a.date < CURDATE() OR (a.date = CURDATE() AND a.end_time < TIME(NOW())))";
     } elseif ($appointmentTab === 'cancelled') {
         $query .= " AND ua.status = 'cancelled'";
     }
@@ -530,10 +589,64 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
 .tab-content.active {
     display: block;
 }
+
+/* Activity styling */
+.activity-item {
+    border-left: 3px solid #3b82f6;
+    padding-left: 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+}
+.activity-item::before {
+    content: '';
+    position: absolute;
+    left: -0.5rem;
+    top: 0.5rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background: #3b82f6;
+}
+.activity-item.completed {
+    border-left-color: #10b981;
+}
+.activity-item.completed::before {
+    background: #10b981;
+}
+.activity-item.cancelled {
+    border-left-color: #ef4444;
+}
+.activity-item.cancelled::before {
+    background: #ef4444;
+}
+.activity-item.pending {
+    border-left-color: #f59e0b;
+}
+.activity-item.pending::before {
+    background: #f59e0b;
+}
+
+/* Disabled date styling */
+.date-disabled {
+    opacity: 0.6;
+    cursor: not-allowed !important;
+    background-color: #f3f4f6 !important;
+}
+.date-disabled:hover {
+    background-color: #f3f4f6 !important;
+}
+
+/* Disabled slot styling */
+.slot-disabled {
+    opacity: 0.6;
+    cursor: not-allowed !important;
+    background-color: #f3f4f6 !important;
+}
+.slot-disabled:hover {
+    background-color: #f3f4f6 !important;
+}
 </style>
 
-<div class="container mx-auto px-4">
-    <!-- In the HTML section, add the enhanced modal system -->
 <div class="container mx-auto px-4">
     <!-- Success Modal -->
     <div id="success-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
@@ -645,7 +758,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
     <div class="flex border-b border-gray-200 mb-6">
         <a href="?tab=dashboard" class="<?= $activeTab === 'dashboard' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                <path stroke-linecap="round" stroke-linejoin-round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
             Dashboard
         </a>
@@ -722,7 +835,33 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
         <div class="bg-white p-6 rounded-lg shadow">
             <h2 class="text-xl font-semibold mb-4">Recent Activities</h2>
             <div class="space-y-4">
-                <p class="text-gray-600">No recent activities yet.</p>
+                <?php if (!empty($recentActivities)): ?>
+                    <?php foreach ($recentActivities as $activity): ?>
+                        <div class="activity-item <?= $activity['status'] ?>">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h4 class="font-medium text-gray-800"><?= htmlspecialchars($activity['title']) ?></h4>
+                                    <p class="text-sm text-gray-600"><?= htmlspecialchars($activity['description']) ?></p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        <?php if ($activity['type'] === 'appointment'): ?>
+                                            <?= date('M d, Y', strtotime($activity['date'])) ?>
+                                        <?php else: ?>
+                                            <?= date('M d, Y h:i A', strtotime($activity['created_at'])) ?>
+                                        <?php endif; ?>
+                                    </p>
+                                </div>
+                                <span class="px-2 py-1 text-xs rounded-full 
+                                    <?= $activity['status'] === 'completed' ? 'bg-green-100 text-green-800' : 
+                                       ($activity['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                       ($activity['status'] === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800')) ?>">
+                                    <?= ucfirst($activity['status']) ?>
+                                </span>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p class="text-gray-600 text-center py-4">No recent activities found.</p>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -740,7 +879,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
             </a>
             <a href="?tab=appointments&appointment_tab=past" class="<?= $appointmentTab === 'past' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 01118 0z" />
                 </svg>
                 Completed
                 <span class="ml-1 bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full"><?= $appointmentCounts['past'] ?></span>
@@ -769,7 +908,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                     <div class="mb-6">
                         <h3 class="font-medium text-gray-700 mb-3 flex items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             Available Dates
                         </h3>
@@ -778,22 +917,20 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                 <?php foreach ($availableDates as $dateInfo): 
                                     $date = $dateInfo['date'];
                                     $hasAvailableSlots = false;
-                                    $userHasBookings = false;
+                                    $userHasAppointment = $dateInfo['user_has_appointment'];
                                     
                                     foreach ($dateInfo['slots'] as $slot) {
                                         if ($slot['available_slots'] > 0 && !$slot['user_has_booked']) {
                                             $hasAvailableSlots = true;
                                         }
-                                        if ($slot['user_has_booked']) {
-                                            $userHasBookings = true;
-                                        }
                                     }
                                 ?>
-                                    <a href="?tab=appointments&date=<?= $date ?>" class="border rounded-lg p-2 text-center transition <?= ($_GET['date'] ?? '') === $date ? 'border-blue-500 bg-blue-50' : ($hasAvailableSlots ? 'border-gray-200 hover:bg-blue-50' : 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed') ?>">
+                                    <a href="<?= $userHasAppointment ? '#' : '?tab=appointments&date=' . $date ?>" 
+                                       class="border rounded-lg p-2 text-center transition <?= ($_GET['date'] ?? '') === $date ? 'border-blue-500 bg-blue-50' : ($userHasAppointment ? 'date-disabled border-gray-200 bg-gray-100 text-gray-500' : ($hasAvailableSlots ? 'border-gray-200 hover:bg-blue-50' : 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed')) ?>">
                                         <div class="font-medium"><?= date('D', strtotime($date)) ?></div>
                                         <div class="text-sm"><?= date('M j', strtotime($date)) ?></div>
-                                        <?php if ($userHasBookings): ?>
-                                            <div class="text-xs text-blue-500 mt-1">You have booking(s)</div>
+                                        <?php if ($userHasAppointment): ?>
+                                            <div class="text-xs text-yellow-600 mt-1">You have appointment</div>
                                         <?php elseif (!$hasAvailableSlots): ?>
                                             <div class="text-xs text-red-500 mt-1">Fully Booked</div>
                                         <?php endif; ?>
@@ -815,20 +952,17 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                     <?php foreach ($availableDates as $dateInfo): 
                                         $date = $dateInfo['date'];
                                         $hasAvailableSlots = false;
-                                        $userHasBookings = false;
+                                        $userHasAppointment = $dateInfo['user_has_appointment'];
                                         
                                         foreach ($dateInfo['slots'] as $slot) {
                                             if ($slot['available_slots'] > 0 && !$slot['user_has_booked']) {
                                                 $hasAvailableSlots = true;
                                             }
-                                            if ($slot['user_has_booked']) {
-                                                $userHasBookings = true;
-                                            }
                                         }
                                     ?>
-                                        <option value="<?= $date ?>" <?= ($_GET['date'] ?? '') === $date ? 'selected' : '' ?> <?= !$hasAvailableSlots ? 'disabled' : '' ?>>
+                                        <option value="<?= $date ?>" <?= ($_GET['date'] ?? '') === $date ? 'selected' : '' ?> <?= $userHasAppointment ? 'disabled' : '' ?>>
                                             <?= date('l, F j, Y', strtotime($date)) ?>
-                                            <?= $userHasBookings ? ' (You have bookings)' : '' ?>
+                                            <?= $userHasAppointment ? ' (You have an appointment)' : '' ?>
                                             <?= !$hasAvailableSlots ? ' (Fully Booked)' : '' ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -838,16 +972,19 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                             <?php if (isset($_GET['date'])): 
                                 $selectedDate = $_GET['date'];
                                 $selectedDateInfo = null;
+                                $userHasAppointmentOnSelectedDate = false;
+                                
                                 foreach ($availableDates as $dateInfo) {
                                     if ($dateInfo['date'] === $selectedDate) {
                                         $selectedDateInfo = $dateInfo;
+                                        $userHasAppointmentOnSelectedDate = $dateInfo['user_has_appointment'];
                                         break;
                                     }
                                 }
                             ?>
                                 <div>
                                     <label for="appointment_slot" class="block text-gray-700 mb-2 font-medium">Available Time Slots:</label>
-                                    <?php if ($selectedDateInfo && !empty($selectedDateInfo['slots'])): ?>
+                                    <?php if ($selectedDateInfo && !empty($selectedDateInfo['slots']) && !$userHasAppointmentOnSelectedDate): ?>
                                         <div class="space-y-2">
                                             <?php foreach ($selectedDateInfo['slots'] as $slot): 
                                                 $isAvailable = $slot['available_slots'] > 0;
@@ -855,14 +992,14 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                                 // Hide slots that user has already booked
                                                 if ($userHasBooked) continue;
                                             ?>
-                                                <div class="border rounded-lg p-3 <?= $isAvailable ? 'border-gray-200 hover:bg-blue-50' : 'border-gray-200 bg-gray-100 text-gray-500' ?>">
+                                                <div class="border rounded-lg p-3 <?= $isAvailable ? 'border-gray-200 hover:bg-blue-50' : 'slot-disabled border-gray-200 bg-gray-100 text-gray-500' ?>">
                                                     <div class="flex items-center">
                                                         <input 
                                                             type="radio" 
                                                             id="slot_<?= $slot['slot_id'] ?>" 
                                                             name="slot" 
                                                             value="<?= $slot['slot_id'] ?>" 
-                                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500" 
+                                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
                                                             <?= !$isAvailable ? 'disabled' : '' ?>
                                                             required
                                                         >
@@ -886,6 +1023,13 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                                 </div>
                                             <?php endforeach; ?>
                                         </div>
+                                    <?php elseif ($userHasAppointmentOnSelectedDate): ?>
+                                        <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded flex items-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                            </svg>
+                                            You already have an appointment scheduled for this date.
+                                        </div>
                                     <?php else: ?>
                                         <p class="text-gray-500 text-sm">No available slots for this date.</p>
                                     <?php endif; ?>
@@ -903,7 +1047,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                         </div>
                     </form>
 
-                    <?php if (isset($_GET['date']) && isset($_GET['slot'])): ?>
+                    <?php if (isset($_GET['date']) && isset($_GET['slot']) && !$userHasAppointmentOnSelectedDate): ?>
                         <?php
                         $selectedDate = $_GET['date'];
                         $selectedSlotId = $_GET['slot'];
@@ -1036,7 +1180,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                                 </form>
                             </div>
                         <?php else: ?>
-                            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-center">
+                            <div class="bg-red-100 border border-red 400 text-red-700 px-4 py-3 rounded flex items-center">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                                 </svg>
@@ -1076,7 +1220,7 @@ if (isset($_GET['download_invoice']) && is_numeric($_GET['download_invoice'])) {
                     <?php if (empty($appointments)): ?>
                         <div class="text-center py-8">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 01118 0z" />
                             </svg>
                             <p class="text-gray-600 mt-2">No <?= $appointmentTab ?> appointments found.</p>
                         </div>
