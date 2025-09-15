@@ -4,6 +4,9 @@ ob_start(); // Start output buffering
 
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/header.php';
+
+// Set timezone to Philippine time
+date_default_timezone_set('Asia/Manila');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,6 +38,16 @@ require_once __DIR__ . '/header.php';
     .overlay-hidden {
         opacity: 0;
         pointer-events: none;
+    }
+    /* Blinking colon animation */
+    @keyframes blink {
+        0% { opacity: 1; }
+        50% { opacity: 0; }
+        100% { opacity: 1; }
+    }
+    
+    .blinking-colon {
+        animation: blink 1s infinite;
     }
 </style>
 
@@ -278,6 +291,28 @@ require_once __DIR__ . '/header.php';
                     </div>
 
                     <div class="flex items-center space-x-4">
+                        <!-- Real-time Philippine Date and Time - Horizontal Layout -->
+                        <div class="flex items-center space-x-3 bg-purple-700/30 px-4 py-2 rounded-lg">
+                            <div class="flex items-center">
+                                <i class="fas fa-calendar-day mr-2 text-purple-200"></i>
+                                <span id="ph-date" class="font-medium">
+                                    <?php echo date('M j, Y'); ?>
+                                </span>
+                            </div>
+                            <div class="h-5 w-px bg-purple-400"></div>
+                            <div class="flex items-center">
+                                <i class="fas fa-clock mr-2 text-purple-200"></i>
+                                <span id="ph-time" class="font-mono font-bold tracking-wide">
+                                    <span id="ph-hours"><?php echo date('h'); ?></span>
+                                    <span class="blinking-colon">:</span>
+                                    <span id="ph-minutes"><?php echo date('i'); ?></span>
+                                    <span class="blinking-colon">:</span>
+                                    <span id="ph-seconds"><?php echo date('s'); ?></span>
+                                    <span id="ph-ampm" class="ml-1"><?php echo date('A'); ?></span>
+                                </span>
+                            </div>
+                        </div>
+                        
                         <div class="flex items-center space-x-2">
                             <i class="fas fa-user-circle text-xl"></i>
                             <span class="font-medium"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
@@ -305,6 +340,43 @@ require_once __DIR__ . '/header.php';
             </nav>
         <?php endif; ?>
     <?php else: ?>
+
+        <script>
+        // Function to update Philippine time in real-time
+        function updatePhilippineTime() {
+            const now = new Date();
+            
+            // Get the current time in the Philippines (UTC+8)
+            // Since we're using the server's timezone setting (Asia/Manila),
+            // we can use local time methods
+            const hours = now.getHours();
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            
+            // Convert to 12-hour format
+            let hours12 = hours % 12;
+            hours12 = hours12 ? hours12 : 12; // Convert 0 to 12
+            const hoursStr = hours12.toString().padStart(2, '0');
+            
+            // Format date
+            const options = { month: 'short', day: 'numeric', year: 'numeric' };
+            const dateStr = now.toLocaleDateString('en-US', options);
+            
+            // Update the elements
+            document.getElementById('ph-date').textContent = dateStr;
+            document.getElementById('ph-hours').textContent = hoursStr;
+            document.getElementById('ph-minutes').textContent = minutes;
+            document.getElementById('ph-seconds').textContent = seconds;
+            document.getElementById('ph-ampm').textContent = ampm;
+        }
+        
+        // Update time immediately and then every second
+        updatePhilippineTime();
+        setInterval(updatePhilippineTime, 1000);
+        
+        // ... (rest of your existing JavaScript code) ...
+    </script>
         <!-- Public Header (Not logged in) -->
 <nav class="bg-white text-black shadow-lg sticky top-0 z-50">
     <div class="container mx-auto px-4 py-5 flex justify-between items-center">
