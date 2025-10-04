@@ -15,12 +15,22 @@ if (!isStaff()) {
 
 global $pdo;
 
-// Check and add missing columns for rescheduling functionality
-function checkAndAddRescheduleColumns($pdo) {
+// Enhanced function to check and add missing columns for appointment functionality
+function checkAndAddAppointmentColumns($pdo) {
     $columns = [
-        'rescheduled_from' => "INT NULL AFTER `status`",
-        'rescheduled_at' => "DATETIME NULL AFTER `rescheduled_from`",
-        'rescheduled_count' => "INT DEFAULT 0 AFTER `rescheduled_at`"
+        'rescheduled_from' => "INT NULL",
+        'rescheduled_at' => "DATETIME NULL", 
+        'rescheduled_count' => "INT DEFAULT 0",
+        'invoice_number' => "VARCHAR(50) NULL",
+        'priority_number' => "VARCHAR(50) NULL",
+        'processed_at' => "DATETIME NULL",
+        'invoice_generated_at' => "DATETIME NULL",
+        'completed_at' => "DATETIME NULL",
+        'rejection_reason' => "TEXT NULL",
+        'cancel_reason' => "TEXT NULL",
+        'cancelled_at' => "DATETIME NULL",
+        'cancelled_by_user' => "BOOLEAN DEFAULT FALSE",
+        'appointment_ticket' => "LONGTEXT NULL"
     ];
     
     foreach ($columns as $columnName => $columnDefinition) {
@@ -36,10 +46,37 @@ function checkAndAddRescheduleColumns($pdo) {
             error_log("Error checking/adding column $columnName: " . $e->getMessage());
         }
     }
+    
+    // Also check if the status enum includes all required values
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM user_appointments LIKE 'status'");
+        $statusColumn = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($statusColumn) {
+            $currentType = $statusColumn['Type'];
+            $requiredValues = ['pending', 'approved', 'completed', 'cancelled', 'rejected', 'rescheduled'];
+            
+            $missingValues = [];
+            foreach ($requiredValues as $value) {
+                if (stripos($currentType, $value) === false) {
+                    $missingValues[] = $value;
+                }
+            }
+            
+            if (!empty($missingValues)) {
+                // Update the enum to include missing values
+                $newEnum = "ENUM('pending', 'approved', 'completed', 'cancelled', 'rejected', 'rescheduled') NOT NULL DEFAULT 'pending'";
+                $pdo->exec("ALTER TABLE user_appointments MODIFY status $newEnum");
+                error_log("Updated status enum to include all required values");
+            }
+        }
+    } catch (PDOException $e) {
+        error_log("Error updating status enum: " . $e->getMessage());
+    }
 }
 
 // Call this function to ensure columns exist
-checkAndAddRescheduleColumns($pdo);
+checkAndAddAppointmentColumns($pdo);
 
 // Function to generate unique number
 function generateUniqueNumber($pdo) {
@@ -82,29 +119,211 @@ function sendAccountStatusEmail($email, $status, $message = '', $uniqueNumber = 
         $mail->Port       = 587;
 
         // Recipients
-        $mail->setFrom('your-email@gmail.com', 'Community Health Tracker');
+        $mail->setFrom('cabanagarchiel@gmail.com', 'Community Health Tracker');
         $mail->addAddress($email);
 
         // Content
         $mail->isHTML(true);
         
         if ($status === 'approved') {
-            $mail->Subject = 'Your Account Has Been Approved';
+            $mail->Subject = 'Account Approval - Community Health Tracker';
             $mail->Body    = '
-                <h2>Account Approved</h2>
-                <p>Your account with Community Health Tracker has been approved by our staff.</p>
-                <p><strong>Your Unique Identification Number: ' . $uniqueNumber . '</strong></p>
-                <p>Please keep this number safe as it will be used to identify you in our system.</p>
-                <p>You can now log in and access all features of our system.</p>
-                <p>Thank you for joining us!</p>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <style>
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            line-height: 1.6;
+                            color: #333;
+                            max-width: 600px;
+                            margin: 0 auto;
+                            padding: 20px;
+                        }
+                        .header {
+                            text-align: center;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            padding: 30px;
+                            border-radius: 10px 10px 0 0;
+                            color: white;
+                        }
+                        .logo {
+                            font-size: 28px;
+                            font-weight: bold;
+                            margin-bottom: 10px;
+                        }
+                        .content {
+                            background: #f9f9f9;
+                            padding: 30px;
+                            border-radius: 0 0 10px 10px;
+                        }
+                        .unique-number {
+                            background: #e8f5e8;
+                            border: 2px solid #4CAF50;
+                            padding: 15px;
+                            border-radius: 8px;
+                            text-align: center;
+                            margin: 20px 0;
+                            font-size: 20px;
+                            font-weight: bold;
+                            color: #2e7d32;
+                        }
+                        .footer {
+                            text-align: center;
+                            margin-top: 30px;
+                            padding-top: 20px;
+                            border-top: 1px solid #ddd;
+                            color: #666;
+                            font-size: 12px;
+                        }
+                        .button {
+                            display: inline-block;
+                            background: #4CAF50;
+                            color: white;
+                            padding: 12px 24px;
+                            text-decoration: none;
+                            border-radius: 5px;
+                            margin: 10px 0;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="logo">🏥 Community Health Tracker</div>
+                        <h1>Account Approved</h1>
+                    </div>
+                    <div class="content">
+                        <p>Dear Valued Patient,</p>
+                        
+                        <p>We are pleased to inform you that your account registration with <strong>Community Health Tracker</strong> has been successfully approved by our administrative team.</p>
+                        
+                        <div class="unique-number">
+                            Your Unique Identification Number:<br>
+                            <strong>' . $uniqueNumber . '</strong>
+                        </div>
+                        
+                        <p>Please keep this number secure as it will be used to identify you in our healthcare system for all future appointments and medical records.</p>
+                        
+                        <p>With your approved account, you can now:</p>
+                        <ul>
+                            <li>Schedule appointments with healthcare providers</li>
+                            <li>Access your medical history and records</li>
+                            <li>Receive personalized health recommendations</li>
+                            <li>Communicate securely with healthcare staff</li>
+                        </ul>
+                        
+                        <p style="text-align: center;">
+                            <a href="https://your-health-portal.com/login" class="button">Access Your Account</a>
+                        </p>
+                        
+                        <p>If you have any questions or require assistance, please don\'t hesitate to contact our support team.</p>
+                        
+                        <p>Thank you for choosing Community Health Tracker for your healthcare needs.</p>
+                        
+                        <p>Best regards,<br>
+                        <strong>The Community Health Tracker Team</strong></p>
+                    </div>
+                    <div class="footer">
+                        <p>This is an automated message. Please do not reply to this email.</p>
+                        <p>&copy; ' . date('Y') . ' Community Health Tracker. All rights reserved.</p>
+                    </div>
+                </body>
+                </html>
             ';
         } else {
-            $mail->Subject = 'Your Account Approval Was Declined';
+            $mail->Subject = 'Account Registration Update - Community Health Tracker';
             $mail->Body    = '
-                <h2>Account Declined</h2>
-                <p>We regret to inform you that your account with Community Health Tracker was not approved.</p>
-                <p>Reason: ' . htmlspecialchars($message) . '</p>
-                <p>If you believe this was a mistake, please contact our support team.</p>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <style>
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            line-height: 1.6;
+                            color: #333;
+                            max-width: 600px;
+                            margin: 0 auto;
+                            padding: 20px;
+                        }
+                        .header {
+                            text-align: center;
+                            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+                            padding: 30px;
+                            border-radius: 10px 10px 0 0;
+                            color: white;
+                        }
+                        .logo {
+                            font-size: 28px;
+                            font-weight: bold;
+                            margin-bottom: 10px;
+                        }
+                        .content {
+                            background: #f9f9f9;
+                            padding: 30px;
+                            border-radius: 0 0 10px 10px;
+                        }
+                        .reason-box {
+                            background: #ffeaea;
+                            border: 2px solid #ff6b6b;
+                            padding: 15px;
+                            border-radius: 8px;
+                            margin: 20px 0;
+                        }
+                        .footer {
+                            text-align: center;
+                            margin-top: 30px;
+                            padding-top: 20px;
+                            border-top: 1px solid #ddd;
+                            color: #666;
+                            font-size: 12px;
+                        }
+                        .contact-info {
+                            background: #e3f2fd;
+                            padding: 15px;
+                            border-radius: 8px;
+                            margin: 20px 0;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="logo">🏥 Community Health Tracker</div>
+                        <h1>Account Registration Update</h1>
+                    </div>
+                    <div class="content">
+                        <p>Dear Applicant,</p>
+                        
+                        <p>Thank you for your interest in registering with <strong>Community Health Tracker</strong>. After careful review of your application, we regret to inform you that we are unable to approve your account registration at this time.</p>
+                        
+                        <div class="reason-box">
+                            <strong>Reason for Declination:</strong><br>
+                            ' . htmlspecialchars($message) . '
+                        </div>
+                        
+                        <p>This decision may be due to various factors including incomplete information, documentation requirements, or current system capacity limitations.</p>
+                        
+                        <div class="contact-info">
+                            <strong>Need Assistance?</strong><br>
+                            If you believe this decision was made in error, or if you would like to provide additional information for reconsideration, please contact our support team:<br>
+                            📞 Support Hotline: (02) 8-123-4567<br>
+                            ✉️ Email: support@communityhealthtracker.ph
+                        </div>
+                        
+                        <p>We appreciate your understanding and encourage you to reach out if you have any questions about this decision or if you wish to reapply in the future.</p>
+                        
+                        <p>Thank you for considering Community Health Tracker for your healthcare needs.</p>
+                        
+                        <p>Sincerely,<br>
+                        <strong>The Community Health Tracker Team</strong></p>
+                    </div>
+                    <div class="footer">
+                        <p>This is an automated message. Please do not reply to this email.</p>
+                        <p>&copy; ' . date('Y') . ' Community Health Tracker. All rights reserved.</p>
+                    </div>
+                </body>
+                </html>
             ';
         }
 
@@ -116,7 +335,43 @@ function sendAccountStatusEmail($email, $status, $message = '', $uniqueNumber = 
     }
 }
 
-// Function to generate appointment ticket PDF
+// Function to generate sequential priority number
+function generatePriorityNumber($pdo, $appointmentId, $staffId, $date) {
+    // Get the count of approved appointments for this staff on this date
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as appointment_count 
+        FROM user_appointments ua
+        JOIN sitio1_appointments a ON ua.appointment_id = a.id
+        WHERE a.staff_id = ? AND a.date = ? AND ua.status = 'approved'
+        AND ua.id <= ?
+    ");
+    $stmt->execute([$staffId, $date, $appointmentId]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    $sequenceNumber = $result['appointment_count'] ?? 1;
+    
+    // Get staff initials
+    $stmt = $pdo->prepare("SELECT full_name FROM sitio1_users WHERE id = ?");
+    $stmt->execute([$staffId]);
+    $staff = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    $initials = 'HW';
+    if ($staff && !empty($staff['full_name'])) {
+        $nameParts = explode(' ', $staff['full_name']);
+        $initials = '';
+        foreach ($nameParts as $part) {
+            if (!empty(trim($part))) {
+                $initials .= strtoupper(substr($part, 0, 1));
+            }
+        }
+        if (empty($initials)) $initials = 'HW';
+    }
+    
+    // Format: HW_INITIALS-01, HW_INITIALS-02, etc.
+    return $initials . '-' . str_pad($sequenceNumber, 2, '0', STR_PAD_LEFT);
+}
+
+// Function to generate appointment ticket
 function generateAppointmentTicket($appointmentData, $priorityNumber) {
     // Create HTML content for the ticket
     $html = '
@@ -126,90 +381,218 @@ function generateAppointmentTicket($appointmentData, $priorityNumber) {
         <meta charset="utf-8">
         <title>Appointment Ticket - ' . $priorityNumber . '</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .ticket { border: 2px solid #3b82f6; padding: 20px; max-width: 600px; margin: 0 auto; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .header h1 { color: #3b82f6; margin: 0; }
-            .header p { color: #6b7280; margin: 5px 0; }
-            .section { margin-bottom: 15px; }
-            .section h2 { color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; font-size: 18px; margin: 15px 0 10px 0; }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-            .info-item { margin-bottom: 8px; }
-            .label { font-weight: bold; color: #4b5563; }
-            .consent { background-color: #f9fafb; padding: 15px; border-radius: 5px; margin-top: 20px; }
-            .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+            body { 
+                font-family: Arial, sans-serif; 
+                margin: 0; 
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .ticket-container {
+                max-width: 400px;
+                width: 100%;
+            }
+            .ticket { 
+                background: white;
+                border-radius: 15px;
+                padding: 30px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                border: 3px solid #3b82f6;
+                position: relative;
+                overflow: hidden;
+            }
+            .ticket::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6);
+            }
+            .header { 
+                text-align: center; 
+                margin-bottom: 25px;
+                border-bottom: 2px dashed #e5e7eb;
+                padding-bottom: 20px;
+            }
+            .header h1 { 
+                color: #3b82f6; 
+                margin: 0 0 10px 0;
+                font-size: 24px;
+                font-weight: bold;
+            }
+            .header p { 
+                color: #6b7280; 
+                margin: 5px 0;
+                font-size: 14px;
+            }
             .priority-number { 
                 text-align: center; 
-                font-size: 24px; 
+                font-size: 32px; 
                 font-weight: bold; 
                 color: #dc2626; 
-                background-color: #fef2f2; 
-                padding: 10px; 
-                border-radius: 5px; 
-                margin: 15px 0; 
+                background: linear-gradient(135deg, #fef3f2, #fee2e2);
+                padding: 15px;
+                border-radius: 10px;
+                margin: 20px 0;
+                border: 2px dashed #dc2626;
+                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            }
+            .section { 
+                margin-bottom: 20px;
+                padding: 15px;
+                background: #f8fafc;
+                border-radius: 8px;
+                border-left: 4px solid #3b82f6;
+            }
+            .section h2 { 
+                color: #374151; 
+                border-bottom: 1px solid #e5e7eb; 
+                padding-bottom: 8px; 
+                font-size: 16px; 
+                margin: 0 0 12px 0;
+                display: flex;
+                align-items: center;
+            }
+            .section h2 i {
+                margin-right: 8px;
+                color: #3b82f6;
+            }
+            .info-grid { 
+                display: grid; 
+                gap: 10px; 
+            }
+            .info-item { 
+                display: flex;
+                justify-content: space-between;
+                padding: 5px 0;
+                border-bottom: 1px dashed #e5e7eb;
+            }
+            .info-item:last-child {
+                border-bottom: none;
+            }
+            .label { 
+                font-weight: bold; 
+                color: #4b5563;
+                font-size: 14px;
+            }
+            .value {
+                color: #1f2937;
+                font-size: 14px;
+                text-align: right;
+            }
+            .barcode {
+                text-align: center;
+                margin: 25px 0 15px;
+                padding: 15px;
+                background: #f8fafc;
+                border-radius: 8px;
+                font-family: "Libre Barcode 128", cursive;
+                font-size: 36px;
+                letter-spacing: 2px;
+            }
+            .footer { 
+                text-align: center; 
+                margin-top: 25px; 
+                color: #6b7280; 
+                font-size: 12px;
+                border-top: 2px dashed #e5e7eb;
+                padding-top: 15px;
+            }
+            .watermark {
+                position: absolute;
+                bottom: 20px;
+                right: 20px;
+                opacity: 0.1;
+                font-size: 72px;
+                font-weight: bold;
+                color: #3b82f6;
+                transform: rotate(-15deg);
+            }
+            @media print {
+                body {
+                    background: white !important;
+                    padding: 0;
+                }
+                .ticket {
+                    box-shadow: none;
+                    border: 2px solid #000;
+                }
             }
         </style>
+        <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
     </head>
     <body>
-        <div class="ticket">
-            <div class="header">
-                <h1>Community Health Tracker</h1>
-                <p>Appointment Confirmation Ticket</p>
-                <div class="priority-number">Priority Number: ' . $priorityNumber . '</div>
-            </div>
-            
-            <div class="section">
-                <h2>Appointment Details</h2>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="label">Date:</span> ' . date('F j, Y', strtotime($appointmentData['date'])) . '
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Time:</span> ' . date('g:i A', strtotime($appointmentData['start_time'])) . ' - ' . date('g:i A', strtotime($appointmentData['end_time'])) . '
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Health Worker:</span> ' . htmlspecialchars($appointmentData['staff_name']) . '
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Specialization:</span> ' . htmlspecialchars($appointmentData['specialization']) . '
+        <div class="ticket-container">
+            <div class="ticket">
+                <div class="watermark">CHT</div>
+                
+                <div class="header">
+                    <h1>Community Health Tracker</h1>
+                    <p>Appointment Confirmation Ticket</p>
+                    <div class="priority-number">' . $priorityNumber . '</div>
+                </div>
+                
+                <div class="section">
+                    <h2>📅 Appointment Details</h2>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="label">Date:</span>
+                            <span class="value">' . date('F j, Y', strtotime($appointmentData['date'])) . '</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Time:</span>
+                            <span class="value">' . date('g:i A', strtotime($appointmentData['start_time'])) . ' - ' . date('g:i A', strtotime($appointmentData['end_time'])) . '</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Health Worker:</span>
+                            <span class="value">' . htmlspecialchars($appointmentData['staff_name']) . '</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Specialization:</span>
+                            <span class="value">' . htmlspecialchars($appointmentData['specialization']) . '</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="section">
-                <h2>Patient Information</h2>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="label">Name:</span> ' . htmlspecialchars($appointmentData['full_name']) . '
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Contact:</span> ' . htmlspecialchars($appointmentData['contact']) . '
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Email:</span> ' . htmlspecialchars($appointmentData['email']) . '
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Patient ID:</span> ' . htmlspecialchars($appointmentData['unique_number']) . '
+                
+                <div class="section">
+                    <h2>👤 Patient Information</h2>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="label">Name:</span>
+                            <span class="value">' . htmlspecialchars($appointmentData['full_name']) . '</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Contact:</span>
+                            <span class="value">' . htmlspecialchars($appointmentData['contact']) . '</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Patient ID:</span>
+                            <span class="value">' . htmlspecialchars($appointmentData['unique_number']) . '</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="section">
-                <h2>Health Concerns</h2>
-                <p>' . (!empty($appointmentData['health_concerns']) ? nl2br(htmlspecialchars($appointmentData['health_concerns'])) : 'No specific health concerns provided.') . '</p>
-            </div>
-            
-            <div class="consent">
-                <h2>Consent for Health Visit</h2>
-                <p>I, ' . htmlspecialchars($appointmentData['full_name']) . ', hereby consent to receive health services from Community Health Tracker. I understand the purpose of the visit and the procedures that may be involved.</p>
-                <p>I authorize the health worker to provide appropriate care based on my health concerns and needs.</p>
-                <p><strong>Signature:</strong> _________________________________________</p>
-                <p><strong>Date:</strong> _________________________</p>
-            </div>
-            
-            <div class="footer">
-                <p>Please bring this ticket to your appointment. Arrive 15 minutes early.</p>
-                <p>Generated on: ' . date('F j, Y \a\t g:i A') . '</p>
+                
+                <div class="section">
+                    <h2>🏥 Health Concerns</h2>
+                    <div style="padding: 10px 0;">
+                        ' . (!empty($appointmentData['health_concerns']) ? nl2br(htmlspecialchars($appointmentData['health_concerns'])) : 'General Checkup') . '
+                    </div>
+                </div>
+
+                <div class="barcode">
+                    *' . $priorityNumber . '*
+                </div>
+                
+                <div class="footer">
+                    <p>🚨 Please bring this ticket to your appointment</p>
+                    <p>⏰ Arrive 15 minutes before your scheduled time</p>
+                    <p>📅 Generated on: ' . date('F j, Y \a\t g:i A') . '</p>
+                </div>
             </div>
         </div>
     </body>
@@ -218,121 +601,295 @@ function generateAppointmentTicket($appointmentData, $priorityNumber) {
     return $html;
 }
 
-// Function to automatically reschedule expired appointments
-function rescheduleExpiredAppointments($pdo) {
-    $currentDateTime = date('Y-m-d H:i:s');
+// Function to send appointment approval email
+function sendAppointmentApprovalEmail($appointment, $priorityNumber, $invoiceNumber) {
+    $mail = new PHPMailer(true);
     
-    // Find all pending appointments that have passed
-    $stmt = $pdo->prepare("
-        SELECT ua.*, a.date, a.start_time, a.end_time, a.staff_id
-        FROM user_appointments ua 
-        JOIN sitio1_appointments a ON ua.appointment_id = a.id 
-        WHERE ua.status = 'pending' 
-        AND (a.date < CURDATE() OR (a.date = CURDATE() AND a.end_time < TIME(NOW())))
-    ");
-    $stmt->execute();
-    $expiredAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host       = 'smtp.gmail.com';
+        $mail->SMTPAuth   = true;
+        $mail->Username   = 'cabanagarchiel@gmail.com';
+        $mail->Password   = 'qmdh ofnf bhfj wxsa';
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = 587;
+
+        // Recipients
+        $mail->setFrom('cabanagarchiel@gmail.com', 'Community Health Tracker');
+        $mail->addAddress($appointment['email']);
+
+        // Content
+        $mail->isHTML(true);
+        $mail->Subject = 'Appointment Confirmation - Priority #' . $priorityNumber;
+        $mail->Body    = '
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { 
+                        font-family: Arial, sans-serif; 
+                        line-height: 1.6;
+                        color: #333;
+                        max-width: 600px;
+                        margin: 0 auto;
+                        padding: 20px;
+                    }
+                    .header {
+                        text-align: center;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        padding: 30px;
+                        border-radius: 10px 10px 0 0;
+                        color: white;
+                    }
+                    .logo {
+                        font-size: 28px;
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                    }
+                    .content {
+                        background: #f9f9f9;
+                        padding: 30px;
+                        border-radius: 0 0 10px 10px;
+                    }
+                    .appointment-details {
+                        background: #e8f5e8;
+                        border: 2px solid #4CAF50;
+                        padding: 20px;
+                        border-radius: 8px;
+                        margin: 20px 0;
+                    }
+                    .priority-box {
+                        background: #fff3cd;
+                        border: 2px solid #ffc107;
+                        padding: 15px;
+                        border-radius: 8px;
+                        text-align: center;
+                        margin: 15px 0;
+                        font-size: 18px;
+                        font-weight: bold;
+                    }
+                    .footer {
+                        text-align: center;
+                        margin-top: 30px;
+                        padding-top: 20px;
+                        border-top: 1px solid #ddd;
+                        color: #666;
+                        font-size: 12px;
+                    }
+                    .info-item {
+                        margin: 10px 0;
+                        padding: 8px 0;
+                        border-bottom: 1px dashed #ddd;
+                    }
+                    .reminder {
+                        background: #e3f2fd;
+                        padding: 15px;
+                        border-radius: 8px;
+                        margin: 15px 0;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="logo">🏥 Community Health Tracker</div>
+                    <h1>Appointment Confirmed</h1>
+                </div>
+                <div class="content">
+                    <p>Dear ' . htmlspecialchars($appointment['full_name']) . ',</p>
+                    
+                    <p>We are pleased to inform you that your appointment request has been approved. Below are the details of your scheduled appointment:</p>
+                    
+                    <div class="appointment-details">
+                        <div class="info-item">
+                            <strong>Date:</strong> ' . date('F j, Y', strtotime($appointment['date'])) . '
+                        </div>
+                        <div class="info-item">
+                            <strong>Time:</strong> ' . date('g:i A', strtotime($appointment['start_time'])) . ' - ' . date('g:i A', strtotime($appointment['end_time'])) . '
+                        </div>
+                        <div class="info-item">
+                            <strong>Healthcare Provider:</strong> ' . htmlspecialchars($appointment['staff_name']) . '
+                        </div>
+                        <div class="info-item">
+                            <strong>Specialization:</strong> ' . htmlspecialchars($appointment['specialization']) . '
+                        </div>
+                        <div class="info-item">
+                            <strong>Invoice Number:</strong> ' . $invoiceNumber . '
+                        </div>
+                    </div>
+                    
+                    <div class="priority-box">
+                        Your Priority Number: <strong style="color: #dc2626; font-size: 24px;">' . $priorityNumber . '</strong>
+                    </div>
+                    
+                    <div class="reminder">
+                        <strong>Important Reminders:</strong>
+                        <ul>
+                            <li>Please arrive 15 minutes before your scheduled appointment time</li>
+                            <li>Bring your appointment ticket (available in your dashboard)</li>
+                            <li>Bring any relevant medical records or test results</li>
+                            <li>Have your patient ID (' . htmlspecialchars($appointment['unique_number']) . ') ready</li>
+                        </ul>
+                    </div>
+                    
+                    <p>Your appointment ticket has been generated and is available for download from your patient dashboard. Please present this ticket upon arrival.</p>
+                    
+                    <p>If you need to reschedule or cancel your appointment, please do so at least 24 hours in advance through your patient portal or by contacting our office.</p>
+                    
+                    <p>We look forward to providing you with quality healthcare services.</p>
+                    
+                    <p>Best regards,<br>
+                    <strong>The Community Health Tracker Team</strong></p>
+                </div>
+                <div class="footer">
+                    <p>This is an automated message. Please do not reply to this email.</p>
+                    <p>&copy; ' . date('Y') . ' Community Health Tracker. All rights reserved.</p>
+                </div>
+            </body>
+            </html>
+        ';
+
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        error_log("Email could not be sent. Mailer Error: {$mail->ErrorInfo}");
+        return false;
+    }
+}
+
+// Export functionality
+if (isset($_GET['export'])) {
+    $exportType = $_GET['export'];
+    $filterStatus = $_GET['status'] ?? 'all';
+    $filterDate = $_GET['date'] ?? '';
     
-    $rescheduledCount = 0;
-    
-    foreach ($expiredAppointments as $appointment) {
-        // Find the next available date with the same time slot
-        $originalDate = $appointment['date'];
-        $startTime = $appointment['start_time'];
-        $endTime = $appointment['end_time'];
-        $staffId = $appointment['staff_id'];
+    try {
+        $query = "
+            SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time,
+                   s.full_name as staff_name, s.specialization
+            FROM user_appointments ua 
+            JOIN sitio1_users u ON ua.user_id = u.id 
+            JOIN sitio1_appointments a ON ua.appointment_id = a.id 
+            JOIN sitio1_users s ON a.staff_id = s.id 
+            WHERE a.staff_id = ? 
+        ";
         
-        // Calculate next available date (7 days from original date)
-        $newDate = date('Y-m-d', strtotime($originalDate . ' +7 days'));
+        $params = [$staffId];
         
-        // Check if this slot exists on the new date, if not create it
-        $checkStmt = $pdo->prepare("
-            SELECT id FROM sitio1_appointments 
-            WHERE staff_id = ? AND date = ? AND start_time = ? AND end_time = ?
-        ");
-        $checkStmt->execute([$staffId, $newDate, $startTime, $endTime]);
-        $slotExists = $checkStmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$slotExists) {
-            // Create the slot on the new date
-            $maxSlots = 5; // Default value
-            $insertStmt = $pdo->prepare("
-                INSERT INTO sitio1_appointments (staff_id, date, start_time, end_time, max_slots) 
-                VALUES (?, ?, ?, ?, ?)
-            ");
-            $insertStmt->execute([$staffId, $newDate, $startTime, $endTime, $maxSlots]);
-            $newSlotId = $pdo->lastInsertId();
-        } else {
-            $newSlotId = $slotExists['id'];
+        if ($filterStatus !== 'all') {
+            $query .= " AND ua.status = ?";
+            $params[] = $filterStatus;
         }
         
-        // Update the appointment with the new date and slot
-        try {
-            // Check if rescheduled_count column exists
-            $columnCheck = $pdo->query("SHOW COLUMNS FROM user_appointments LIKE 'rescheduled_count'");
-            $columnExists = $columnCheck->fetch(PDO::FETCH_ASSOC);
+        if (!empty($filterDate)) {
+            $query .= " AND a.date = ?";
+            $params[] = $filterDate;
+        }
+        
+        $query .= " ORDER BY a.date DESC, a.start_time DESC";
+        
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $exportAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if ($exportType === 'excel') {
+            header('Content-Type: application/vnd.ms-excel');
+            header('Content-Disposition: attachment; filename="appointments_' . date('Y-m-d') . '.xls"');
             
-            if ($columnExists) {
-                $updateStmt = $pdo->prepare("
-                    UPDATE user_appointments 
-                    SET appointment_id = ?, rescheduled_from = ?, rescheduled_at = NOW(), 
-                        rescheduled_count = COALESCE(rescheduled_count, 0) + 1
-                    WHERE id = ?
-                ");
-            } else {
-                $updateStmt = $pdo->prepare("
-                    UPDATE user_appointments 
-                    SET appointment_id = ?, rescheduled_from = ?, rescheduled_at = NOW()
-                    WHERE id = ?
-                ");
+            echo "Appointment ID\tPatient Name\tPatient ID\tContact Number\tDate\tTime\tStatus\tPriority Number\tInvoice Number\tHealth Concerns\n";
+            
+            foreach ($exportAppointments as $appointment) {
+                $appointmentId = $appointment['id'];
+                $patientName = $appointment['full_name'];
+                $patientId = $appointment['unique_number'] ?? 'N/A';
+                $contactNumber = $appointment['contact'];
+                $date = date('M d, Y', strtotime($appointment['date']));
+                $time = date('g:i A', strtotime($appointment['start_time'])) . ' - ' . date('g:i A', strtotime($appointment['end_time']));
+                $status = ucfirst($appointment['status']);
+                $priorityNumber = $appointment['priority_number'] ?? 'N/A';
+                $invoiceNumber = $appointment['invoice_number'] ?? 'N/A';
+                $healthConcerns = str_replace(["\t", "\n", "\r"], " ", $appointment['health_concerns'] ?? 'No concerns specified');
+                
+                echo "$appointmentId\t$patientName\t$patientId\t$contactNumber\t$date\t$time\t$status\t$priorityNumber\t$invoiceNumber\t$healthConcerns\n";
+            }
+            exit;
+            
+        } elseif ($exportType === 'pdf') {
+            require_once __DIR__ . '/../vendor/autoload.php';
+            
+            $mpdf = new \Mpdf\Mpdf();
+            $mpdf->SetTitle('Appointments Report');
+            
+            $html = '
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; }
+                    .header { text-align: center; margin-bottom: 30px; }
+                    .header h1 { color: #3b82f6; margin-bottom: 5px; }
+                    .header p { color: #6b7280; margin: 0; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th { background-color: #3b82f6; color: white; padding: 12px; text-align: left; }
+                    td { padding: 10px; border-bottom: 1px solid #e5e7eb; }
+                    .status-approved { color: #059669; }
+                    .status-pending { color: #d97706; }
+                    .status-rejected { color: #dc2626; }
+                    .status-completed { color: #2563eb; }
+                    .footer { margin-top: 30px; text-align: center; color: #6b7280; font-size: 12px; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>Community Health Tracker</h1>
+                    <p>Appointments Report - ' . date('F j, Y') . '</p>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Patient Name</th>
+                            <th>Patient ID</th>
+                            <th>Contact</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th>Priority No.</th>
+                        </tr>
+                    </thead>
+                    <tbody>';
+            
+            foreach ($exportAppointments as $appointment) {
+                $statusClass = 'status-' . $appointment['status'];
+                $html .= '
+                    <tr>
+                        <td>' . htmlspecialchars($appointment['full_name']) . '</td>
+                        <td>' . htmlspecialchars($appointment['unique_number'] ?? 'N/A') . '</td>
+                        <td>' . htmlspecialchars($appointment['contact']) . '</td>
+                        <td>' . date('M d, Y', strtotime($appointment['date'])) . '</td>
+                        <td>' . date('g:i A', strtotime($appointment['start_time'])) . ' - ' . date('g:i A', strtotime($appointment['end_time'])) . '</td>
+                        <td class="' . $statusClass . '">' . ucfirst($appointment['status']) . '</td>
+                        <td>' . htmlspecialchars($appointment['priority_number'] ?? 'N/A') . '</td>
+                    </tr>';
             }
             
-            $updateStmt->execute([$newSlotId, $appointment['appointment_id'], $appointment['id']]);
-            $rescheduledCount++;
+            $html .= '
+                    </tbody>
+                </table>
+                <div class="footer">
+                    <p>Generated on ' . date('F j, Y \a\t g:i A') . '</p>
+                </div>
+            </body>
+            </html>';
             
-        } catch (PDOException $e) {
-            error_log("Error rescheduling appointment: " . $e->getMessage());
+            $mpdf->WriteHTML($html);
+            $mpdf->Output('appointments_' . date('Y-m-d') . '.pdf', 'D');
+            exit;
         }
+    } catch (Exception $e) {
+        $error = 'Error exporting data: ' . $e->getMessage();
     }
-    
-    return $rescheduledCount;
-}
-
-// Call this function to reschedule expired appointments
-$rescheduledCount = rescheduleExpiredAppointments($pdo);
-if ($rescheduledCount > 0) {
-    // Optional: Log or notify about rescheduled appointments
-    error_log("Auto-rescheduled $rescheduledCount expired appointments");
-}
-
-// Get Philippine holidays for the current year
-function getPhilippineHolidays($year) {
-    $holidays = array();
-    
-    // Fixed date holidays
-    $fixedHolidays = array(
-        $year . '-01-01' => 'New Year\'s Day',
-        $year . '-04-09' => 'Day of Valor',
-        $year . '-05-01' => 'Labor Day',
-        $year . '-06-12' => 'Independence Day',
-        $year . '-08-21' => 'Ninoy Aquino Day',
-        $year . '-08-26' => 'National Heroes Day',
-        $year . '-11-30' => 'Bonifacio Day',
-        $year . '-12-25' => 'Christmas Day',
-        $year . '-12-30' => 'Rizal Day'
-    );
-    
-    // Variable date holidays (Easter-based)
-    $easter = date('Y-m-d', easter_date($year));
-    $goodFriday = date('Y-m-d', strtotime($easter . ' -2 days'));
-    $holidays[$goodFriday] = 'Good Friday';
-    
-    // Add all fixed holidays
-    foreach ($fixedHolidays as $date => $name) {
-        $holidays[$date] = $name;
-    }
-    
-    return $holidays;
 }
 
 // Get stats for dashboard
@@ -343,24 +900,7 @@ $stats = [
     'unapproved_users' => 0
 ];
 
-try {
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM sitio1_patients WHERE added_by = ?");
-    $stmt->execute([$_SESSION['user']['id']]);
-    $stats['total_patients'] = $stmt->fetchColumn();
-
-    $stmt = $pdo->query("SELECT COUNT(*) FROM sitio1_consultations WHERE status = 'pending'");
-    $stats['pending_consultations'] = $stmt->fetchColumn();
-
-    $stmt = $pdo->query("SELECT COUNT(*) FROM user_appointments WHERE status = 'pending'");
-    $stats['pending_appointments'] = $stmt->fetchColumn();
-
-    $stmt = $pdo->query("SELECT COUNT(*) FROM sitio1_users WHERE approved = FALSE AND (status IS NULL OR status != 'declined')");
-    $stats['unapproved_users'] = $stmt->fetchColumn();
-} catch (PDOException $e) {
-    // Handle error
-}
-
-// Appointment Management Variables
+// Staff ID
 $staffId = $_SESSION['user']['id'];
 $error = '';
 $success = '';
@@ -379,10 +919,6 @@ $afternoonSlots = [
     ['start' => '15:00', 'end' => '16:00'],
     ['start' => '16:00', 'end' => '17:00']
 ];
-
-// Get Philippine holidays
-$currentYear = date('Y');
-$phHolidays = getPhilippineHolidays($currentYear);
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -475,18 +1011,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (in_array($action, ['approve', 'reject', 'complete'])) {
             try {
-                $status = $action === 'approve' ? 'approved' : ($action === 'reject' ? 'rejected' : 'completed');
-                
-                if ($action === 'reject' && empty($rejectionReason)) {
-                    $error = 'Please provide a reason for rejecting this appointment.';
-                } else {
-                    $stmt = $pdo->prepare("UPDATE user_appointments SET status = ?, rejection_reason = ? WHERE id = ?");
-                    $stmt->execute([$status, $rejectionReason, $appointmentId]);
+                if ($action === 'approve') {
+                    // Get appointment details for priority number generation
+                    $stmt = $pdo->prepare("
+                        SELECT a.staff_id, a.date 
+                        FROM user_appointments ua
+                        JOIN sitio1_appointments a ON ua.appointment_id = a.id
+                        WHERE ua.id = ?
+                    ");
+                    $stmt->execute([$appointmentId]);
+                    $appointmentDetails = $stmt->fetch(PDO::FETCH_ASSOC);
                     
-                    $success = 'Appointment ' . $status . ' successfully!';
+                    if (!$appointmentDetails) {
+                        throw new Exception('Appointment not found');
+                    }
+                    
+                    // Generate invoice and priority number
+                    $invoiceNumber = 'INV-' . date('Ymd') . '-' . str_pad($appointmentId, 4, '0', STR_PAD_LEFT);
+                    $priorityNumber = generatePriorityNumber($pdo, $appointmentId, $appointmentDetails['staff_id'], $appointmentDetails['date']);
+                    
+                    // Update appointment with approved status and generated numbers
+                    $stmt = $pdo->prepare("
+                        UPDATE user_appointments 
+                        SET status = 'approved', 
+                            invoice_number = ?, 
+                            priority_number = ?, 
+                            processed_at = NOW(),
+                            invoice_generated_at = NOW()
+                        WHERE id = ?
+                    ");
+                    $stmt->execute([$invoiceNumber, $priorityNumber, $appointmentId]);
+                    
+                    if ($stmt->rowCount() > 0) {
+                        // Generate and store appointment ticket
+                        $stmt = $pdo->prepare("
+                            SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number,
+                                   a.date, a.start_time, a.end_time,
+                                   s.full_name as staff_name, s.specialization
+                            FROM user_appointments ua
+                            JOIN sitio1_users u ON ua.user_id = u.id
+                            JOIN sitio1_appointments a ON ua.appointment_id = a.id
+                            JOIN sitio1_users s ON a.staff_id = s.id
+                            WHERE ua.id = ?
+                        ");
+                        $stmt->execute([$appointmentId]);
+                        $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($appointment) {
+                            // Generate appointment ticket HTML
+                            $ticketHtml = generateAppointmentTicket($appointment, $priorityNumber);
+                            
+                            // Store the ticket in the database for later download
+                            $stmt = $pdo->prepare("
+                                UPDATE user_appointments 
+                                SET appointment_ticket = ? 
+                                WHERE id = ?
+                            ");
+                            $stmt->execute([$ticketHtml, $appointmentId]);
+                            
+                            // Send notification email to user
+                            if (filter_var($appointment['email'], FILTER_VALIDATE_EMAIL)) {
+                                sendAppointmentApprovalEmail($appointment, $priorityNumber, $invoiceNumber);
+                            }
+                        }
+                        
+                        $success = 'Appointment approved successfully! Priority Number: <strong>' . $priorityNumber . '</strong> | Invoice: <strong>' . $invoiceNumber . '</strong>';
+                    } else {
+                        $error = 'Failed to update appointment status. Please try again.';
+                    }
+                    
+                } elseif ($action === 'reject') {
+                    if (empty($rejectionReason)) {
+                        $error = 'Please provide a reason for rejecting this appointment.';
+                    } else {
+                        $stmt = $pdo->prepare("UPDATE user_appointments SET status = 'rejected', rejection_reason = ? WHERE id = ?");
+                        $stmt->execute([$rejectionReason, $appointmentId]);
+                        
+                        if ($stmt->rowCount() > 0) {
+                            $success = 'Appointment rejected successfully!';
+                        } else {
+                            $error = 'Failed to reject appointment. Please try again.';
+                        }
+                    }
+                } elseif ($action === 'complete') {
+                    $stmt = $pdo->prepare("UPDATE user_appointments SET status = 'completed', completed_at = NOW() WHERE id = ?");
+                    $stmt->execute([$appointmentId]);
+                    
+                    if ($stmt->rowCount() > 0) {
+                        $success = 'Appointment marked as completed successfully!';
+                    } else {
+                        $error = 'Failed to mark appointment as completed. Please try again.';
+                    }
                 }
             } catch (PDOException $e) {
                 $error = 'Error updating appointment: ' . $e->getMessage();
+                error_log("Appointment update error: " . $e->getMessage());
             }
         }
     } elseif (isset($_POST['approve_user'])) {
@@ -545,111 +1164,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Error: ' . $e->getMessage();
         }
     }
+}
 
-    // Handle invoice generation
-    if (isset($_POST['generate_invoice'])) {
-        $appointmentId = intval($_POST['appointment_id']);
-        
-        try {
-            // Get appointment details
-            $stmt = $pdo->prepare("SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number,
-                   a.date, a.start_time, a.end_time,
-                   s.full_name as staff_name, s.specialization
-            FROM user_appointments ua
-            JOIN sitio1_users u ON ua.user_id = u.id
-            JOIN sitio1_appointments a ON ua.appointment_id = a.id
-            JOIN sitio1_users s ON a.staff_id = s.id
-            WHERE ua.id = ?");
-            $stmt->execute([$appointmentId]);
-            $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($appointment) {
-                // Generate a unique invoice number
-                $invoiceNumber = 'INV-' . date('Ymd') . '-' . str_pad($appointmentId, 4, '0', STR_PAD_LEFT);
-                
-                // Generate priority number (based on appointment time and date)
-                $priorityNumber = 'P-' . date('md', strtotime($appointment['date'])) . 
-                                 '-' . str_replace(':', '', substr($appointment['start_time'], 0, 5));
-                
-                // Update appointment with invoice details
-                $updateStmt = $pdo->prepare("UPDATE user_appointments 
-                                            SET invoice_number = ?, priority_number = ?, status = 'approved', 
-                                            processed_at = NOW(), invoice_generated_at = NOW() 
-                                            WHERE id = ?");
-                $updateStmt->execute([$invoiceNumber, $priorityNumber, $appointmentId]);
-                
-                // Generate appointment ticket HTML
-                $ticketHtml = generateAppointmentTicket($appointment, $priorityNumber);
-                
-                // Store the ticket HTML in session for download
-                $_SESSION['appointment_ticket'] = $ticketHtml;
-                $_SESSION['ticket_filename'] = 'appointment_ticket_' . $priorityNumber . '.html';
-                
-                // Send notification email to user with ticket attached as HTML
-                if (filter_var($appointment['email'], FILTER_VALIDATE_EMAIL)) {
-                    $mail = new PHPMailer(true);
-                    
-                    try {
-                        // Server settings
-                        $mail->isSMTP();
-                        $mail->Host       = 'smtp.gmail.com';
-                        $mail->SMTPAuth   = true;
-                        $mail->Username   = 'cabanagarchiel@gmail.com';
-                        $mail->Password   = 'qmdh ofnf bhfj wxsa';
-                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                        $mail->Port       = 587;
-
-                        // Recipients
-                        $mail->setFrom('your-email@gmail.com', 'Community Health Tracker');
-                        $mail->addAddress($appointment['email']);
-
-                        // Content
-                        $mail->isHTML(true);
-                        $mail->Subject = 'Your Appointment Has Been Approved - Invoice #' . $invoiceNumber;
-                        $mail->Body    = '
-                            <h2>Appointment Approved</h2>
-                            <p>Your appointment with Community Health Tracker has been approved.</p>
-                            <p><strong>Appointment Details:</strong></p>
-                            <ul>
-                                <li>Date: ' . date('M d, Y', strtotime($appointment['date'])) . '</li>
-                                <li>Time: ' . date('h:i A', strtotime($appointment['start_time'])) . ' - ' . date('h:i A', strtotime($appointment['end_time'])) . '</li>
-                                <li>Health Worker: ' . htmlspecialchars($appointment['staff_name']) . '</li>
-                                <li>Specialization: ' . htmlspecialchars($appointment['specialization']) . '</li>
-                                <li>Priority Number: ' . $priorityNumber . '</li>
-                                <li>Invoice Number: ' . $invoiceNumber . '</li>
-                            </ul>
-                            <p>Your appointment ticket has been generated and is available for download from your dashboard.</p>
-                            <p>Please bring your ticket to your appointment.</p>
-                            <p>Thank you for choosing our services!</p>
-                        ';
-
-                        $mail->send();
-                    } catch (Exception $e) {
-                        error_log("Email could not be sent. Mailer Error: {$mail->ErrorInfo}");
-                    }
-                }
-                
-                $success = 'Invoice generated and appointment approved successfully! <a href="download_ticket.php" class="text-blue-600 underline">Download Ticket</a>';
-            } else {
-                $error = 'Appointment not found.';
-            }
-        } catch (PDOException $e) {
-            $error = 'Error generating invoice: ' . $e->getMessage();
-        }
-    }
+// Handle deletion of cancelled appointments by staff
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_cancelled_appointment'])) {
+    $cancelledAppointmentId = intval($_POST['cancelled_appointment_id']);
     
-    // Handle approval without invoice
-    if (isset($_POST['approve_without_invoice'])) {
-        $appointmentId = intval($_POST['appointment_id']);
+    try {
+        // Verify the appointment exists and is cancelled
+        $stmt = $pdo->prepare("
+            SELECT ua.id 
+            FROM user_appointments ua
+            JOIN sitio1_appointments a ON ua.appointment_id = a.id
+            WHERE ua.id = ? AND ua.status = 'cancelled' AND a.staff_id = ?
+        ");
+        $stmt->execute([$cancelledAppointmentId, $staffId]);
+        $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        try {
-            $stmt = $pdo->prepare("UPDATE user_appointments SET status = 'approved', processed_at = NOW() WHERE id = ?");
-            $stmt->execute([$appointmentId]);
-            
-            $success = 'Appointment approved successfully!';
-        } catch (PDOException $e) {
-            $error = 'Error approving appointment: ' . $e->getMessage();
+        if (!$appointment) {
+            throw new Exception('Cancelled appointment not found or you do not have permission to delete it.');
         }
+        
+        // Delete the cancelled appointment
+        $stmt = $pdo->prepare("DELETE FROM user_appointments WHERE id = ?");
+        $stmt->execute([$cancelledAppointmentId]);
+        
+        $_SESSION['notification'] = [
+            'type' => 'success',
+            'message' => 'Cancelled appointment deleted successfully.'
+        ];
+        
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?tab=appointments&appointment_tab=cancelled');
+        exit();
+        
+    } catch (Exception $e) {
+        $_SESSION['notification'] = [
+            'type' => 'error',
+            'message' => 'Error deleting cancelled appointment: ' . $e->getMessage()
+        ];
+        header('Location: ' . $_SERVER['HTTP_REFERER']);
+        exit();
     }
 }
 
@@ -658,16 +1212,25 @@ if (isset($_GET['success'])) {
     $success = urldecode($_GET['success']);
 }
 
-// Get available slots with accurate booking counts
-$availableSlots = [];
-// Get pending appointments
-$pendingAppointments = [];
-// Get all appointments
-$allAppointments = [];
-// Get unapproved users
-$unapprovedUsers = [];
+// Get filter parameters
+$filterStatus = $_GET['status'] ?? 'all';
+$filterDate = $_GET['date'] ?? '';
 
+// Get data for dashboard
 try {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM sitio1_patients WHERE added_by = ?");
+    $stmt->execute([$_SESSION['user']['id']]);
+    $stats['total_patients'] = $stmt->fetchColumn();
+
+    $stmt = $pdo->query("SELECT COUNT(*) FROM sitio1_consultations WHERE status = 'pending'");
+    $stats['pending_consultations'] = $stmt->fetchColumn();
+
+    $stmt = $pdo->query("SELECT COUNT(*) FROM user_appointments WHERE status = 'pending'");
+    $stats['pending_appointments'] = $stmt->fetchColumn();
+
+    $stmt = $pdo->query("SELECT COUNT(*) FROM sitio1_users WHERE approved = FALSE AND (status IS NULL OR status != 'declined')");
+    $stats['unapproved_users'] = $stmt->fetchColumn();
+    
     // Get available slots with accurate booking counts
     $stmt = $pdo->prepare("
         SELECT 
@@ -684,9 +1247,9 @@ try {
     $stmt->execute([$staffId]);
     $availableSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get pending appointments (excluding those that will be rescheduled)
+    // Get pending appointments
     $stmt = $pdo->prepare("
-        SELECT ua.*, u.full_name, u.email, u.contact, a.date, a.start_time, a.end_time
+        SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time
         FROM user_appointments ua 
         JOIN sitio1_users u ON ua.user_id = u.id 
         JOIN sitio1_appointments a ON ua.appointment_id = a.id 
@@ -697,26 +1260,107 @@ try {
     $stmt->execute([$staffId]);
     $pendingAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get all appointments with user's unique number
-    $stmt = $pdo->prepare("SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time 
-                          FROM user_appointments ua 
-                          JOIN sitio1_users u ON ua.user_id = u.id 
-                          JOIN sitio1_appointments a ON ua.appointment_id = a.id 
-                          WHERE a.staff_id = ? 
-                          ORDER BY a.date DESC, a.start_time DESC");
+    // Get upcoming appointments (approved but not completed)
+    $stmt = $pdo->prepare("
+        SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time,
+               ua.priority_number, ua.invoice_number
+        FROM user_appointments ua 
+        JOIN sitio1_users u ON ua.user_id = u.id 
+        JOIN sitio1_appointments a ON ua.appointment_id = a.id 
+        WHERE a.staff_id = ? AND ua.status = 'approved' 
+        AND (a.date >= CURDATE())
+        ORDER BY a.date, a.start_time
+    ");
     $stmt->execute([$staffId]);
+    $upcomingAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get cancelled appointments (including those cancelled by users)
+    $stmt = $pdo->prepare("
+        SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, 
+               a.date, a.start_time, a.end_time, ua.cancel_reason, ua.cancelled_at,
+               CASE 
+                   WHEN ua.cancelled_by_user = 1 THEN 'Cancelled by Patient'
+                   ELSE 'Cancelled by Staff'
+               END as cancelled_by
+        FROM user_appointments ua 
+        JOIN sitio1_users u ON ua.user_id = u.id 
+        JOIN sitio1_appointments a ON ua.appointment_id = a.id 
+        WHERE a.staff_id = ? AND ua.status = 'cancelled'
+        ORDER BY ua.cancelled_at DESC
+    ");
+    $stmt->execute([$staffId]);
+    $cancelledAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get all appointments with filters
+    $query = "
+        SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time,
+               s.full_name as staff_name, s.specialization
+        FROM user_appointments ua 
+        JOIN sitio1_users u ON ua.user_id = u.id 
+        JOIN sitio1_appointments a ON ua.appointment_id = a.id 
+        JOIN sitio1_users s ON a.staff_id = s.id 
+        WHERE a.staff_id = ? 
+    ";
+    
+    $params = [$staffId];
+    
+    if ($filterStatus !== 'all') {
+        $query .= " AND ua.status = ?";
+        $params[] = $filterStatus;
+    }
+    
+    if (!empty($filterDate)) {
+        $query .= " AND a.date = ?";
+        $params[] = $filterDate;
+    }
+    
+    $query .= " ORDER BY a.date DESC, a.start_time DESC";
+    
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
     $allAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Get unapproved users
     $stmt = $pdo->query("SELECT * FROM sitio1_users WHERE approved = FALSE AND (status IS NULL OR status != 'declined') ORDER BY created_at DESC");
     $unapprovedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Update stats after potential changes
-    $stmt = $pdo->query("SELECT COUNT(*) FROM sitio1_users WHERE approved = FALSE AND (status IS NULL OR status != 'declined')");
-    $stats['unapproved_users'] = $stmt->fetchColumn();
 } catch (PDOException $e) {
     $error = 'Error fetching data: ' . $e->getMessage();
 }
+
+// Get Philippine holidays for the current year
+function getPhilippineHolidays($year) {
+    $holidays = array();
+    
+    // Fixed date holidays
+    $fixedHolidays = array(
+        $year . '-01-01' => 'New Year\'s Day',
+        $year . '-04-09' => 'Day of Valor',
+        $year . '-05-01' => 'Labor Day',
+        $year . '-06-12' => 'Independence Day',
+        $year . '-08-21' => 'Ninoy Aquino Day',
+        $year . '-08-26' => 'National Heroes Day',
+        $year . '-11-30' => 'Bonifacio Day',
+        $year . '-12-25' => 'Christmas Day',
+        $year . '-12-30' => 'Rizal Day'
+    );
+    
+    // Variable date holidays (Easter-based)
+    $easter = date('Y-m-d', easter_date($year));
+    $goodFriday = date('Y-m-d', strtotime($easter . ' -2 days'));
+    $holidays[$goodFriday] = 'Good Friday';
+    
+    // Add all fixed holidays
+    foreach ($fixedHolidays as $date => $name) {
+        $holidays[$date] = $name;
+    }
+    
+    return $holidays;
+}
+
+// Get Philippine holidays
+$currentYear = date('Y');
+$phHolidays = getPhilippineHolidays($currentYear);
 
 // Get available dates for calendar view
 $calendarDates = [];
@@ -750,165 +1394,16 @@ foreach ($availableDates as $slot) {
     }
     $dateSlots[$date][] = $slot;
 }
-
-// Function to handle expired appointments
-function handleExpiredAppointments($pdo) {
-    $currentDateTime = date('Y-m-d H:i:s');
-    
-    // Find appointments that are past their scheduled time and still pending
-    $stmt = $pdo->prepare("
-        SELECT ua.*, a.date, a.start_time, a.end_time, a.staff_id
-        FROM user_appointments ua
-        JOIN sitio1_appointments a ON ua.appointment_id = a.id
-        WHERE ua.status = 'pending'
-        AND (a.date < CURDATE() OR (a.date = CURDATE() AND a.end_time < TIME(NOW())))
-    ");
-    $stmt->execute();
-    $expiredAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    foreach ($expiredAppointments as $appointment) {
-        $originalDate = $appointment['date'];
-        $originalStartTime = $appointment['start_time'];
-        $originalEndTime = $appointment['end_time'];
-        $staffId = $appointment['staff_id'];
-        
-        // Calculate next available date (skip weekends and holidays)
-        $nextDate = findNextAvailableDate($pdo, $originalDate, $staffId, $originalStartTime, $originalEndTime);
-        
-        if ($nextDate) {
-            // Check if slot already exists on the new date
-            $checkStmt = $pdo->prepare("
-                SELECT id FROM sitio1_appointments 
-                WHERE staff_id = ? AND date = ? AND start_time = ? AND end_time = ?
-            ");
-            $checkStmt->execute([$staffId, $nextDate, $originalStartTime, $originalEndTime]);
-            $existingSlot = $checkStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($existingSlot) {
-                // Update appointment to use existing slot
-                $updateStmt = $pdo->prepare("
-                    UPDATE user_appointments 
-                    SET appointment_id = ? 
-                    WHERE id = ?
-                ");
-                $updateStmt->execute([$existingSlot['id'], $appointment['id']]);
-            } else {
-                // Create new slot
-                $slotStmt = $pdo->prepare("
-                    INSERT INTO sitio1_appointments (staff_id, date, start_time, end_time, max_slots) 
-                    VALUES (?, ?, ?, ?, 1)
-                ");
-                $slotStmt->execute([$staffId, $nextDate, $originalStartTime, $originalEndTime]);
-                $newSlotId = $pdo->lastInsertId();
-                
-                // Update appointment to use new slot
-                $updateStmt = $pdo->prepare("
-                    UPDATE user_appointments 
-                    SET appointment_id = ? 
-                    WHERE id = ?
-                ");
-                $updateStmt->execute([$newSlotId, $appointment['id']]);
-            }
-            
-            // Log the rescheduling
-            error_log("Appointment #{$appointment['id']} rescheduled from {$originalDate} to {$nextDate}");
-        } else {
-            // If no available date found, keep the appointment but mark it as expired
-            $updateStmt = $pdo->prepare("
-                UPDATE user_appointments 
-                SET status = 'expired' 
-                WHERE id = ?
-            ");
-            $updateStmt->execute([$appointment['id']]);
-        }
-    }
-    
-    return count($expiredAppointments);
-}
-
-// Function to find the next available date considering holidays and weekends
-function findNextAvailableDate($pdo, $originalDate, $staffId, $startTime, $endTime) {
-    $currentYear = date('Y');
-    $phHolidays = getPhilippineHolidays($currentYear);
-    
-    // Start from the day after the original date
-    $nextDate = date('Y-m-d', strtotime($originalDate . ' +1 day'));
-    
-    // Try up to 30 days in the future
-    for ($i = 0; $i < 30; $i++) {
-        $dateObj = new DateTime($nextDate);
-        $dayOfWeek = $dateObj->format('w'); // 0 = Sunday, 6 = Saturday
-        $isWeekend = ($dayOfWeek == 0 || $dayOfWeek == 6);
-        $isHoliday = array_key_exists($nextDate, $phHolidays);
-        
-        // Skip weekends and holidays
-        if ($isWeekend || $isHoliday) {
-            $nextDate = date('Y-m-d', strtotime($nextDate . ' +1 day'));
-            continue;
-        }
-        
-        // Check if staff already has appointments at this time on this date
-        $checkStmt = $pdo->prepare("
-            SELECT COUNT(*) as conflict_count 
-            FROM sitio1_appointments 
-            WHERE staff_id = ? AND date = ? AND (
-                (start_time < ? AND end_time > ?) OR 
-                (start_time < ? AND end_time > ?) OR 
-                (start_time >= ? AND end_time <= ?)
-            )
-        ");
-        $checkStmt->execute([$staffId, $nextDate, $endTime, $startTime, $endTime, $startTime, $startTime, $endTime]);
-        $conflict = $checkStmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($conflict['conflict_count'] == 0) {
-            return $nextDate;
-        }
-        
-        $nextDate = date('Y-m-d', strtotime($nextDate . ' +1 day'));
-    }
-    
-    return false; // No available date found within 30 days
-}
-
-// Call this function at the beginning of your script
-$rescheduledCount = handleExpiredAppointments($pdo);
-if ($rescheduledCount > 0) {
-    // Refresh the data to reflect changes
-    $stmt = $pdo->prepare("
-        SELECT ua.*, u.full_name, u.email, u.contact, a.date, a.start_time, a.end_time 
-        FROM user_appointments ua 
-        JOIN sitio1_users u ON ua.user_id = u.id 
-        JOIN sitio1_appointments a ON ua.appointment_id = a.id 
-        WHERE a.staff_id = ? AND ua.status = 'pending' AND a.date >= CURDATE() 
-        ORDER BY a.date, a.start_time
-    ");
-    $stmt->execute([$staffId]);
-    $pendingAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
 ?>
-
-<script>
-    // Add this to your DOMContentLoaded event listener
-document.addEventListener('DOMContentLoaded', function() {
-    // ... existing code ...
-    
-    <?php if ($rescheduledCount > 0): ?>
-        showSuccessModal('<?= $rescheduledCount ?> expired appointment(s) have been automatically rescheduled to the next available date.');
-    <?php endif; ?>
-});
-</script>
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Staff Dashboard - Community Health Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/community-health-tracker/assets/css/styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <script src="/community-health-tracker/assets/js/scripts.js" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .fixed {
             position: fixed;
@@ -951,14 +1446,19 @@ document.addEventListener('DOMContentLoaded', function() {
             margin-left: 0.5rem;
         }
         .action-button {
-            border-radius: 8px;
-            padding: 8px 16px;
-            font-weight: 600;
-            transition: all 0.2s ease;
+            border-radius: 12px !important;
+            padding: 12px 24px !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
         }
         .action-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transform: translateY(-3px) !important;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
+        }
+        .action-button:active {
+            transform: translateY(-1px) !important;
         }
         .slot-past {
             background-color: #f3f4f6;
@@ -972,72 +1472,85 @@ document.addEventListener('DOMContentLoaded', function() {
             background-color: #f0fdf4;
             color: #16a34a;
         }
+        
         /* Enhanced Calendar Styles */
-.calendar-day {
-    min-height: 80px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    transition: all 0.2s ease-in-out;
-    border: 2px solid transparent;
-}
+        .calendar-day {
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s ease-in-out;
+            border: 2px solid transparent;
+        }
 
-.calendar-day:hover:not(.disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
+        .calendar-day:hover:not(.disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
 
-.calendar-day.selected {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    z-index: 10;
-}
+        .calendar-day.selected {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            z-index: 10;
+        }
 
-.calendar-day.disabled {
-    opacity: 0.6;
-    cursor: not-allowed !important;
-}
+        .calendar-day.disabled {
+            opacity: 0.6;
+            cursor: not-allowed !important;
+        }
 
-.calendar-day .font-semibold {
-    font-weight: 600;
-}
+        .calendar-day .font-semibold {
+            font-weight: 600;
+        }
 
-/* Time Slot Styles */
-.time-slot {
-    transition: all 0.2s ease-in-out;
-    border: 2px solid;
-}
+        /* Time Slot Styles */
+        .time-slot {
+            transition: all 0.2s ease-in-out;
+            border: 2px solid;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
 
-.time-slot:hover:not(.disabled):not(.full) {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
+        .time-slot:hover:not(.disabled):not(.full) {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
 
-.time-slot.selected {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-    z-index: 5;
-}
+        .time-slot.selected {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            z-index: 5;
+        }
 
-/* Ensure text visibility in selected states */
-.calendar-day.selected *,
-.time-slot.selected * {
-    color: white !important;
-    opacity: 1 !important;
-}
+        /* Ensure text visibility in selected states */
+        .calendar-day.selected *,
+        .time-slot.selected * {
+            color: white !important;
+            opacity: 1 !important;
+        }
 
-/* Holiday and weekend specific styles */
-.calendar-day.holiday:not(.selected) {
-    background: linear-gradient(135deg, #fed7d7 0%, #feebeb 100%);
-}
+        /* Holiday and weekend specific styles */
+        .calendar-day.holiday:not(.selected) {
+            background: linear-gradient(135deg, #fed7d7 0%, #feebeb 100%);
+        }
 
-.calendar-day.weekend:not(.selected) {
-    background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
-}
+        .calendar-day.weekend:not(.selected) {
+            background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+        }
+        
+        /* Modal buttons */
+        .modal-button {
+            border-radius: 10px !important;
+            padding: 12px 24px !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+            transition: all 0.3s ease !important;
+        }
     </style>
 </head>
-
 <body class="bg-gray-100">
     <div class="container mx-auto px-4 py-6">
         <!-- Dashboard Header -->
@@ -1069,9 +1582,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         <p class="text-blue-800"><strong>Welcome to the Community Health Tracker Staff Dashboard!</strong> This guide will help you understand how to use all the features available to you as a staff member.</p>
                     </div>
                     
-                    <!-- Guide content remains the same as before -->
+                    <!-- Guide content -->
+                    <div class="space-y-4">
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-semibold text-lg text-gray-800">Appointment Management</h4>
+                            <p class="text-gray-600">Manage your available time slots, view pending appointments, and handle appointment approvals.</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold text-lg text-gray-800">Account Approvals</h4>
+                            <p class="text-gray-600">Review and approve new patient registrations for system access.</p>
+                        </div>
+                    </div>
+                    
                     <div class="flex justify-end mt-6">
-                        <button type="button" onclick="closeHelpModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                        <button type="button" onclick="closeHelpModal()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium modal-button">
                             Got it, thanks!
                         </button>
                     </div>
@@ -1174,6 +1699,20 @@ document.addEventListener('DOMContentLoaded', function() {
                             </button>
                         </li>
                         <li class="mr-2" role="presentation">
+                            <button class="inline-flex items-center p-4 border-b-2 rounded-t-lg" id="upcoming-tab" data-tabs-target="#upcoming" type="button" role="tab" aria-controls="upcoming" aria-selected="false">
+                                <i class="fas fa-calendar-day mr-2"></i>
+                                Upcoming Appointments
+                                <span class="count-badge bg-green-100 text-green-800 ml-2"><?= count($upcomingAppointments) ?></span>
+                            </button>
+                        </li>
+                        <li class="mr-2" role="presentation">
+                            <button class="inline-flex items-center p-4 border-b-2 rounded-t-lg" id="cancelled-tab" data-tabs-target="#cancelled" type="button" role="tab" aria-controls="cancelled" aria-selected="false">
+                                <i class="fas fa-times-circle mr-2"></i>
+                                Cancelled Appointments
+                                <span class="count-badge bg-red-100 text-red-800 ml-2"><?= count($cancelledAppointments) ?></span>
+                            </button>
+                        </li>
+                        <li class="mr-2" role="presentation">
                             <button class="inline-flex items-center p-4 border-b-2 rounded-t-lg" id="all-tab" data-tabs-target="#all" type="button" role="tab" aria-controls="all" aria-selected="false">
                                 <i class="fas fa-history mr-2"></i>
                                 All Appointments
@@ -1243,10 +1782,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <h4 class="font-medium mb-2">Morning Slots (8:00 AM - 12:00 PM)</h4>
                                 <div class="grid grid-cols-2 gap-3">
                                     <?php foreach ($morningSlots as $index => $slot): ?>
-                                        <div class="time-slot" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
+                                        <div class="time-slot border rounded-lg p-3 cursor-pointer" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
                                             <div class="flex justify-between items-center">
                                                 <span><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></span>
-                                                <span class="availability-indicator"></span>
+                                                <span class="availability-indicator text-sm text-gray-500">Available</span>
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
@@ -1257,10 +1796,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <h4 class="font-medium mb-2">Afternoon Slots (1:00 PM - 5:00 PM)</h4>
                                 <div class="grid grid-cols-2 gap-3">
                                     <?php foreach ($afternoonSlots as $index => $slot): ?>
-                                        <div class="time-slot" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
+                                        <div class="time-slot border rounded-lg p-3 cursor-pointer" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
                                             <div class="flex justify-between items-center">
                                                 <span><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></span>
-                                                <span class="availability-indicator"></span>
+                                                <span class="availability-indicator text-sm text-gray-500">Available</span>
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
@@ -1281,66 +1820,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             <input type="hidden" id="selected_date" name="date">
                             <input type="hidden" id="selected_time_slot" name="time_slot">
                             
-                            <button type="button" id="addSlotBtn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition font-medium">
+                            <button type="button" id="addSlotBtn" class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-medium action-button">
                                 Add Selected Time Slot
                             </button>
                         </div>
-                        
-                        <!-- Traditional Form (Hidden by default) -->
-                        <form method="POST" action="" class="hidden" id="traditionalForm">
-                            <div class="mb-4">
-                                <label for="date" class="block text-gray-700 mb-2 font-medium">Date *</label>
-                                <input type="date" id="date" name="date" min="<?= date('Y-m-d') ?>" 
-                                       class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label class="block text-gray-700 mb-2 font-medium">Time Slot *</label>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <h3 class="text-sm font-medium text-gray-700 mb-2">Morning (8:00 AM - 12:00 PM)</h3>
-                                        <div class="space-y-2">
-                                            <?php foreach ($morningSlots as $slot): ?>
-                                                <div class="flex items-center">
-                                                    <input type="radio" id="morning_<?= str_replace(':', '', $slot['start']) ?>" 
-                                                           name="time_slot" value="<?= $slot['start'] ?> - <?= $slot['end'] ?>" 
-                                                           class="mr-2" required>
-                                                    <label for="morning_<?= str_replace(':', '', $slot['start']) ?>"><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></label>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h3 class="text-sm font-medium text-gray-700 mb-2">Afternoon (1:00 PM - 5:00 PM)</h3>
-                                        <div class="space-y-2">
-                                            <?php foreach ($afternoonSlots as $slot): ?>
-                                                <div class="flex items-center">
-                                                    <input type="radio" id="afternoon_<?= str_replace(':', '', $slot['start']) ?>" 
-                                                           name="time_slot" value="<?= $slot['start'] ?> - <?= $slot['end'] ?>" 
-                                                           class="mr-2" required>
-                                                    <label for="afternoon_<?= str_replace(':', '', $slot['start']) ?>"><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></label>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label for="max_slots" class="block text-gray-700 mb-2 font-medium">Maximum Appointments *</label>
-                                <select id="max_slots" name="max_slots" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3">3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                </select>
-                            </div>
-                            
-                            <button type="submit" name="add_slot" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition font-medium">
-                                Add Time Slot
-                            </button>
-                        </form>
                     </div>
                     
                     <!-- Available Slots -->
@@ -1384,7 +1867,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
-                                                                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Booked</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Booked</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -1494,35 +1977,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                         </tr>
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
-                                        <?php foreach ($pendingAppointments as $appointment): 
-                                            // Check if this appointment was rescheduled
-                                            $isRescheduled = false;
-                                            try {
-                                                $checkRescheduled = $pdo->prepare("SHOW COLUMNS FROM user_appointments LIKE 'rescheduled_count'");
-                                                $rescheduledColumnExists = $checkRescheduled->execute() && $checkRescheduled->fetch(PDO::FETCH_ASSOC);
-                                                
-                                                if ($rescheduledColumnExists) {
-                                                    $rescheduledStmt = $pdo->prepare("SELECT rescheduled_count FROM user_appointments WHERE id = ?");
-                                                    $rescheduledStmt->execute([$appointment['id']]);
-                                                    $rescheduledData = $rescheduledStmt->fetch(PDO::FETCH_ASSOC);
-                                                    $isRescheduled = !empty($rescheduledData['rescheduled_count']) && $rescheduledData['rescheduled_count'] > 0;
-                                                }
-                                            } catch (PDOException $e) {
-                                                // Column doesn't exist or other error, treat as not rescheduled
-                                                $isRescheduled = false;
-                                            }
-                                        ?>
+                                        <?php foreach ($pendingAppointments as $appointment): ?>
                                             <tr>
                                                 <td class="px-6 py-4 whitespace-nowrap">
                                                     <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
-                                                    <?php if ($isRescheduled): ?>
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                                            Auto-Rescheduled
-                                                        </span>
-                                                    <?php endif; ?>
+                                                    <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap">
                                                     <div class="text-sm text-gray-900"><?= htmlspecialchars($appointment['contact']) ?></div>
+                                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['email']) ?></div>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap">
                                                     <div class="text-sm text-gray-900">
@@ -1536,9 +1999,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
                                                         Pending
                                                     </span>
-                                                    <?php if ($isRescheduled): ?>
-                                                        <div class="text-xs text-gray-500 mt-1">Previously expired</div>
-                                                    <?php endif; ?>
                                                 </td>
                                                 <td class="px-6 py-4">
                                                     <div class="text-sm text-gray-900">
@@ -1546,14 +2006,162 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <button onclick="openInvoiceModal(<?= $appointment['id'] ?>)" 
-                                                            class="bg-green-500 text-white action-button mr-2">
-                                                        <i class="fas fa-check-circle mr-1"></i> Approve
-                                                    </button>
+                                                    <form method="POST" action="" class="inline">
+                                                        <input type="hidden" name="appointment_id" value="<?= $appointment['id'] ?>">
+                                                        <input type="hidden" name="action" value="approve">
+                                                        <button type="submit" name="approve_appointment" 
+                                                                class="bg-green-500 text-white action-button mr-2">
+                                                            <i class="fas fa-check-circle mr-1"></i> Approve
+                                                        </button>
+                                                    </form>
                                                     <button onclick="openRejectionModal(<?= $appointment['id'] ?>)" 
                                                             class="bg-red-500 text-white action-button">
                                                         <i class="fas fa-times-circle mr-1"></i> Reject
                                                     </button>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- Upcoming Appointments -->
+                    <div class="hidden p-4 bg-white rounded-lg border border-gray-200" id="upcoming" role="tabpanel" aria-labelledby="upcoming-tab">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-blue-700">Upcoming Appointments</h2>
+                            <span class="text-sm text-gray-600"><?= count($upcomingAppointments) ?> upcoming</span>
+                        </div>
+                        
+                        <?php if (empty($upcomingAppointments)): ?>
+                            <div class="bg-blue-50 p-4 rounded-lg text-center">
+                                <p class="text-gray-600">No upcoming appointments.</p>
+                            </div>
+                        <?php else: ?>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority Number</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <?php foreach ($upcomingAppointments as $appointment): 
+                                            $isToday = $appointment['date'] == date('Y-m-d');
+                                        ?>
+                                            <tr>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
+                                                    <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900"><?= htmlspecialchars($appointment['contact']) ?></div>
+                                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['email']) ?></div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900">
+                                                        <?= date('D, M d, Y', strtotime($appointment['date'])) ?>
+                                                        <?php if ($isToday): ?>
+                                                            <span class="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Today</span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <div class="text-sm text-gray-500">
+                                                        <?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm font-bold text-red-600">
+                                                        <?= !empty($appointment['priority_number']) ? htmlspecialchars($appointment['priority_number']) : 'N/A' ?>
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900">
+                                                        <?= !empty($appointment['invoice_number']) ? htmlspecialchars($appointment['invoice_number']) : 'N/A' ?>
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                        Approved
+                                                    </span>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                    <form method="POST" action="" class="inline">
+                                                        <input type="hidden" name="appointment_id" value="<?= $appointment['id'] ?>">
+                                                        <input type="hidden" name="action" value="complete">
+                                                        <button type="submit" name="approve_appointment" 
+                                                                class="bg-blue-500 text-white action-button">
+                                                            <i class="fas fa-check-circle mr-1"></i> Mark Completed
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- Cancelled Appointments -->
+                    <div class="hidden p-6 bg-white rounded-lg border border-gray-200" id="cancelled" role="tabpanel" aria-labelledby="cancelled-tab">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-semibold text-red-700">Cancelled Appointments</h2>
+                            <span class="text-sm text-gray-600"><?= count($cancelledAppointments) ?> cancelled</span>
+                        </div>
+                        
+                        <?php if (empty($cancelledAppointments)): ?>
+                            <div class="bg-blue-50 p-6 rounded-lg text-center">
+                                <p class="text-gray-600">No cancelled appointments found.</p>
+                            </div>
+                        <?php else: ?>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date & Time</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cancelled By</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cancelled At</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <?php foreach ($cancelledAppointments as $appointment): ?>
+                                            <tr>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
+                                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['contact']) ?></div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900"><?= date('M d, Y', strtotime($appointment['date'])) ?></div>
+                                                    <div class="text-sm text-gray-500"><?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?></div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <span class="px-3 py-1 text-xs font-semibold rounded-full <?= ($appointment['cancelled_by'] == 'Cancelled by Patient' ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800') ?>">
+                                                        <?= htmlspecialchars($appointment['cancelled_by']) ?>
+                                                    </span>
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    <div class="text-sm text-gray-900 max-w-xs"><?= !empty($appointment['cancel_reason']) ? htmlspecialchars($appointment['cancel_reason']) : 'No reason provided' ?></div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <?= date('M d, Y g:i A', strtotime($appointment['cancelled_at'])) ?>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                    <form method="POST" action="" class="inline" onsubmit="return confirm('Are you sure you want to permanently delete this cancelled appointment? This action cannot be undone.');">
+                                                        <input type="hidden" name="cancelled_appointment_id" value="<?= $appointment['id'] ?>">
+                                                        <button type="submit" name="delete_cancelled_appointment" class="text-red-600 hover:text-red-900">
+                                                            <i class="fas fa-trash mr-1"></i> Delete
+                                                        </button>
+                                                    </form>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -1570,6 +2178,42 @@ document.addEventListener('DOMContentLoaded', function() {
                             <span class="text-sm text-gray-600"><?= count($allAppointments) ?> total</span>
                         </div>
                         
+                        <!-- Filters and Export Buttons -->
+                        <div class="mb-6 bg-gray-50 p-4 rounded-lg">
+                            <div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                                <div class="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                                    <!-- Status Filter -->
+                                    <div>
+                                        <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Status</label>
+                                        <select id="statusFilter" class="w-full md:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="all" <?= $filterStatus === 'all' ? 'selected' : '' ?>>All Statuses</option>
+                                            <option value="pending" <?= $filterStatus === 'pending' ? 'selected' : '' ?>>Pending</option>
+                                            <option value="approved" <?= $filterStatus === 'approved' ? 'selected' : '' ?>>Approved</option>
+                                            <option value="completed" <?= $filterStatus === 'completed' ? 'selected' : '' ?>>Completed</option>
+                                            <option value="cancelled" <?= $filterStatus === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                                            <option value="rejected" <?= $filterStatus === 'rejected' ? 'selected' : '' ?>>Rejected</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Date Filter -->
+                                    <div>
+                                        <label for="dateFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Date</label>
+                                        <input type="date" id="dateFilter" value="<?= $filterDate ?>" class="w-full md:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                </div>
+                                
+                                <!-- Export Buttons -->
+                                <div class="flex gap-2 w-full md:w-auto">
+                                    <button onclick="exportData('excel')" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-medium flex items-center">
+                                        <i class="fas fa-file-excel mr-2"></i> Export Excel
+                                    </button>
+                                    <button onclick="exportData('pdf')" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-medium flex items-center">
+                                        <i class="fas fa-file-pdf mr-2"></i> Export PDF
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <?php if (empty($allAppointments)): ?>
                             <div class="bg-blue-50 p-4 rounded-lg text-center">
                                 <p class="text-gray-600">No appointments found.</p>
@@ -1579,11 +2223,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-gray-50">
                                         <tr>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient Name</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient ID</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact Number</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Appointed</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority Number</th>
                                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
@@ -1593,16 +2238,19 @@ document.addEventListener('DOMContentLoaded', function() {
                                         ?>
                                             <tr class="<?= $isPast ? 'bg-gray-50' : '' ?>">
                                                 <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm font-medium text-blue-600"><?= !empty($appointment['unique_number']) ? htmlspecialchars($appointment['unique_number']) : 'N/A' ?></div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
                                                     <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
-                                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['contact']) ?></div>
+                                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['email']) ?></div>
                                                     <?php if ($appointment['status'] === 'rejected' && !empty($appointment['rejection_reason'])): ?>
                                                         <div class="mt-1 text-xs text-red-600">
                                                             <strong>Reason:</strong> <?= htmlspecialchars($appointment['rejection_reason']) ?>
                                                         </div>
                                                     <?php endif; ?>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm font-medium text-blue-600"><?= !empty($appointment['unique_number']) ? htmlspecialchars($appointment['unique_number']) : 'N/A' ?></div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900"><?= htmlspecialchars($appointment['contact']) ?></div>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap">
                                                     <div class="text-sm text-gray-900">
@@ -1616,29 +2264,23 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                                         <?= $appointment['status'] === 'approved' ? 'bg-green-100 text-green-800' : 
                                                            ($appointment['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                                                           ($appointment['status'] === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800')) ?>">
+                                                           ($appointment['status'] === 'rejected' ? 'bg-red-100 text-red-800' : 
+                                                           ($appointment['status'] === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'))) ?>">
                                                         <?= ucfirst($appointment['status']) ?>
                                                     </span>
                                                 </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    <?php if (!empty($appointment['invoice_number'])): ?>
-                                                        <div class="text-sm font-medium text-blue-600"><?= $appointment['invoice_number'] ?></div>
-                                                        <div class="text-xs text-gray-500">Priority: <?= $appointment['priority_number'] ?></div>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <?php if (!empty($appointment['priority_number'])): ?>
+                                                        <div class="text-sm font-medium text-red-600"><?= $appointment['priority_number'] ?></div>
                                                     <?php else: ?>
-                                                        <span class="text-gray-400">No invoice</span>
+                                                        <span class="text-gray-400">N/A</span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <?php if ($appointment['status'] === 'approved' && !$isPast): ?>
-                                                        <form method="POST" action="" class="inline">
-                                                            <input type="hidden" name="appointment_id" value="<?= $appointment['id'] ?>">
-                                                            <input type="hidden" name="action" value="complete">
-                                                            <button type="submit" name="approve_appointment" 
-                                                                    class="bg-blue-500 text-white action-button">
-                                                                <i class="fas fa-check-circle mr-1"></i> Mark as Completed
-                                                            </button>
-                                                        </form>
-                                                    <?php endif; ?>
+                                                    <button onclick="openViewModal(<?= htmlspecialchars(json_encode($appointment)) ?>)" 
+                                                            class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition font-medium">
+                                                        <i class="fas fa-eye mr-1"></i> View
+                                                    </button>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -1691,11 +2333,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 <form method="POST" action="" class="inline">
                                                     <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
                                                     <input type="hidden" name="action" value="approve">
-                                                    <button type="submit" name="approve_user" class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 mr-2">Approve</button>
+                                                    <button type="submit" name="approve_user" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 mr-2 action-button">Approve</button>
                                                 </form>
                                                 
                                                 <!-- Decline with reason modal trigger -->
-                                                <button onclick="openDeclineModal(<?= $user['id'] ?>)" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Decline</button>
+                                                <button onclick="openDeclineModal(<?= $user['id'] ?>)" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 action-button">Decline</button>
                                             <?php else: ?>
                                                 <span class="text-gray-400">No actions available</span>
                                             <?php endif; ?>
@@ -1706,32 +2348,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         </table>
                     </div>
                 <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- Invoice Generation Modal -->
-    <div id="invoiceModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Approve Appointment</h3>
-                <p class="text-gray-600 mb-4">Would you like to generate an invoice and appointment ticket for this appointment?</p>
-                
-                <form id="invoiceForm" method="POST" action="">
-                    <input type="hidden" name="appointment_id" id="invoice_appointment_id">
-                    
-                    <div class="flex justify-end space-x-3 mt-6">
-                        <button type="button" onclick="closeInvoiceModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium">
-                            Cancel
-                        </button>
-                        <button type="submit" name="approve_without_invoice" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
-                            Approve Only
-                        </button>
-                        <button type="submit" name="generate_invoice" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">
-                            Generate Invoice & Ticket
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
@@ -1747,7 +2363,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <h3 class="text-lg leading-6 font-medium text-gray-900 mt-3" id="successMessage"></h3>
                 <div class="px-4 py-3 sm:px-6">
-                    <button type="button" onclick="closeSuccessModal()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:text-sm">
+                    <button type="button" onclick="closeSuccessModal()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:text-sm modal-button">
                         OK
                     </button>
                 </div>
@@ -1766,7 +2382,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <h3 class="text-lg leading-6 font-medium text-gray-900 mt-3" id="errorMessage"></h3>
                 <div class="px-4 py-3 sm:px-6">
-                    <button type="button" onclick="closeErrorModal()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm">
+                    <button type="button" onclick="closeErrorModal()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm modal-button">
                         OK
                     </button>
                 </div>
@@ -1791,14 +2407,89 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     
                     <div class="flex justify-end space-x-3 mt-6">
-                        <button type="button" onclick="closeRejectionModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium">
+                        <button type="button" onclick="closeRejectionModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium modal-button">
                             Cancel
                         </button>
-                        <button type="submit" name="approve_appointment" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium">
+                        <button type="submit" name="approve_appointment" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium modal-button">
                             Confirm Rejection
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Appointment Modal -->
+    <div id="viewModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Appointment Details</h3>
+                <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="font-semibold text-gray-700">Patient Information</h4>
+                            <div class="mt-2 space-y-2">
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600">Full Name:</span>
+                                    <p class="text-sm text-gray-900" id="viewFullName"></p>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600">Patient ID:</span>
+                                    <p class="text-sm text-gray-900" id="viewPatientId"></p>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600">Contact Number:</span>
+                                    <p class="text-sm text-gray-900" id="viewContact"></p>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600">Email:</span>
+                                    <p class="text-sm text-gray-900" id="viewEmail"></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-700">Appointment Details</h4>
+                            <div class="mt-2 space-y-2">
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600">Date:</span>
+                                    <p class="text-sm text-gray-900" id="viewDate"></p>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600">Time:</span>
+                                    <p class="text-sm text-gray-900" id="viewTime"></p>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600">Status:</span>
+                                    <p class="text-sm" id="viewStatus"></p>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600">Priority Number:</span>
+                                    <p class="text-sm text-gray-900" id="viewPriorityNumber"></p>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600">Invoice Number:</span>
+                                    <p class="text-sm text-gray-900" id="viewInvoiceNumber"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <h4 class="font-semibold text-gray-700">Health Concerns</h4>
+                        <p class="text-sm text-gray-900 mt-2 bg-white p-3 rounded border" id="viewHealthConcerns"></p>
+                    </div>
+                    <?php if ($appointment['status'] === 'rejected' && !empty($appointment['rejection_reason'])): ?>
+                    <div class="mt-4">
+                        <h4 class="font-semibold text-red-700">Rejection Reason</h4>
+                        <p class="text-sm text-red-600 mt-2 bg-red-50 p-3 rounded border" id="viewRejectionReason"></p>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeViewModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium modal-button">
+                        Close
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1839,7 +2530,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <div class="flex items-center">
                                             <input type="radio" id="edit_afternoon_<?= str_replace(':', '', $slot['start']) ?>" 
                                                    name="time_slot" value="<?= $slot['start'] ?> - <?= $slot['end'] ?>" 
-                                                                                                      class="mr-2" required>
+                                                   class="mr-2" required>
                                             <label for="edit_afternoon_<?= str_replace(':', '', $slot['start']) ?>"><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></label>
                                         </div>
                                     <?php endforeach; ?>
@@ -1860,10 +2551,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     
                     <div class="flex justify-end space-x-3 mt-6">
-                        <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium">
+                        <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium modal-button">
                             Cancel
                         </button>
-                        <button type="submit" name="update_slot" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                        <button type="submit" name="update_slot" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium modal-button">
                             Save Changes
                         </button>
                     </div>
@@ -1886,10 +2577,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             <textarea name="decline_reason" id="decline_reason" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required></textarea>
                         </div>
                         <div class="items-center px-4 py-3">
-                            <button type="submit" name="approve_user" class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500">
+                            <button type="submit" name="approve_user" class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 modal-button">
                                 Confirm Decline
                             </button>
-                            <button type="button" onclick="closeDeclineModal()" class="ml-3 px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                            <button type="button" onclick="closeDeclineModal()" class="ml-3 px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 modal-button">
                                 Cancel
                             </button>
                         </div>
@@ -1973,15 +2664,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function closeRejectionModal() {
         document.getElementById('rejectionModal').classList.add('hidden');
     }
-
-    function openInvoiceModal(appointmentId) {
-        document.getElementById('invoice_appointment_id').value = appointmentId;
-        document.getElementById('invoiceModal').classList.remove('hidden');
-    }
-
-    function closeInvoiceModal() {
-        document.getElementById('invoiceModal').classList.add('hidden');
-    }
     
     function openDeclineModal(userId) {
         document.getElementById('declineUserId').value = userId;
@@ -1991,6 +2673,44 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function closeDeclineModal() {
         document.getElementById('declineModal').classList.add('hidden');
+    }
+    
+    // View Modal functions
+    function openViewModal(appointment) {
+        document.getElementById('viewFullName').textContent = appointment.full_name || 'N/A';
+        document.getElementById('viewPatientId').textContent = appointment.unique_number || 'N/A';
+        document.getElementById('viewContact').textContent = appointment.contact || 'N/A';
+        document.getElementById('viewEmail').textContent = appointment.email || 'N/A';
+        document.getElementById('viewDate').textContent = appointment.date ? new Date(appointment.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+        document.getElementById('viewTime').textContent = appointment.start_time && appointment.end_time ? 
+            new Date('1970-01-01T' + appointment.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) + ' - ' + 
+            new Date('1970-01-01T' + appointment.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A';
+        
+        // Status with color coding
+        const statusElement = document.getElementById('viewStatus');
+        statusElement.textContent = appointment.status ? appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1) : 'N/A';
+        statusElement.className = 'text-sm font-semibold ' + 
+            (appointment.status === 'approved' ? 'text-green-600' :
+             appointment.status === 'pending' ? 'text-yellow-600' :
+             appointment.status === 'rejected' ? 'text-red-600' :
+             appointment.status === 'completed' ? 'text-blue-600' : 'text-gray-600');
+        
+        document.getElementById('viewPriorityNumber').textContent = appointment.priority_number || 'N/A';
+        document.getElementById('viewInvoiceNumber').textContent = appointment.invoice_number || 'N/A';
+        document.getElementById('viewHealthConcerns').textContent = appointment.health_concerns || 'No health concerns specified';
+        
+        if (appointment.status === 'rejected' && appointment.rejection_reason) {
+            document.getElementById('viewRejectionReason').textContent = appointment.rejection_reason;
+            document.getElementById('viewRejectionReason').parentElement.style.display = 'block';
+        } else {
+            document.getElementById('viewRejectionReason').parentElement.style.display = 'none';
+        }
+        
+        document.getElementById('viewModal').classList.remove('hidden');
+    }
+
+    function closeViewModal() {
+        document.getElementById('viewModal').classList.add('hidden');
     }
     
     function showSuccessModal(message) {
@@ -2046,6 +2766,45 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('helpModal').classList.add('hidden');
     }
 
+    // Export functionality
+    function exportData(type) {
+        const status = document.getElementById('statusFilter').value;
+        const date = document.getElementById('dateFilter').value;
+        
+        let url = `?export=${type}`;
+        if (status !== 'all') {
+            url += `&status=${status}`;
+        }
+        if (date) {
+            url += `&date=${date}`;
+        }
+        
+        window.location.href = url;
+    }
+
+    // Filter functionality
+    function applyFilters() {
+        const status = document.getElementById('statusFilter').value;
+        const date = document.getElementById('dateFilter').value;
+        
+        let url = '?';
+        if (status !== 'all') {
+            url += `status=${status}&`;
+        }
+        if (date) {
+            url += `date=${date}&`;
+        }
+        
+        // Remove trailing & or ? if no parameters
+        if (url === '?') {
+            url = '';
+        } else {
+            url = url.slice(0, -1);
+        }
+        
+        window.location.href = url;
+    }
+
     // Calendar functionality
     let currentMonth = <?= date('m') ?>;
     let currentYear = <?= date('Y') ?>;
@@ -2055,362 +2814,169 @@ document.addEventListener('DOMContentLoaded', function() {
     const dateSlots = <?= json_encode($dateSlots) ?>;
 
     function generateCalendar(month, year) {
-    const calendarEl = document.getElementById('calendar');
-    calendarEl.innerHTML = '';
-    
-    const firstDay = new Date(year, month - 1, 1).getDay();
-    const daysInMonth = new Date(year, month, 0).getDate();
-    
-    // Update month/year display
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    document.getElementById('currentMonthYear').textContent = `${monthNames[month - 1]} ${year}`;
-    
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < firstDay; i++) {
-        const emptyCell = document.createElement('div');
-        emptyCell.classList.add('calendar-day', 'disabled', 'text-center', 'p-2', 'rounded', 'bg-gray-100', 'text-gray-400');
-        calendarEl.appendChild(emptyCell);
-    }
-    
-    // Add cells for each day of the month
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-        const dateObj = new Date(year, month - 1, day);
+        const calendarEl = document.getElementById('calendar');
+        calendarEl.innerHTML = '';
         
-        const dayCell = document.createElement('div');
-        dayCell.classList.add('calendar-day', 'text-center', 'p-2', 'rounded', 'border', 'border-gray-200');
+        const firstDay = new Date(year, month - 1, 1).getDay();
+        const daysInMonth = new Date(year, month, 0).getDate();
         
-        // Check if it's a holiday
-        const isHoliday = phHolidays.hasOwnProperty(dateStr);
+        // Update month/year display
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        document.getElementById('currentMonthYear').textContent = `${monthNames[month - 1]} ${year}`;
         
-        // Check if it's a weekend
-        const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-        
-        // Check if it's in the past (including today if time has passed)
-        const now = new Date();
-        const isPast = dateObj < today || (dateObj.getTime() === today.getTime() && now.getHours() >= 17); // Past if date is before today or today after 5 PM
-        
-        // Check if it has available slots
-        const hasSlots = dateSlots.hasOwnProperty(dateStr);
-        
-        // Add appropriate classes based on date status
-        if (isPast) {
-            dayCell.classList.add('disabled', 'bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
-            dayCell.title = 'This date has passed and cannot be selected';
-        } else if (isHoliday) {
-            dayCell.classList.add('holiday', 'bg-red-50', 'text-red-700', 'border-red-200');
-            dayCell.title = 'Holiday: ' + phHolidays[dateStr];
-        } else if (isWeekend) {
-            dayCell.classList.add('weekend', 'bg-blue-50', 'text-blue-700', 'border-blue-200');
-        } else {
-            dayCell.classList.add('bg-white', 'text-gray-700', 'hover:bg-blue-50', 'hover:border-blue-300', 'cursor-pointer');
+        // Add empty cells for days before the first day of the month
+        for (let i = 0; i < firstDay; i++) {
+            const emptyCell = document.createElement('div');
+            emptyCell.classList.add('calendar-day', 'disabled', 'text-center', 'p-2', 'rounded', 'bg-gray-100', 'text-gray-400');
+            calendarEl.appendChild(emptyCell);
         }
         
-        // Add selected class if this date is currently selected
-        if (selectedDate === dateStr) {
-            dayCell.classList.remove('bg-white', 'bg-blue-50', 'bg-red-50', 'bg-gray-100');
-            dayCell.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
-        }
+        // Add cells for each day of the month
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         
-        // Add day number - ensure it's always visible
-        const dayNumber = document.createElement('div');
-        dayNumber.classList.add('font-semibold', 'text-lg', 'mb-1');
-        dayNumber.textContent = day;
-        dayCell.appendChild(dayNumber);
-        
-        // Add holiday indicator
-        if (isHoliday && !isPast) {
-            const holidayIndicator = document.createElement('div');
-            holidayIndicator.classList.add('text-xs', 'font-medium');
-            holidayIndicator.textContent = 'HOLIDAY';
-            dayCell.appendChild(holidayIndicator);
-        }
-        
-        // Add slot availability indicator (only for future dates)
-        if (!isPast && hasSlots) {
-            const slotIndicator = document.createElement('div');
-            slotIndicator.classList.add('text-xs', 'mt-1');
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+            const dateObj = new Date(year, month - 1, day);
             
-            const availableSlots = dateSlots[dateStr].filter(slot => {
-                const booked = parseInt(slot.booked_count) || 0;
-                const max = parseInt(slot.max_slots) || 0;
-                return max - booked > 0;
-            });
+            const dayCell = document.createElement('div');
+            dayCell.classList.add('calendar-day', 'text-center', 'p-2', 'rounded', 'border', 'border-gray-200');
             
-            if (availableSlots.length > 0) {
-                slotIndicator.classList.add('text-green-600', 'font-medium');
-                slotIndicator.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Available';
+            // Check if it's a weekend
+            const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+            
+            // Check if it's in the past
+            const isPast = dateObj < today;
+            
+            // Add appropriate classes based on date status
+            if (isPast) {
+                dayCell.classList.add('disabled', 'bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
+                dayCell.title = 'This date has passed and cannot be selected';
+            } else if (isWeekend) {
+                dayCell.classList.add('weekend', 'bg-blue-50', 'text-blue-700', 'border-blue-200');
             } else {
-                slotIndicator.classList.add('text-red-600', 'font-medium');
-                slotIndicator.innerHTML = '<i class="fas fa-times-circle mr-1"></i>Full';
+                dayCell.classList.add('bg-white', 'text-gray-700', 'hover:bg-blue-50', 'hover:border-blue-300', 'cursor-pointer');
             }
             
-            dayCell.appendChild(slotIndicator);
-        } else if (!isPast) {
-            // No slots configured for this future date
-            const slotIndicator = document.createElement('div');
-            slotIndicator.classList.add('text-xs', 'mt-1', 'text-gray-500');
-            slotIndicator.innerHTML = '<i class="fas fa-plus-circle mr-1"></i>Add slots';
-            dayCell.appendChild(slotIndicator);
+            // Add selected class if this date is currently selected
+            if (selectedDate === dateStr) {
+                dayCell.classList.remove('bg-white', 'bg-blue-50', 'bg-gray-100');
+                dayCell.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+            }
+            
+            // Add day number
+            const dayNumber = document.createElement('div');
+            dayNumber.classList.add('font-semibold', 'text-lg', 'mb-1');
+            dayNumber.textContent = day;
+            dayCell.appendChild(dayNumber);
+            
+            // Add weekend indicator
+            if (isWeekend && !isPast) {
+                const weekendIndicator = document.createElement('div');
+                weekendIndicator.classList.add('text-xs', 'font-medium');
+                weekendIndicator.textContent = 'WEEKEND';
+                dayCell.appendChild(weekendIndicator);
+            }
+            
+            // Add click event if not disabled
+            if (!isPast) {
+                dayCell.addEventListener('click', () => selectDate(dateStr, day, month, year));
+            } else {
+                dayCell.style.cursor = 'not-allowed';
+            }
+            
+            calendarEl.appendChild(dayCell);
         }
-        
-        // Add click event if not disabled
-        if (!isPast) {
-            dayCell.addEventListener('click', () => selectDate(dateStr, day, month, year));
-        } else {
-            dayCell.style.cursor = 'not-allowed';
-        }
-        
-        calendarEl.appendChild(dayCell);
     }
-}
     
     function selectDate(dateStr, day, month, year) {
-    // First, check if the date is in the past
-    const selectedDateObj = new Date(year, month - 1, day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // More accurate past date checking (including time consideration)
-    const now = new Date();
-    const isPast = selectedDateObj < today || 
-                  (selectedDateObj.getTime() === today.getTime() && now.getHours() >= 17);
-    
-    if (isPast) {
-        showErrorModal('Cannot select past dates. Please choose a future date.');
-        return;
+        selectedDate = dateStr;
+        
+        // Update selected date display
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        document.getElementById('selectedDateDisplay').textContent = `${monthNames[month - 1]} ${day}, ${year}`;
+        document.getElementById('selected_date').value = dateStr;
+        
+        // Update calendar UI
+        document.querySelectorAll('.calendar-day').forEach(dayEl => {
+            dayEl.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+        });
+        
+        // Add selection to clicked day
+        event.target.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+        
+        // Show time slots section
+        document.getElementById('timeSlotsSection').classList.remove('hidden');
+        
+        // Reset time slot selection
+        selectedTimeSlot = null;
+        document.querySelectorAll('.time-slot').forEach(slot => {
+            slot.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+            slot.classList.add('bg-white', 'border-gray-200');
+        });
     }
-    
-    selectedDate = dateStr;
-    
-    // Update selected date display
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    document.getElementById('selectedDateDisplay').textContent = `${monthNames[month - 1]} ${day}, ${year}`;
-    document.getElementById('selected_date').value = dateStr;
-    
-    // Update calendar UI - remove selection from all days
-    document.querySelectorAll('.calendar-day').forEach(dayEl => {
-        dayEl.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
-        
-        // Restore appropriate background colors
-        if (dayEl.classList.contains('disabled')) {
-            dayEl.classList.add('bg-gray-100', 'text-gray-400');
-        } else if (dayEl.classList.contains('holiday')) {
-            dayEl.classList.add('bg-red-50', 'text-red-700');
-        } else if (dayEl.classList.contains('weekend')) {
-            dayEl.classList.add('bg-blue-50', 'text-blue-700');
-        } else {
-            dayEl.classList.add('bg-white', 'text-gray-700');
-        }
-    });
-    
-    // Add selection to clicked day with consistent styling
-    event.target.classList.remove('bg-white', 'bg-red-50', 'bg-blue-50', 'bg-gray-100');
-    event.target.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
-    
-    // Ensure text content remains visible
-    const dayNumber = event.target.querySelector('div:first-child');
-    const indicators = event.target.querySelectorAll('div:not(:first-child)');
-    
-    if (dayNumber) {
-        dayNumber.classList.remove('text-gray-700', 'text-red-700', 'text-blue-700');
-        dayNumber.classList.add('text-white');
-    }
-    
-    indicators.forEach(indicator => {
-        indicator.classList.remove('text-gray-500', 'text-red-600', 'text-green-600', 'text-blue-600');
-        indicator.classList.add('text-blue-100');
-    });
-    
-    // Show time slots section
-    document.getElementById('timeSlotsSection').classList.remove('hidden');
-    
-    // Update time slots availability
-    updateTimeSlotsAvailability(dateStr);
-    
-    // Reset time slot selection
-    selectedTimeSlot = null;
-    document.querySelectorAll('.time-slot').forEach(slot => {
-        slot.classList.remove('selected');
-    });
-}
-
-function updateTimeSlotsAvailability(dateStr) {
-    const timeSlots = document.querySelectorAll('.time-slot');
-    const now = new Date();
-    const selectedDateObj = new Date(dateStr);
-    
-    timeSlots.forEach(slotEl => {
-        const timeRange = slotEl.getAttribute('data-time');
-        const [startTime] = timeRange.split(' - ');
-        const slotDateTime = new Date(dateStr + 'T' + startTime);
-        
-        // Reset classes and events
-        slotEl.classList.remove('available', 'limited', 'full', 'selected', 
-                               'bg-green-50', 'bg-yellow-50', 'bg-red-50', 'bg-blue-500',
-                               'text-green-700', 'text-yellow-700', 'text-red-700', 'text-white',
-                               'border-green-200', 'border-yellow-200', 'border-red-200', 'border-blue-600');
-        
-        slotEl.onclick = null;
-        
-        // Check if this time slot is in the past
-        const isPast = slotDateTime < now;
-        
-        if (isPast) {
-            slotEl.classList.add('disabled', 'bg-gray-100', 'text-gray-400', 'border-gray-200', 'cursor-not-allowed');
-            slotEl.querySelector('.availability-indicator').innerHTML = '<span class="text-gray-500">Past</span>';
-            slotEl.title = 'This time slot has passed and cannot be selected';
-            return;
-        }
-        
-        if (dateSlots[dateStr]) {
-            const existingSlot = dateSlots[dateStr].find(slot => 
-                `${slot.start_time}-${slot.end_time}` === timeRange.replace(' - ', '-')
-            );
-            
-            if (existingSlot) {
-                const booked = parseInt(existingSlot.booked_count) || 0;
-                const max = parseInt(existingSlot.max_slots) || 0;
-                const available = max - booked;
-                
-                if (available > 0) {
-                    if (available >= 3) {
-                        slotEl.classList.add('available', 'bg-green-50', 'text-green-700', 'border-green-200', 'cursor-pointer');
-                        slotEl.querySelector('.availability-indicator').innerHTML = `<span class="text-green-600 font-medium">${available} available</span>`;
-                    } else if (available >= 1) {
-                        slotEl.classList.add('limited', 'bg-yellow-50', 'text-yellow-700', 'border-yellow-200', 'cursor-pointer');
-                        slotEl.querySelector('.availability-indicator').innerHTML = `<span class="text-yellow-600 font-medium">${available} left</span>`;
-                    }
-                    
-                    // Add click event
-                    slotEl.onclick = () => selectTimeSlot(slotEl, timeRange);
-                    slotEl.title = `Click to select this time slot (${available} available)`;
-                } else {
-                    slotEl.classList.add('full', 'bg-red-50', 'text-red-700', 'border-red-200', 'cursor-not-allowed');
-                    slotEl.querySelector('.availability-indicator').innerHTML = '<span class="text-red-600 font-medium">Full</span>';
-                    slotEl.title = 'This time slot is fully booked';
-                }
-            } else {
-                // Slot doesn't exist yet, so it's available
-                slotEl.classList.add('available', 'bg-green-50', 'text-green-700', 'border-green-200', 'cursor-pointer');
-                slotEl.querySelector('.availability-indicator').innerHTML = '<span class="text-green-600 font-medium">Available</span>';
-                slotEl.title = 'Click to add this time slot';
-                
-                // Add click event
-                slotEl.onclick = () => selectTimeSlot(slotEl, timeRange);
-            }
-        } else {
-            // No slots for this date yet, all are available
-            slotEl.classList.add('available', 'bg-green-50', 'text-green-700', 'border-green-200', 'cursor-pointer');
-            slotEl.querySelector('.availability-indicator').innerHTML = '<span class="text-green-600 font-medium">Available</span>';
-            slotEl.title = 'Click to add this time slot';
-            
-            // Add click event
-            slotEl.onclick = () => selectTimeSlot(slotEl, timeRange);
-        }
-    });
-}
     
     function selectTimeSlot(slotEl, timeRange) {
-    // First, check if the selected date-time combination is in the past
-    if (selectedDate) {
-        const selectedDateTime = new Date(selectedDate + 'T' + timeRange.split(' - ')[0]);
-        const now = new Date();
+        // Remove previous selection
+        document.querySelectorAll('.time-slot').forEach(el => {
+            el.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+            el.classList.add('bg-white', 'border-gray-200');
+        });
         
-        if (selectedDateTime < now) {
-            showErrorModal('Cannot select past time slots. Please choose a future time.');
-            return;
-        }
-    }
-    
-    // Remove previous selection
-    document.querySelectorAll('.time-slot').forEach(el => {
-        el.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+        // Add selection to clicked slot
+        slotEl.classList.remove('bg-white', 'border-gray-200');
+        slotEl.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
         
-        // Restore appropriate styling
-        if (el.classList.contains('available')) {
-            el.classList.add('bg-green-50', 'text-green-700', 'border-green-200');
-        } else if (el.classList.contains('limited')) {
-            el.classList.add('bg-yellow-50', 'text-yellow-700', 'border-yellow-200');
-        } else if (el.classList.contains('full')) {
-            el.classList.add('bg-red-50', 'text-red-700', 'border-red-200', 'cursor-not-allowed');
-        }
-    });
-    
-    // Add selection to clicked slot with consistent styling
-    slotEl.classList.remove('bg-green-50', 'bg-yellow-50', 'bg-red-50');
-    slotEl.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
-    
-    // Update the availability indicator text color
-    const indicator = slotEl.querySelector('.availability-indicator');
-    if (indicator) {
-        indicator.classList.remove('text-green-600', 'text-yellow-600', 'text-red-600');
-        indicator.classList.add('text-blue-100');
+        selectedTimeSlot = timeRange;
+        document.getElementById('selected_time_slot').value = timeRange;
     }
-    
-    selectedTimeSlot = timeRange;
-    document.getElementById('selected_time_slot').value = timeRange;
-}
     
     function addSelectedSlot() {
-    if (!selectedDate) {
-        showErrorModal('Please select a date');
-        return;
+        if (!selectedDate) {
+            showErrorModal('Please select a date');
+            return;
+        }
+        
+        if (!selectedTimeSlot) {
+            showErrorModal('Please select a time slot');
+            return;
+        }
+        
+        const maxSlots = document.getElementById('max_slots').value;
+        
+        // Create a form and submit it
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '';
+        
+        const dateInput = document.createElement('input');
+        dateInput.type = 'hidden';
+        dateInput.name = 'date';
+        dateInput.value = selectedDate;
+        
+        const timeInput = document.createElement('input');
+        timeInput.type = 'hidden';
+        timeInput.name = 'time_slot';
+        timeInput.value = selectedTimeSlot;
+        
+        const maxInput = document.createElement('input');
+        maxInput.type = 'hidden';
+        maxInput.name = 'max_slots';
+        maxInput.value = maxSlots;
+        
+        const submitInput = document.createElement('input');
+        submitInput.type = 'hidden';
+        submitInput.name = 'add_slot';
+        submitInput.value = '1';
+        
+        form.appendChild(dateInput);
+        form.appendChild(timeInput);
+        form.appendChild(maxInput);
+        form.appendChild(submitInput);
+        
+        document.body.appendChild(form);
+        form.submit();
     }
-    
-    if (!selectedTimeSlot) {
-        showErrorModal('Please select a time slot');
-        return;
-    }
-    
-    // Final validation - check if the selected date-time is in the past
-    const [startTime] = selectedTimeSlot.split(' - ');
-    const selectedDateTime = new Date(selectedDate + 'T' + startTime);
-    const now = new Date();
-    
-    if (selectedDateTime < now) {
-        showErrorModal('Cannot add time slots in the past. Please select a future date and time.');
-        return;
-    }
-    
-    const maxSlots = document.getElementById('max_slots').value;
-    
-    // Create a form and submit it
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '';
-    
-    const dateInput = document.createElement('input');
-    dateInput.type = 'hidden';
-    dateInput.name = 'date';
-    dateInput.value = selectedDate;
-    
-    const timeInput = document.createElement('input');
-    timeInput.type = 'hidden';
-    timeInput.name = 'time_slot';
-    timeInput.value = selectedTimeSlot;
-    
-    const maxInput = document.createElement('input');
-    maxInput.type = 'hidden';
-    maxInput.name = 'max_slots';
-    maxInput.value = maxSlots;
-    
-    const submitInput = document.createElement('input');
-    submitInput.type = 'hidden';
-    submitInput.name = 'add_slot';
-    submitInput.value = '1';
-    
-    form.appendChild(dateInput);
-    form.appendChild(timeInput);
-    form.appendChild(maxInput);
-    form.appendChild(submitInput);
-    
-    document.body.appendChild(form);
-    form.submit();
-}
     
     // Initialize tabs
     document.addEventListener('DOMContentLoaded', function() {
@@ -2459,13 +3025,21 @@ function updateTimeSlotsAvailability(dateStr) {
         // Add slot button
         document.getElementById('addSlotBtn').addEventListener('click', addSelectedSlot);
         
+        // Add time slot selection
+        document.querySelectorAll('.time-slot').forEach(slot => {
+            slot.addEventListener('click', function() {
+                const timeRange = this.getAttribute('data-time');
+                selectTimeSlot(this, timeRange);
+            });
+        });
+        
+        // Filter event listeners
+        document.getElementById('statusFilter').addEventListener('change', applyFilters);
+        document.getElementById('dateFilter').addEventListener('change', applyFilters);
+        
         // Show success/error modals if messages exist
         <?php if ($success): ?>
             showSuccessModal('<?= addslashes($success) ?>');
-            // Refresh the page after a short delay to update the UI
-            setTimeout(function() {
-                window.location.href = window.location.href.split('?')[0];
-            }, 5000);
         <?php endif; ?>
         
         <?php if ($error): ?>
@@ -2483,11 +3057,6 @@ function updateTimeSlotsAvailability(dateStr) {
         const rejectionModal = document.getElementById('rejectionModal');
         if (event.target === rejectionModal) {
             closeRejectionModal();
-        }
-        
-        const invoiceModal = document.getElementById('invoiceModal');
-        if (event.target === invoiceModal) {
-            closeInvoiceModal();
         }
         
         const successModal = document.getElementById('successModal');
@@ -2509,8 +3078,12 @@ function updateTimeSlotsAvailability(dateStr) {
         if (event.target === helpModal) {
             closeHelpModal();
         }
+        
+        const viewModal = document.getElementById('viewModal');
+        if (event.target === viewModal) {
+            closeViewModal();
+        }
     }
     </script>
 </body>
-
 </html>
