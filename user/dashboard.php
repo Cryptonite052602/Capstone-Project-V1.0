@@ -14,7 +14,7 @@ $userId = $_SESSION['user']['id'];
 $userData = null;
 $error = '';
 $success = '';
-$activeTab = $_GET['tab'] ?? 'dashboard';
+$activeTab = $_GET['tab'] ?? 'appointments'; // Changed default to appointments
 
 // Get user data
 try {
@@ -203,6 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
                     ':consent'         => $consentGiven
                 ]);
 
+                $_SESSION['booking_success'] = true;
                 $_SESSION['notification'] = [
                     'type' => 'success',
                     'message' => 'Appointment booked successfully! Your health visit has been scheduled.'
@@ -221,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
     }
 }
 
-// Handle appointment cancellation - ONLY FOR PENDING APPOINTMENTS
+// Handle appointment cancellation - FIXED: Only allow cancellation for pending appointments
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])) {
     $userAppointmentId = $_POST['appointment_id'];
     $cancelReason = trim($_POST['cancel_reason'] ?? '');
@@ -253,7 +254,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
             JOIN sitio1_appointments a ON ua.appointment_id = a.id
             WHERE ua.id = ? AND ua.user_id = ? 
             AND ua.status = 'pending'  -- ONLY allow cancellation of pending appointments
-            AND (a.date > CURDATE() OR (a.date = CURDATE() AND a.start_time > TIME(NOW())))  -- Only allow cancellation of future appointments
         ");
         $stmt->execute([$userAppointmentId, $userId]);
         $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -277,31 +277,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
                 throw new Exception('Completed appointments cannot be cancelled.');
             } elseif ($appointmentInfo['status'] === 'cancelled') {
                 throw new Exception('This appointment has already been cancelled.');
-            } elseif ($appointmentInfo['date'] < date('Y-m-d') || 
-                     ($appointmentInfo['date'] == date('Y-m-d') && $appointmentInfo['start_time'] < date('H:i:s'))) {
-                throw new Exception('Past appointments cannot be cancelled.');
+            } elseif ($appointmentInfo['status'] === 'rejected') {
+                throw new Exception('This appointment has been rejected by staff.');
             } else {
                 throw new Exception('Appointment cannot be cancelled at this time.');
             }
         }
         
-        // DELETE the appointment instead of marking as cancelled
+        // UPDATE the appointment status to cancelled instead of deleting
         $stmt = $pdo->prepare("
-            DELETE FROM user_appointments 
+            UPDATE user_appointments 
+            SET status = 'cancelled', cancel_reason = ?, cancelled_at = NOW()
             WHERE id = ? AND user_id = ? AND status = 'pending'
         ");
-        $stmt->execute([$userAppointmentId, $userId]);
+        $stmt->execute([$cancelReason, $userAppointmentId, $userId]);
         
         if ($stmt->rowCount() > 0) {
             $_SESSION['notification'] = [
                 'type' => 'success',
-                'message' => 'Appointment cancelled successfully. You can now book a new appointment.'
+                'message' => 'Appointment cancelled successfully.'
             ];
         } else {
             throw new Exception('Failed to cancel appointment.');
         }
         
-        // Redirect to prevent form resubmission and show available slots
+        // Redirect to prevent form resubmission
         header('Location: ?tab=appointments');
         exit();
         
@@ -382,11 +382,12 @@ try {
     $error = 'Error fetching available dates: ' . $e->getMessage();
 }
 
-// Get counts for each appointment tab - UPDATED TO EXCLUDE CANCELLED FROM UPCOMING
+// Get counts for each appointment tab
 $appointmentCounts = [
     'upcoming' => 0,
     'past' => 0,
-    'cancelled' => 0
+    'cancelled' => 0,
+    'rejected' => 0
 ];
 
 try {
@@ -421,12 +422,22 @@ try {
     ");
     $stmt->execute([$userId]);
     $appointmentCounts['cancelled'] = $stmt->fetch()['count'];
+
+    // Rejected: Count rejected appointments only
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as count
+        FROM user_appointments ua
+        WHERE ua.user_id = ? 
+        AND ua.status = 'rejected'
+    ");
+    $stmt->execute([$userId]);
+    $appointmentCounts['rejected'] = $stmt->fetch()['count'];
     
 } catch (PDOException $e) {
     $error = 'Error fetching appointment counts: ' . $e->getMessage();
 }
 
-// Get user's appointments - UPDATED WITH PROPER FILTERING
+// Get user's appointments
 $appointments = [];
 
 try {
@@ -445,7 +456,8 @@ try {
             ua.cancel_reason, 
             ua.cancelled_at,
             ua.processed_at,
-            ua.appointment_ticket
+            ua.appointment_ticket,
+            ua.rejection_reason
         FROM user_appointments ua
         JOIN sitio1_appointments a ON ua.appointment_id = a.id
         JOIN sitio1_staff s ON a.staff_id = s.id
@@ -459,9 +471,11 @@ try {
         $query .= " AND ua.status = 'completed'";
     } elseif ($appointmentTab === 'cancelled') {
         $query .= " AND ua.status = 'cancelled'";
+    } elseif ($appointmentTab === 'rejected') {
+        $query .= " AND ua.status = 'rejected'";
     }
     
-    $query .= " ORDER BY a.date " . ($appointmentTab === 'past' || $appointmentTab === 'cancelled' ? 'DESC' : 'ASC') . ", a.start_time";
+    $query .= " ORDER BY a.date " . ($appointmentTab === 'past' || $appointmentTab === 'cancelled' || $appointmentTab === 'rejected' ? 'DESC' : 'ASC') . ", a.start_time";
     
     $stmt = $pdo->prepare($query);
     $stmt->execute([$userId]);
@@ -602,50 +616,44 @@ try {
             cursor: not-allowed;
         }
 
-        /* Enhanced status indicators */
-        .status-pending {
-            background-color: #fef3c7;
-            color: #d97706;
+        /* Enhanced status indicators - SIMPLIFIED */
+        .status-badge {
+            padding: 4px 12px !important;
             border-radius: 20px !important;
-            padding: 8px 16px !important;
-            font-weight: 700 !important;
-            font-size: 14px !important;
+            font-weight: 600 !important;
+            font-size: 12px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+        }
+
+        .status-pending {
+            background-color: #fef3c7 !important;
+            color: #d97706 !important;
         }
 
         .status-approved {
-            background-color: #d1fae5;
-            color: #065f46;
-            border-radius: 20px !important;
-            padding: 8px 16px !important;
-            font-weight: 700 !important;
-            font-size: 14px !important;
+            background-color: #d1fae5 !important;
+            color: #065f46 !important;
         }
 
         .status-completed {
-            background-color: #dbeafe;
-            color: #1e40af;
-            border-radius: 20px !important;
-            padding: 8px 16px !important;
-            font-weight: 700 !important;
-            font-size: 14px !important;
+            background-color: #dbeafe !important;
+            color: #1e40af !important;
         }
 
         .status-cancelled {
-            background-color: #fee2e2;
-            color: #dc2626;
-            border-radius: 20px !important;
-            padding: 8px 16px !important;
-            font-weight: 700 !important;
-            font-size: 14px !important;
+            background-color: #fee2e2 !important;
+            color: #dc2626 !important;
+        }
+
+        .status-rejected {
+            background-color: #fee2e2 !important;
+            color: #dc2626 !important;
         }
 
         .status-rescheduled {
-            background-color: #f3e8ff;
-            color: #7c3aed;
-            border-radius: 20px !important;
-            padding: 8px 16px !important;
-            font-weight: 700 !important;
-            font-size: 14px !important;
+            background-color: #f3e8ff !important;
+            color: #7c3aed !important;
         }
 
         /* Cancellation warning */
@@ -663,60 +671,86 @@ try {
             font-size: 16px !important;
             transition: all 0.3s ease !important;
         }
-                /* Enhanced status indicators - BIGGER and BOLDER */
-        .status-pending {
-            background-color: #fef3c7 !important;
-            color: #d97706 !important;
-            border-radius: 20px !important;
-            padding: 10px 20px !important;
-            font-weight: 800 !important;
-            font-size: 14px !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.5px !important;
+
+        /* Blue theme for consistency with staff dashboard */
+        .blue-theme-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
-        .status-approved {
-            background-color: #d1fae5 !important;
-            color: #065f46 !important;
-            border-radius: 20px !important;
-            padding: 10px 20px !important;
-            font-weight: 800 !important;
-            font-size: 14px !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.5px !important;
+        .blue-theme-text {
+            color: #3b82f6;
         }
 
-        .status-completed {
-            background-color: #dbeafe !important;
-            color: #1e40af !important;
-            border-radius: 20px !important;
-            padding: 10px 20px !important;
-            font-weight: 800 !important;
-            font-size: 14px !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.5px !important;
+        .blue-theme-border {
+            border-color: #3b82f6;
         }
 
-        .status-cancelled {
-            background-color: #fee2e2 !important;
-            color: #dc2626 !important;
-            border-radius: 20px !important;
-            padding: 10px 20px !important;
-            font-weight: 800 !important;
-            font-size: 14px !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.5px !important;
+        /* Calendar day styling */
+        .calendar-day {
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s ease-in-out;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            background: white;
         }
 
-        .status-rescheduled {
-            background-color: #f3e8ff !important;
-            color: #7c3aed !important;
-            border-radius: 20px !important;
-            padding: 10px 20px !important;
-            font-weight: 800 !important;
-            font-size: 14px !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.5px !important;
+        .calendar-day.selected {
+            border-color: #3b82f6 !important;
+            background: #3b82f6 !important;
+            color: white !important;
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+            transform: scale(1.02);
+            z-index: 10;
+        }
+
+        .calendar-day.disabled {
+            opacity: 0.4;
+            cursor: not-allowed !important;
+            background: #f8fafc !important;
+            color: #9ca3af !important;
+            border-color: #e5e7eb;
+        }
+
+        /* Count badge styling */
+        .count-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.8rem;
+            height: 1.8rem;
+            border-radius: 9999px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            padding: 0 0.6rem;
+            margin-left: 0.5rem;
+        }
+
+        /* Stats card styling */
+        .stats-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            border: 1px solid #e5e7eb;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Tab active state */
+        .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #2563eb;
         }
 
         /* Activity item hover effects */
@@ -727,6 +761,22 @@ try {
         .activity-item:hover {
             transform: translateX(5px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Button disabled state */
+        .button-disabled {
+            opacity: 0.6;
+            cursor: not-allowed !important;
+            background-color: #9ca3af !important;
+        }
+        .button-disabled:hover {
+            transform: none !important;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        /* Dashboard stats styling */
+        .dashboard-stats {
+            margin-bottom: 2rem;
         }
     </style>
 </head>
@@ -792,7 +842,7 @@ try {
             </div>
         </div>
 
-        <!-- Success Modal -->
+        <!-- Success Modal for Appointment Booking -->
         <div id="success-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
             <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="success-modal-backdrop"></div>
             <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full opacity-0 scale-95" id="success-modal-content">
@@ -873,12 +923,73 @@ try {
             <?php unset($_SESSION['notification']); ?>
         <?php endif; ?>
 
-        <h1 class="text-2xl font-bold mb-6 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            User Dashboard
-        </h1>
+        <!-- Auto-show success modal after booking -->
+        <?php if (isset($_SESSION['booking_success']) && $_SESSION['booking_success']): ?>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(function() {
+                        showSuccessModal();
+                    }, 500);
+                });
+            </script>
+            <?php unset($_SESSION['booking_success']); ?>
+        <?php endif; ?>
+
+        <!-- Dashboard Header -->
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                User Dashboard
+            </h1>
+            <!-- Help Button -->
+            <button onclick="openHelpModal()" class="help-icon bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300 transition">
+                <i class="fas fa-question-circle text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Help/Guide Modal -->
+        <div id="helpModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-2xl leading-6 font-medium text-gray-900">User Dashboard Guide</h3>
+                        <button onclick="closeHelpModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                        <p class="text-blue-800"><strong>Welcome to the Community Health Tracker User Dashboard!</strong> This guide will help you understand how to use all the features available to you as a patient.</p>
+                    </div>
+                    
+                    <!-- Guide content -->
+                    <div class="space-y-4">
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-semibold text-lg text-gray-800">Appointment Management</h4>
+                            <p class="text-gray-600">Book new appointments, view your upcoming appointments, and manage your scheduled visits.</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold text-lg text-gray-800">Appointment Status</h4>
+                            <p class="text-gray-600">Track your appointment status: Pending, Approved, Completed, Cancelled, or Rejected.</p>
+                        </div>
+
+                        <div class="border-l-4 border-purple-500 pl-4">
+                            <h4 class="font-semibold text-lg text-gray-800">Cancellation Policy</h4>
+                            <p class="text-gray-600">You can cancel pending appointments online. Approved appointments require contacting support.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end mt-6">
+                        <button type="button" onclick="closeHelpModal()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium modal-button">
+                            Got it, thanks!
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <?php if ($error): ?>
             <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">
@@ -898,26 +1009,10 @@ try {
             </div>
         <?php endif; ?>
 
-        <!-- Main Tabs -->
-        <div class="flex border-b border-gray-200 mb-6">
-            <a href="?tab=dashboard" class="<?= $activeTab === 'dashboard' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin-round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                Dashboard
-            </a>
-            <a href="?tab=appointments" class="<?= $activeTab === 'appointments' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                Appointments
-            </a>
-        </div>
-
-        <!-- Dashboard Tab Content -->
-        <div class="tab-content <?= $activeTab === 'dashboard' ? 'active' : '' ?>">
+        <!-- Dashboard Stats Section - Always visible -->
+        <div class="dashboard-stats">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-white p-6 rounded-lg shadow">
+                <div class="stats-card">
                     <div class="flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-yellow-600 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -929,7 +1024,7 @@ try {
                     </div>
                 </div>
                 
-                <div class="bg-white p-6 rounded-lg shadow">
+                <div class="stats-card">
                     <div class="flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-600 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -941,7 +1036,7 @@ try {
                     </div>
                 </div>
                 
-                <div class="bg-white p-6 rounded-lg shadow">
+                <div class="stats-card">
                     <div class="flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -953,142 +1048,25 @@ try {
                     </div>
                 </div>
             </div>
-            
-            <div class="bg-white p-6 rounded-lg shadow mb-8">
-                <h2 class="text-xl font-semibold mb-4">Your Information</h2>
-                
-                <?php if ($userData): ?>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <p class="text-gray-600"><span class="font-semibold">Full Name:</span> <?= htmlspecialchars($userData['full_name']) ?></p>
-                            <p class="text-gray-600"><span class="font-semibold">Age:</span> <?= $userData['age'] ? htmlspecialchars($userData['age']) : 'N/A' ?></p>
-                            <p class="text-gray-600"><span class="font-semibold">Contact:</span> <?= $userData['contact'] ? htmlspecialchars($userData['contact']) : 'N/A' ?></p>
-                        </div>
-                        <div>
-                            <p class="text-gray-600"><span class="font-semibold">Address:</span> <?= $userData['address'] ? htmlspecialchars($userData['address']) : 'N/A' ?></p>
-                            <p class="text-gray-600"><span class="font-semibold">Account Status:</span> 
-                                <?= $userData['approved'] ? 'Approved' : 'Pending Approval' ?>
-                            </p>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <p class="text-gray-600">Your account information could not be loaded.</p>
-                <?php endif; ?>
-            </div>
-            
-                        <div class="bg-white p-6 rounded-lg shadow">
-                <h2 class="text-xl font-semibold mb-4">Recent Activities</h2>
-                <div class="space-y-4">
-                    <?php if (!empty($recentActivities)): ?>
-                        <?php foreach ($recentActivities as $activity): 
-                            // Determine status color based on activity status
-                            $statusConfig = [
-                                'class' => '',
-                                'bg' => '',
-                                'border' => ''
-                            ];
-                            
-                            switch($activity['status']) {
-                                case 'pending':
-                                    $statusConfig = [
-                                        'class' => 'status-pending',
-                                        'bg' => 'bg-yellow-50',
-                                        'border' => 'border-yellow-200'
-                                    ];
-                                    break;
-                                case 'approved':
-                                    $statusConfig = [
-                                        'class' => 'status-approved',
-                                        'bg' => 'bg-green-50',
-                                        'border' => 'border-green-200'
-                                    ];
-                                    break;
-                                case 'completed':
-                                    $statusConfig = [
-                                        'class' => 'status-completed',
-                                        'bg' => 'bg-blue-50',
-                                        'border' => 'border-blue-200'
-                                    ];
-                                    break;
-                                case 'cancelled':
-                                    $statusConfig = [
-                                        'class' => 'status-cancelled',
-                                        'bg' => 'bg-red-50',
-                                        'border' => 'border-red-200'
-                                    ];
-                                    break;
-                                case 'rejected':
-                                    $statusConfig = [
-                                        'class' => 'status-cancelled',
-                                        'bg' => 'bg-red-50',
-                                        'border' => 'border-red-200'
-                                    ];
-                                    break;
-                                case 'rescheduled':
-                                    $statusConfig = [
-                                        'class' => 'status-rescheduled',
-                                        'bg' => 'bg-purple-50',
-                                        'border' => 'border-purple-200'
-                                    ];
-                                    break;
-                                case 'in_progress':
-                                    $statusConfig = [
-                                        'class' => 'status-completed',
-                                        'bg' => 'bg-blue-50',
-                                        'border' => 'border-blue-200'
-                                    ];
-                                    break;
-                                default:
-                                    $statusConfig = [
-                                        'class' => 'status-pending',
-                                        'bg' => 'bg-gray-50',
-                                        'border' => 'border-gray-200'
-                                    ];
-                            }
-                        ?>
-                            <div class="border-l-4 <?= $statusConfig['border'] ?> <?= $statusConfig['bg'] ?> pl-4 py-4 rounded-r-lg transition-all duration-200 hover:shadow-sm">
-                                <div class="flex justify-between items-start">
-                                    <div class="flex-1">
-                                        <div class="flex items-center justify-between mb-2">
-                                            <h4 class="font-semibold text-gray-800 text-lg"><?= htmlspecialchars($activity['title']) ?></h4>
-                                            <span class="<?= $statusConfig['class'] ?> text-sm font-bold px-4 py-2 rounded-full">
-                                                <?= strtoupper($activity['status']) ?>
-                                            </span>
-                                        </div>
-                                        <p class="text-gray-600 mb-2"><?= htmlspecialchars($activity['description']) ?></p>
-                                        <div class="flex items-center text-sm text-gray-500">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                            <?php if ($activity['type'] === 'appointment'): ?>
-                                                <?= date('F j, Y', strtotime($activity['date'])) ?>
-                                            <?php else: ?>
-                                                <?= date('F j, Y \a\t g:i A', strtotime($activity['created_at'])) ?>
-                                            <?php endif; ?>
-                                            <span class="mx-2">•</span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            <?= ucfirst($activity['type']) ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <div class="text-center py-8">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 01118 0z" />
-                            </svg>
-                            <p class="text-gray-600 text-lg">No recent activities found.</p>
-                            <p class="text-gray-500 mt-2">Your appointments and consultations will appear here.</p>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
         </div>
 
-        <!-- Appointments Tab Content -->
+        <!-- Main Tabs - Appointments first -->
+        <div class="flex border-b border-gray-200 mb-6">
+            <a href="?tab=appointments" class="<?= $activeTab === 'appointments' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Appointments
+            </a>
+            <a href="?tab=dashboard" class="<?= $activeTab === 'dashboard' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                Dashboard
+            </a>
+        </div>
+
+        <!-- Appointments Tab Content - Now first -->
         <div class="tab-content <?= $activeTab === 'appointments' ? 'active' : '' ?>">
             <!-- Enhanced Tabs with Counts and Icons -->
             <div class="flex border-b border-gray-200 mb-6">
@@ -1097,31 +1075,38 @@ try {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     Upcoming
-                    <span class="ml-1 bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full"><?= $appointmentCounts['upcoming'] ?></span>
+                    <span class="count-badge bg-blue-100 text-blue-800"><?= $appointmentCounts['upcoming'] ?></span>
                 </a>
                 <a href="?tab=appointments&appointment_tab=past" class="<?= $appointmentTab === 'past' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 01118 0z" />
                     </svg>
                     Completed
-                    <span class="ml-1 bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full"><?= $appointmentCounts['past'] ?></span>
+                    <span class="count-badge bg-green-100 text-green-800"><?= $appointmentCounts['past'] ?></span>
                 </a>
                 <a href="?tab=appointments&appointment_tab=cancelled" class="<?= $appointmentTab === 'cancelled' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                     Cancelled
-                    <span class="ml-1 bg-red-100 text-red-800 text-xs font-semibold px-2 py-0.5 rounded-full"><?= $appointmentCounts['cancelled'] ?></span>
+                    <span class="count-badge bg-red-100 text-red-800"><?= $appointmentCounts['cancelled'] ?></span>
+                </a>
+                <a href="?tab=appointments&appointment_tab=rejected" class="<?= $appointmentTab === 'rejected' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    Rejected
+                    <span class="count-badge bg-red-100 text-red-800"><?= $appointmentCounts['rejected'] ?></span>
                 </a>
             </div>
 
-            <div class="flex flex-col md:flex-row gap-6">
+            <div class="flex flex-col lg:flex-row gap-6">
                 <!-- Left Side - Schedule Health Check-up -->
-                <div class="md:w-1/2">
-                    <div id="book-appointment" class="bg-white p-6 rounded-lg shadow">
-                        <h2 class="text-xl font-semibold mb-4 flex items-center">
+                <div class="lg:w-1/2">
+                    <div id="book-appointment" class="bg-white p-6 rounded-lg shadow stats-card">
+                        <h2 class="text-xl font-semibold mb-4 flex items-center blue-theme-text">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                             </svg>
                             Schedule Health Check-up
                         </h2>
@@ -1130,7 +1115,7 @@ try {
                         <div class="mb-6">
                             <h3 class="font-medium text-gray-700 mb-3 flex items-center">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2  0 002 2z" />
                                 </svg>
                                 Available Dates
                             </h3>
@@ -1148,7 +1133,7 @@ try {
                                         }
                                     ?>
                                         <a href="<?= $userHasAppointment ? '#' : '?tab=appointments&date=' . $date ?>" 
-                                           class="border rounded-lg p-2 text-center transition <?= ($_GET['date'] ?? '') === $date ? 'border-blue-500 bg-blue-50' : ($userHasAppointment ? 'date-disabled border-gray-200 bg-gray-100 text-gray-500' : ($hasAvailableSlots ? 'border-gray-200 hover:bg-blue-50' : 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed')) ?>">
+                                           class="calendar-day <?= ($_GET['date'] ?? '') === $date ? 'selected' : ($userHasAppointment ? 'date-disabled' : ($hasAvailableSlots ? '' : 'date-disabled')) ?>">
                                             <div class="font-medium"><?= date('D', strtotime($date)) ?></div>
                                             <div class="text-sm"><?= date('M j', strtotime($date)) ?></div>
                                             <?php if ($userHasAppointment): ?>
@@ -1288,8 +1273,8 @@ try {
                             }
                             
                             if ($selectedSlot && !$selectedSlot['user_has_booked']): ?>
-                                <div class="border border-gray-200 rounded-lg p-6 mb-6">
-                                    <h3 class="font-semibold text-lg mb-4 flex items-center">
+                                <div class="border border-gray-200 rounded-lg p-6 mb-6 stats-card">
+                                    <h3 class="font-semibold text-lg mb-4 flex items-center text-green-600">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                         </svg>
@@ -1418,9 +1403,9 @@ try {
                 </div>
 
                 <!-- Right Side - Appointments List -->
-                <div class="md:w-1/2">
-                    <div class="bg-white p-6 rounded-lg shadow">
-                        <h2 class="text-xl font-semibold mb-4 flex items-center">
+                <div class="lg:w-1/2">
+                    <div class="bg-white p-6 rounded-lg shadow stats-card">
+                        <h2 class="text-xl font-semibold mb-4 flex items-center blue-theme-text">
                             <?php if ($appointmentTab === 'upcoming'): ?>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1431,11 +1416,16 @@ try {
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 01118 0z" />
                                 </svg>
                                 Completed Appointments
-                            <?php else: ?>
+                            <?php elseif ($appointmentTab === 'cancelled'): ?>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                                 Cancelled Appointments
+                            <?php else: ?>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
+                                Rejected Appointments
                             <?php endif; ?>
                         </h2>
 
@@ -1449,7 +1439,7 @@ try {
                         <?php else: ?>
                             <div class="space-y-4">
                                 <?php foreach ($appointments as $appointment): ?>
-                                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition stats-card">
                                         <div class="flex justify-between items-start">
                                             <div class="flex items-start">
                                                 <!-- Status icons -->
@@ -1495,10 +1485,10 @@ try {
                                                     <?php endif; ?>
                                                 </div>
                                             </div>
-                                            <span class="px-2 py-1 text-xs rounded-full 
-                                                <?= $appointment['status'] === 'approved' ? 'status-approved' : 
+                                            <span class="status-badge <?= $appointment['status'] === 'approved' ? 'status-approved' : 
                                                    ($appointment['status'] === 'pending' ? 'status-pending' : 
-                                                   ($appointment['status'] === 'completed' ? 'status-completed' : 'status-cancelled')) ?>">
+                                                   ($appointment['status'] === 'completed' ? 'status-completed' : 
+                                                   ($appointment['status'] === 'rejected' ? 'status-rejected' : 'status-cancelled'))) ?>">
                                                 <?= ucfirst($appointment['status']) ?>
                                             </span>
                                         </div>
@@ -1517,6 +1507,15 @@ try {
                                             <div class="mt-2 pl-7">
                                                 <p class="text-sm text-gray-700">
                                                     <span class="font-medium">Notes:</span> <?= htmlspecialchars($appointment['notes']) ?>
+                                                </p>
+                                            </div>
+                                        <?php endif; ?>
+                                        
+                                        <!-- Rejection Reason for Rejected Appointments -->
+                                        <?php if ($appointmentTab === 'rejected' && !empty($appointment['rejection_reason'])): ?>
+                                            <div class="mt-3 pl-7">
+                                                <p class="text-sm text-red-700">
+                                                    <span class="font-medium">Rejection Reason:</span> <?= htmlspecialchars($appointment['rejection_reason']) ?>
                                                 </p>
                                             </div>
                                         <?php endif; ?>
@@ -1558,7 +1557,7 @@ try {
                                             <div class="mt-2 pl-7">
                                                 <p class="text-sm text-purple-600">
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 01118 0z" />
                                                     </svg>
                                                     Your appointment has been moved to a future date. Please check back for the new schedule.
                                                 </p>
@@ -1592,6 +1591,19 @@ try {
                                             <?php endif; ?>
                                         <?php endif; ?>
 
+                                        <!-- Contact Support for Approved Appointments -->
+                                        <?php if ($appointmentTab === 'upcoming' && $appointment['status'] === 'approved'): ?>
+                                            <div class="mt-3 pl-7">
+                                                <button onclick="showContactModal()"
+                                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center transition duration-200">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                    </svg>
+                                                    Contact Support to Cancel
+                                                </button>
+                                            </div>
+                                        <?php endif; ?>
+
                                         <!-- Cancellation Reason Display for Cancelled Appointments -->
                                         <?php if ($appointmentTab === 'cancelled' && !empty($appointment['cancel_reason'])): ?>
                                             <div class="mt-3 pl-7">
@@ -1608,6 +1620,142 @@ try {
                             </div>
                         <?php endif; ?>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Tab Content - Now second -->
+        <div class="tab-content <?= $activeTab === 'dashboard' ? 'active' : '' ?>">
+            <div class="stats-card mb-8">
+                <h2 class="text-xl font-semibold mb-4 blue-theme-text">Your Information</h2>
+                
+                <?php if ($userData): ?>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <p class="text-gray-600"><span class="font-semibold">Full Name:</span> <?= htmlspecialchars($userData['full_name']) ?></p>
+                            <p class="text-gray-600"><span class="font-semibold">Age:</span> <?= $userData['age'] ? htmlspecialchars($userData['age']) : 'N/A' ?></p>
+                            <p class="text-gray-600"><span class="font-semibold">Contact:</span> <?= $userData['contact'] ? htmlspecialchars($userData['contact']) : 'N/A' ?></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600"><span class="font-semibold">Address:</span> <?= $userData['address'] ? htmlspecialchars($userData['address']) : 'N/A' ?></p>
+                            <p class="text-gray-600"><span class="font-semibold">Account Status:</span> 
+                                <?= $userData['approved'] ? 'Approved' : 'Pending Approval' ?>
+                            </p>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <p class="text-gray-600">Your account information could not be loaded.</p>
+                <?php endif; ?>
+            </div>
+            
+            <div class="stats-card">
+                <h2 class="text-xl font-semibold mb-4 blue-theme-text">Recent Activities</h2>
+                <div class="space-y-4">
+                    <?php if (!empty($recentActivities)): ?>
+                        <?php foreach ($recentActivities as $activity): 
+                            // Determine status color based on activity status
+                            $statusConfig = [
+                                'class' => '',
+                                'bg' => '',
+                                'border' => ''
+                            ];
+                            
+                            switch($activity['status']) {
+                                case 'pending':
+                                    $statusConfig = [
+                                        'class' => 'status-pending',
+                                        'bg' => 'bg-yellow-50',
+                                        'border' => 'border-yellow-200'
+                                    ];
+                                    break;
+                                case 'approved':
+                                    $statusConfig = [
+                                        'class' => 'status-approved',
+                                        'bg' => 'bg-green-50',
+                                        'border' => 'border-green-200'
+                                    ];
+                                    break;
+                                case 'completed':
+                                    $statusConfig = [
+                                        'class' => 'status-completed',
+                                        'bg' => 'bg-blue-50',
+                                        'border' => 'border-blue-200'
+                                    ];
+                                    break;
+                                case 'cancelled':
+                                    $statusConfig = [
+                                        'class' => 'status-cancelled',
+                                        'bg' => 'bg-red-50',
+                                        'border' => 'border-red-200'
+                                    ];
+                                    break;
+                                case 'rejected':
+                                    $statusConfig = [
+                                        'class' => 'status-rejected',
+                                        'bg' => 'bg-red-50',
+                                        'border' => 'border-red-200'
+                                    ];
+                                    break;
+                                case 'rescheduled':
+                                    $statusConfig = [
+                                        'class' => 'status-rescheduled',
+                                        'bg' => 'bg-purple-50',
+                                        'border' => 'border-purple-200'
+                                    ];
+                                    break;
+                                case 'in_progress':
+                                    $statusConfig = [
+                                        'class' => 'status-completed',
+                                        'bg' => 'bg-blue-50',
+                                        'border' => 'border-blue-200'
+                                    ];
+                                    break;
+                                default:
+                                    $statusConfig = [
+                                        'class' => 'status-pending',
+                                        'bg' => 'bg-gray-50',
+                                        'border' => 'border-gray-200'
+                                    ];
+                            }
+                        ?>
+                            <div class="border-l-4 <?= $statusConfig['border'] ?> <?= $statusConfig['bg'] ?> pl-4 py-4 rounded-r-lg transition-all duration-200 hover:shadow-sm">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <h4 class="font-semibold text-gray-800 text-lg"><?= htmlspecialchars($activity['title']) ?></h4>
+                                            <span class="<?= $statusConfig['class'] ?> status-badge">
+                                                <?= strtoupper($activity['status']) ?>
+                                            </span>
+                                        </div>
+                                        <p class="text-gray-600 mb-2"><?= htmlspecialchars($activity['description']) ?></p>
+                                        <div class="flex items-center text-sm text-gray-500">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <?php if ($activity['type'] === 'appointment'): ?>
+                                                <?= date('F j, Y', strtotime($activity['date'])) ?>
+                                            <?php else: ?>
+                                                <?= date('F j, Y \a\t g:i A', strtotime($activity['created_at'])) ?>
+                                            <?php endif; ?>
+                                            <span class="mx-2">•</span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 01118 0z" />
+                                            </svg>
+                                            <?= ucfirst($activity['type']) ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="text-center py-8">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 01118 0z" />
+                            </svg>
+                            <p class="text-gray-600 text-lg">No recent activities found.</p>
+                            <p class="text-gray-500 mt-2">Your appointments and consultations will appear here.</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -1697,6 +1845,65 @@ try {
         document.getElementById('cancel-modal').classList.add('hidden');
     }
 
+    // Success Modal Functions
+    function showSuccessModal() {
+        const modal = document.getElementById('success-modal');
+        const backdrop = document.getElementById('success-modal-backdrop');
+        const content = document.getElementById('success-modal-content');
+        
+        modal.classList.remove('hidden');
+        
+        setTimeout(() => {
+            backdrop.classList.add('opacity-100');
+            content.classList.add('opacity-100', 'scale-100');
+        }, 10);
+    }
+
+    function hideModal(type) {
+        const modal = document.getElementById(`${type}-modal`);
+        const backdrop = document.getElementById(`${type}-modal-backdrop`);
+        const content = document.getElementById(`${type}-modal-content`);
+        
+        if (backdrop && content) {
+            backdrop.classList.remove('opacity-100');
+            content.classList.remove('opacity-100', 'scale-100');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+    }
+
+    function showErrorModal(message) {
+        document.getElementById('error-message').textContent = message;
+        showModal('error');
+    }
+
+    function showModal(type, message) {
+        const modal = document.getElementById(`${type}-modal`);
+        const messageElement = document.getElementById(`${type}-message`);
+        
+        if (messageElement && message) {
+            messageElement.textContent = message;
+        }
+        
+        modal.classList.remove('hidden');
+        
+        setTimeout(() => {
+            document.getElementById(`${type}-modal-backdrop`).classList.add('opacity-100');
+            document.getElementById(`${type}-modal-content`).classList.add('opacity-100', 'scale-100');
+        }, 10);
+    }
+
+    // Help modal functions
+    function openHelpModal() {
+        document.getElementById('helpModal').classList.remove('hidden');
+    }
+
+    function closeHelpModal() {
+        document.getElementById('helpModal').classList.add('hidden');
+    }
+
     // Enhanced form validation for cancellation
     document.addEventListener('DOMContentLoaded', function() {
         const cancelForm = document.getElementById('cancel-form');
@@ -1735,44 +1942,14 @@ try {
                 hideModal('session');
             }, 3000);
         }
-    });
 
-    // Enhanced modal control functions
-    function showModal(type, message) {
-        const modal = document.getElementById(`${type}-modal`);
-        const messageElement = document.getElementById(`${type}-message`);
-        
-        if (messageElement && message) {
-            messageElement.textContent = message;
-        }
-        
-        modal.classList.remove('hidden');
-        
-        setTimeout(() => {
-            document.getElementById(`${type}-modal-backdrop`).classList.add('opacity-100');
-            document.getElementById(`${type}-modal-content`).classList.add('opacity-100', 'scale-100');
-        }, 10);
-    }
-
-    function hideModal(type) {
-        const modal = document.getElementById(`${type}-modal`);
-        const backdrop = document.getElementById(`${type}-modal-backdrop`);
-        const content = document.getElementById(`${type}-modal-content`);
-        
-        if (backdrop && content) {
-            backdrop.classList.remove('opacity-100');
-            content.classList.remove('opacity-100', 'scale-100');
-            
+        // Auto-show success modal if booking was successful
+        <?php if (isset($_SESSION['booking_success']) && $_SESSION['booking_success']): ?>
             setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
-        }
-    }
-
-    function showErrorModal(message) {
-        document.getElementById('error-message').textContent = message;
-        showModal('error');
-    }
+                showSuccessModal();
+            }, 500);
+        <?php endif; ?>
+    });
 
     // Close modal when clicking outside
     window.onclick = function(event) {
@@ -1785,7 +1962,24 @@ try {
         if (event.target === contactModal) {
             closeContactModal();
         }
+        
+        const successModal = document.getElementById('success-modal');
+        if (event.target === successModal) {
+            hideModal('success');
+        }
+        
+        const errorModal = document.getElementById('error-modal');
+        if (event.target === errorModal) {
+            hideModal('error');
+        }
+        
+        const helpModal = document.getElementById('helpModal');
+        if (event.target === helpModal) {
+            closeHelpModal();
+        }
     }
     </script>
 </body>
 </html>
+
+<!-- Updated Code Here -->
