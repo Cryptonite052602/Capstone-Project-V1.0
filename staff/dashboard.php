@@ -1231,7 +1231,7 @@ try {
     $stmt = $pdo->query("SELECT COUNT(*) FROM sitio1_users WHERE approved = FALSE AND (status IS NULL OR status != 'declined')");
     $stats['unapproved_users'] = $stmt->fetchColumn();
     
-    // Get available slots with accurate booking counts
+    // Get available slots with accurate booking counts - ONLY FUTURE SLOTS
     $stmt = $pdo->prepare("
         SELECT 
             a.*, 
@@ -1241,6 +1241,7 @@ try {
         FROM sitio1_appointments a 
         LEFT JOIN user_appointments ua ON a.id = ua.appointment_id AND ua.status IN ('pending', 'approved', 'completed')
         WHERE a.staff_id = ? 
+        AND (a.date > CURDATE() OR (a.date = CURDATE() AND a.end_time > TIME(NOW())))
         GROUP BY a.id 
         ORDER BY a.date, a.start_time
     ");
@@ -1362,12 +1363,12 @@ function getPhilippineHolidays($year) {
 $currentYear = date('Y');
 $phHolidays = getPhilippineHolidays($currentYear);
 
-// Get available dates for calendar view
+// Get available dates for calendar view - ONLY FUTURE DATES
 $calendarDates = [];
 $currentMonth = date('m');
 $currentYear = date('Y');
 
-// Get all available slots grouped by date
+// Get all available slots grouped by date - ONLY FUTURE SLOTS
 $stmt = $pdo->prepare("
     SELECT 
         a.date, 
@@ -1393,6 +1394,12 @@ foreach ($availableDates as $slot) {
         $dateSlots[$date] = [];
     }
     $dateSlots[$date][] = $slot;
+}
+
+// Find the next available date with slots
+$nextAvailableDate = null;
+if (!empty($availableDates)) {
+    $nextAvailableDate = $availableDates[0]['date'];
 }
 ?>
 
@@ -1473,7 +1480,7 @@ foreach ($availableDates as $slot) {
             color: #16a34a;
         }
         
-        /* Enhanced Calendar Styles */
+        /* Enhanced Calendar Styles - Blue Theme */
         .calendar-day {
             min-height: 80px;
             display: flex;
@@ -1481,48 +1488,85 @@ foreach ($availableDates as $slot) {
             justify-content: center;
             align-items: center;
             transition: all 0.2s ease-in-out;
-            border: 2px solid transparent;
-        }
-
-        .calendar-day:hover:not(.disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            background: white;
         }
 
         .calendar-day.selected {
             border-color: #3b82f6 !important;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            background: #3b82f6 !important;
+            color: white !important;
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+            transform: scale(1.02);
             z-index: 10;
         }
 
         .calendar-day.disabled {
-            opacity: 0.6;
+            opacity: 0.4;
             cursor: not-allowed !important;
+            background: #f8fafc !important;
+            color: #9ca3af !important;
+            border-color: #e5e7eb;
         }
 
         .calendar-day .font-semibold {
             font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .calendar-day .day-indicator {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .calendar-day.has-slots .day-indicator {
+            background: #10b981;
+        }
+
+        .calendar-day.no-slots .day-indicator {
+            background: #ef4444;
         }
 
         /* Time Slot Styles */
         .time-slot {
             transition: all 0.2s ease-in-out;
-            border: 2px solid;
+            border: 2px solid #e5e7eb;
             border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
             cursor: pointer;
+            background: white;
+            position: relative;
         }
 
-        .time-slot:hover:not(.disabled):not(.full) {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        .time-slot.disabled {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+            background: #f8fafc !important;
+            color: #9ca3af !important;
+            border-color: #e5e7eb;
         }
 
         .time-slot.selected {
             border-color: #3b82f6 !important;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            background: #3b82f6 !important;
+            color: white !important;
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+            transform: scale(1.02);
             z-index: 5;
+        }
+
+        .time-slot.selected * {
+            color: white !important;
         }
 
         /* Ensure text visibility in selected states */
@@ -1534,20 +1578,53 @@ foreach ($availableDates as $slot) {
 
         /* Holiday and weekend specific styles */
         .calendar-day.holiday:not(.selected) {
-            background: linear-gradient(135deg, #fed7d7 0%, #feebeb 100%);
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #dc2626;
         }
 
         .calendar-day.weekend:not(.selected) {
-            background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+            background: #eff6ff;
+            border-color: #dbeafe;
+            color: #1e40af;
+        }
+
+        .calendar-day.today:not(.selected) {
+            background: #dbeafe;
+            border-color: #3b82f6;
+            color: #1e40af;
+            font-weight: bold;
         }
         
         /* Modal buttons */
         .modal-button {
-            border-radius: 10px !important;
+            border-radius: 8px !important;
             padding: 12px 24px !important;
             font-weight: 600 !important;
             font-size: 16px !important;
             transition: all 0.3s ease !important;
+        }
+
+        /* Simple hover effect for available dates */
+        .calendar-day:not(.disabled):not(.selected):hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .time-slot:not(.disabled):not(.selected):hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+        
+        /* Button disabled state */
+        .button-disabled {
+            opacity: 0.6;
+            cursor: not-allowed !important;
+            background-color: #9ca3af !important;
+        }
+        .button-disabled:hover {
+            transform: none !important;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
         }
     </style>
 </head>
@@ -1758,14 +1835,22 @@ foreach ($availableDates as $slot) {
                                 <!-- Calendar will be populated by JavaScript -->
                             </div>
                             
-                            <div class="mt-4 flex items-center space-x-4">
+                            <div class="mt-4 flex items-center space-x-4 flex-wrap gap-2">
                                 <div class="flex items-center">
-                                    <div class="w-4 h-4 bg-blue-100 rounded mr-2"></div>
+                                    <div class="w-4 h-4 bg-blue-500 rounded mr-2"></div>
                                     <span class="text-sm">Selected Date</span>
                                 </div>
                                 <div class="flex items-center">
                                     <div class="w-4 h-4 bg-red-100 rounded mr-2"></div>
                                     <span class="text-sm">Holiday</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-4 h-4 bg-blue-100 rounded mr-2"></div>
+                                    <span class="text-sm">Today</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-4 h-4 bg-blue-50 rounded mr-2"></div>
+                                    <span class="text-sm">Weekend</span>
                                 </div>
                                 <div class="flex items-center">
                                     <div class="w-4 h-4 bg-gray-100 rounded mr-2"></div>
@@ -1776,15 +1861,15 @@ foreach ($availableDates as $slot) {
                         
                         <!-- Time Slots Selection -->
                         <div id="timeSlotsSection" class="hidden mb-6 bg-white p-4 rounded-lg shadow">
-                            <h3 class="text-lg font-semibold mb-4 text-blue-700">Select Time Slots for <span id="selectedDateDisplay"></span></h3>
+                            <h3 class="text-lg font-semibold mb-4 text-blue-700">Select Time Slots for <span id="selectedDateDisplay" class="text-blue-600"></span></h3>
                             
                             <div class="mb-4">
                                 <h4 class="font-medium mb-2">Morning Slots (8:00 AM - 12:00 PM)</h4>
-                                <div class="grid grid-cols-2 gap-3">
+                                <div class="grid grid-cols-2 gap-3" id="morningSlotsContainer">
                                     <?php foreach ($morningSlots as $index => $slot): ?>
                                         <div class="time-slot border rounded-lg p-3 cursor-pointer" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
                                             <div class="flex justify-between items-center">
-                                                <span><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></span>
+                                                <span class="font-medium"><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></span>
                                                 <span class="availability-indicator text-sm text-gray-500">Available</span>
                                             </div>
                                         </div>
@@ -1794,11 +1879,11 @@ foreach ($availableDates as $slot) {
                             
                             <div class="mb-6">
                                 <h4 class="font-medium mb-2">Afternoon Slots (1:00 PM - 5:00 PM)</h4>
-                                <div class="grid grid-cols-2 gap-3">
+                                <div class="grid grid-cols-2 gap-3" id="afternoonSlotsContainer">
                                     <?php foreach ($afternoonSlots as $index => $slot): ?>
                                         <div class="time-slot border rounded-lg p-3 cursor-pointer" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
                                             <div class="flex justify-between items-center">
-                                                <span><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></span>
+                                                <span class="font-medium"><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></span>
                                                 <span class="availability-indicator text-sm text-gray-500">Available</span>
                                             </div>
                                         </div>
@@ -1820,8 +1905,8 @@ foreach ($availableDates as $slot) {
                             <input type="hidden" id="selected_date" name="date">
                             <input type="hidden" id="selected_time_slot" name="time_slot">
                             
-                            <button type="button" id="addSlotBtn" class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-medium action-button">
-                                Add Selected Time Slot
+                            <button type="button" id="addSlotBtn" class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-medium action-button button-disabled" disabled>
+                                <i class="fas fa-plus-circle mr-2"></i> Add Selected Time Slot
                             </button>
                         </div>
                     </div>
@@ -2812,6 +2897,7 @@ foreach ($availableDates as $slot) {
     let selectedTimeSlot = null;
     const phHolidays = <?= json_encode($phHolidays) ?>;
     const dateSlots = <?= json_encode($dateSlots) ?>;
+    const nextAvailableDate = '<?= $nextAvailableDate ?>';
 
     function generateCalendar(month, year) {
         const calendarEl = document.getElementById('calendar');
@@ -2834,6 +2920,10 @@ foreach ($availableDates as $slot) {
         // Add cells for each day of the month
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const currentTime = new Date();
+        
+        // Auto-select the next available date on first load
+        let autoSelected = false;
         
         for (let day = 1; day <= daysInMonth; day++) {
             const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
@@ -2842,26 +2932,66 @@ foreach ($availableDates as $slot) {
             const dayCell = document.createElement('div');
             dayCell.classList.add('calendar-day', 'text-center', 'p-2', 'rounded', 'border', 'border-gray-200');
             
+            // Check if it's today
+            const isToday = dateObj.toDateString() === today.toDateString();
+            
             // Check if it's a weekend
             const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
             
             // Check if it's in the past
             const isPast = dateObj < today;
             
+            // Check if it's a holiday
+            const isHoliday = phHolidays.hasOwnProperty(dateStr);
+            
+            // Check if date has available slots
+            const hasSlots = dateSlots.hasOwnProperty(dateStr);
+            
             // Add appropriate classes based on date status
             if (isPast) {
                 dayCell.classList.add('disabled', 'bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
                 dayCell.title = 'This date has passed and cannot be selected';
+            } else if (isHoliday) {
+                dayCell.classList.add('holiday', 'bg-red-50', 'text-red-700', 'border-red-200', 'cursor-not-allowed');
+                dayCell.title = 'Holiday: ' + phHolidays[dateStr];
             } else if (isWeekend) {
                 dayCell.classList.add('weekend', 'bg-blue-50', 'text-blue-700', 'border-blue-200');
+                if (!hasSlots) {
+                    dayCell.classList.add('no-slots');
+                } else {
+                    dayCell.classList.add('has-slots');
+                }
+            } else if (isToday) {
+                dayCell.classList.add('today', 'bg-blue-100', 'text-blue-700', 'border-blue-200');
+                if (!hasSlots) {
+                    dayCell.classList.add('no-slots');
+                } else {
+                    dayCell.classList.add('has-slots');
+                }
             } else {
-                dayCell.classList.add('bg-white', 'text-gray-700', 'hover:bg-blue-50', 'hover:border-blue-300', 'cursor-pointer');
+                dayCell.classList.add('bg-white', 'text-gray-700');
+                if (!hasSlots) {
+                    dayCell.classList.add('no-slots');
+                } else {
+                    dayCell.classList.add('has-slots');
+                }
             }
             
-            // Add selected class if this date is currently selected
-            if (selectedDate === dateStr) {
-                dayCell.classList.remove('bg-white', 'bg-blue-50', 'bg-gray-100');
+            // Auto-select the next available date on first load
+            if (!autoSelected && !isPast && !isHoliday && hasSlots && dateStr === nextAvailableDate) {
                 dayCell.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+                selectedDate = dateStr;
+                autoSelected = true;
+                
+                // Update selected date display
+                document.getElementById('selectedDateDisplay').textContent = `${monthNames[month - 1]} ${day}, ${year}`;
+                document.getElementById('selected_date').value = dateStr;
+                
+                // Show time slots section
+                document.getElementById('timeSlotsSection').classList.remove('hidden');
+                
+                // Update time slots for selected date
+                updateTimeSlotsForDate(dateStr);
             }
             
             // Add day number
@@ -2870,16 +3000,39 @@ foreach ($availableDates as $slot) {
             dayNumber.textContent = day;
             dayCell.appendChild(dayNumber);
             
+            // Add day indicator for slots
+            if (!isPast && !isHoliday) {
+                const dayIndicator = document.createElement('div');
+                dayIndicator.classList.add('day-indicator');
+                dayCell.appendChild(dayIndicator);
+            }
+            
+            // Add holiday indicator
+            if (isHoliday) {
+                const holidayIndicator = document.createElement('div');
+                holidayIndicator.classList.add('text-xs', 'font-medium', 'text-red-500');
+                holidayIndicator.textContent = 'HOLIDAY';
+                dayCell.appendChild(holidayIndicator);
+            }
+            
+            // Add today indicator
+            if (isToday) {
+                const todayIndicator = document.createElement('div');
+                todayIndicator.classList.add('text-xs', 'font-medium', 'text-blue-600');
+                todayIndicator.textContent = 'TODAY';
+                dayCell.appendChild(todayIndicator);
+            }
+            
             // Add weekend indicator
-            if (isWeekend && !isPast) {
+            if (isWeekend && !isPast && !isHoliday) {
                 const weekendIndicator = document.createElement('div');
-                weekendIndicator.classList.add('text-xs', 'font-medium');
+                weekendIndicator.classList.add('text-xs', 'font-medium', 'text-blue-500');
                 weekendIndicator.textContent = 'WEEKEND';
                 dayCell.appendChild(weekendIndicator);
             }
             
             // Add click event if not disabled
-            if (!isPast) {
+            if (!isPast && !isHoliday) {
                 dayCell.addEventListener('click', () => selectDate(dateStr, day, month, year));
             } else {
                 dayCell.style.cursor = 'not-allowed';
@@ -2903,24 +3056,83 @@ foreach ($availableDates as $slot) {
         });
         
         // Add selection to clicked day
-        event.target.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+        event.currentTarget.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
         
         // Show time slots section
         document.getElementById('timeSlotsSection').classList.remove('hidden');
         
-        // Reset time slot selection
+        // Update time slots for selected date
+        updateTimeSlotsForDate(dateStr);
+        
+        // Reset time slot selection and update button state
         selectedTimeSlot = null;
+        updateAddSlotButtonState();
+    }
+    
+    function updateTimeSlotsForDate(dateStr) {
+        const currentDate = new Date();
+        const isToday = dateStr === currentDate.toISOString().split('T')[0];
+        
+        // Reset all time slots
         document.querySelectorAll('.time-slot').forEach(slot => {
-            slot.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+            slot.classList.remove('selected', 'disabled', 'bg-blue-500', 'text-white', 'border-blue-600');
             slot.classList.add('bg-white', 'border-gray-200');
+            slot.style.cursor = 'pointer';
+            
+            // Reset availability indicator
+            const indicator = slot.querySelector('.availability-indicator');
+            indicator.textContent = 'Available';
+            indicator.classList.remove('text-red-500', 'text-green-500');
+            indicator.classList.add('text-gray-500');
+            
+            // Remove existing click events
+            const newSlot = slot.cloneNode(true);
+            slot.parentNode.replaceChild(newSlot, slot);
         });
+        
+        // Add click events to time slots
+        document.querySelectorAll('.time-slot').forEach(slot => {
+            slot.addEventListener('click', function() {
+                if (!this.classList.contains('disabled')) {
+                    selectTimeSlot(this, this.getAttribute('data-time'));
+                }
+            });
+        });
+        
+        // Disable past time slots for today
+        if (isToday) {
+            document.querySelectorAll('.time-slot').forEach(slot => {
+                const timeRange = slot.getAttribute('data-time');
+                const [startTime] = timeRange.split(' - ');
+                const slotDateTime = new Date(`${dateStr}T${startTime}`);
+                
+                if (slotDateTime < currentDate) {
+                    slot.classList.add('disabled');
+                    slot.style.cursor = 'not-allowed';
+                    const indicator = slot.querySelector('.availability-indicator');
+                    indicator.textContent = 'Past';
+                    indicator.classList.remove('text-gray-500');
+                    indicator.classList.add('text-red-500');
+                }
+            });
+        }
+        
+        // Reset time slot selection and update button state
+        selectedTimeSlot = null;
+        updateAddSlotButtonState();
     }
     
     function selectTimeSlot(slotEl, timeRange) {
+        if (slotEl.classList.contains('disabled')) {
+            return;
+        }
+        
         // Remove previous selection
         document.querySelectorAll('.time-slot').forEach(el => {
-            el.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
-            el.classList.add('bg-white', 'border-gray-200');
+            if (!el.classList.contains('disabled')) {
+                el.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+                el.classList.add('bg-white', 'border-gray-200');
+            }
         });
         
         // Add selection to clicked slot
@@ -2929,6 +3141,22 @@ foreach ($availableDates as $slot) {
         
         selectedTimeSlot = timeRange;
         document.getElementById('selected_time_slot').value = timeRange;
+        
+        // Update button state
+        updateAddSlotButtonState();
+    }
+    
+    function updateAddSlotButtonState() {
+        const addSlotBtn = document.getElementById('addSlotBtn');
+        if (selectedDate && selectedTimeSlot) {
+            addSlotBtn.disabled = false;
+            addSlotBtn.classList.remove('button-disabled');
+            addSlotBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+        } else {
+            addSlotBtn.disabled = true;
+            addSlotBtn.classList.add('button-disabled');
+            addSlotBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+        }
     }
     
     function addSelectedSlot() {
@@ -3028,8 +3256,10 @@ foreach ($availableDates as $slot) {
         // Add time slot selection
         document.querySelectorAll('.time-slot').forEach(slot => {
             slot.addEventListener('click', function() {
-                const timeRange = this.getAttribute('data-time');
-                selectTimeSlot(this, timeRange);
+                if (!this.classList.contains('disabled')) {
+                    const timeRange = this.getAttribute('data-time');
+                    selectTimeSlot(this, timeRange);
+                }
             });
         });
         
@@ -3087,6 +3317,3 @@ foreach ($availableDates as $slot) {
     </script>
 </body>
 </html>
-
-
-<!-- HELLO UPDATE NANI SHA NGA CODE HERE KINDLY CHECK -->
