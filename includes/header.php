@@ -193,6 +193,35 @@ $current_page = basename($_SERVER['PHP_SELF']);
         transform: none;
     }
     
+    /* Logo image styles */
+    .logo-image {
+        width: 65px;
+        height: 65px;
+        border-radius: 50%;
+        object-fit: cover;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Header title styles */
+    .header-title-container {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .barangay-text {
+        font-size: 0.875rem;
+        font-weight: 500;
+        line-height: 1;
+        margin-bottom: 2px;
+        opacity: 0.9;
+    }
+    
+    .main-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+        line-height: 1.2;
+    }
+    
     /* Responsive adjustments */
     @media (max-width: 1024px) {
         .staff-nav-container, .user-nav-container {
@@ -236,6 +265,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .time-zone {
             display: none;
         }
+        
+        .logo-image {
+            width: 50px;
+            height: 50px;
+        }
+        
+        .barangay-text {
+            font-size: 0.8rem;
+        }
+        
+        .main-title {
+            font-size: 1.25rem;
+        }
     }
     
     @media (max-width: 640px) {
@@ -264,6 +306,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .nav-tab {
             padding: 0.5rem 1rem;
             font-size: 0.85rem;
+        }
+        
+        .logo-image {
+            width: 45px;
+            height: 45px;
+        }
+        
+        .barangay-text {
+            font-size: 0.75rem;
+        }
+        
+        .main-title {
+            font-size: 1.1rem;
         }
     }
 </style>
@@ -465,13 +520,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <nav class="bg-red-600 text-white shadow-lg sticky top-0 z-50">
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
-                        <div class="h-8 w-8">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 6v12M6 12h12" stroke-linecap="round"/>
-                                <path d="M3 12h2l2 4 3-8 3 8 2-4h2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
+                        <!-- Barangay Toong Logo -->
+                        <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg" 
+                             alt="Barangay Toong Logo" 
+                             class="logo-image">
+                        <!-- Updated Header Title with Barangay Toong text -->
+                        <div class="header-title-container">
+                            <div class="barangay-text">Barangay Toong</div>
+                            <a href="/community-health-tracker/" class="main-title">Health Center Admin Panel</a>
                         </div>
-                        <a href="/community-health-tracker/" class="text-2xl font-bold">STAFF ADMIN</a>
                     </div>
                     
                     <div class="flex items-center space-x-4">
@@ -537,14 +594,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <nav class="bg-purple-600 text-white shadow-lg sticky top-0 z-50">
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
-                        <div class="h-8 w-8">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M12 6v12M6 12h12" stroke-linecap="round" />
-                                <path d="M3 12h2l2 4 3-8 3 8 2-4h2" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
+                        <!-- Barangay Toong Logo -->
+                        <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg" 
+                             alt="Barangay Toong Logo" 
+                             class="logo-image">
+                        <!-- Updated Header Title with Barangay Toong text -->
+                        <div class="header-title-container">
+                            <div class="barangay-text">Barangay Toong</div>
+                            <a href="/community-health-tracker/" class="main-title">Resident Consultation Portal</a>
                         </div>
-                        <a href="/community-health-tracker/" class="text-2xl font-bold">USER RESIDENT</a>
                     </div>
 
                     <div class="flex items-center space-x-4">
@@ -655,7 +713,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <div class="container mx-auto px-4 nav-container flex justify-between items-center">
                 <!-- Logo/Title with two-line text -->
                 <div class="flex items-center">
-                    <img src="asssets/images/Barangay Toong.jpg" alt="Barangay Toong Logo" class="circle-image mr-4">
+                    <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg"
+                         alt="Barangay Toong Logo" 
+                         class="circle-image mr-4">
                     <div class="logo-text">
                         <div class="font-bold text-xl leading-tight">Barangay Toong</div>
                         <div class="text-lg text-gray-700">Monitoring and Tracking</div>
