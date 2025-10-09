@@ -456,7 +456,6 @@ try {
             ua.cancel_reason, 
             ua.cancelled_at,
             ua.processed_at,
-            ua.appointment_ticket,
             ua.rejection_reason
         FROM user_appointments ua
         JOIN sitio1_appointments a ON ua.appointment_id = a.id
@@ -1521,36 +1520,55 @@ try {
                                         <?php endif; ?>
                                         
                                         <!-- Download Section for Approved Appointments -->
-                                        <?php if ($appointment['status'] === 'approved' && !empty($appointment['priority_number'])): ?>
-                                            <div class="mt-3 pl-7 flex flex-wrap gap-2">
-                                                <?php if (!empty($appointment['invoice_number'])): ?>
-                                                    <button onclick="downloadInvoice(<?= $appointment['id'] ?>)" 
-                                                            class="bg-blue-100 text-blue-800 px-3 py-2 rounded-full text-sm font-medium hover:bg-blue-200 flex items-center transition duration-200 ease-in-out transform hover:scale-105 download-btn">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                        </svg>
-                                                        Download Invoice
-                                                    </button>
-                                                <?php endif; ?>
-                                                
-                                                <button onclick="downloadAppointmentTicket(<?= $appointment['id'] ?>)" 
-                                                        class="bg-green-100 text-green-800 px-3 py-2 rounded-full text-sm font-medium hover:bg-green-200 flex items-center transition duration-200 ease-in-out transform hover:scale-105 download-btn">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                                                    </svg>
-                                                    Download Ticket
-                                                </button>
-                                            </div>
-                                        <?php elseif ($appointment['status'] === 'approved' && empty($appointment['priority_number'])): ?>
-                                            <div class="mt-2 pl-7">
-                                                <p class="text-sm text-yellow-600">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                                                    </svg>
-                                                    Ticket will be available after priority number is assigned.
-                                                </p>
-                                            </div>
-                                        <?php endif; ?>
+<?php if ($appointment['status'] === 'approved' && !empty($appointment['priority_number'])): ?>
+    <div class="mt-3 pl-7">
+        <p class="text-sm text-green-600 font-bold mb-2">
+            <strong>Priority Number:</strong> <?= htmlspecialchars($appointment['priority_number']) ?>
+        </p>
+        <div class="flex flex-wrap gap-2">
+            <?php if (!empty($appointment['invoice_number'])): ?>
+                <button onclick="downloadInvoice(<?= $appointment['id'] ?>)" 
+                        class="bg-blue-100 text-blue-800 px-3 py-2 rounded-full text-sm font-medium hover:bg-blue-200 flex items-center transition duration-200 ease-in-out transform hover:scale-105 download-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Download Invoice
+                </button>
+            <?php endif; ?>
+            
+            <button onclick="previewAppointmentTicket(<?= $appointment['id'] ?>)" 
+                    class="bg-purple-100 text-purple-800 px-3 py-2 rounded-full text-sm font-medium hover:bg-purple-200 flex items-center transition duration-200 ease-in-out transform hover:scale-105 download-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Preview Ticket
+            </button>
+            
+            <button onclick="downloadAppointmentTicket(<?= $appointment['id'] ?>)" 
+                    class="bg-green-100 text-green-800 px-3 py-2 rounded-full text-sm font-medium hover:bg-green-200 flex items-center transition duration-200 ease-in-out transform hover:scale-105 download-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                </svg>
+                Download Ticket
+            </button>
+        </div>
+        
+        <!-- Instructions for screenshot -->
+        <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+            <strong>Tip:</strong> Use "Preview Ticket" to view your ticket, then take a screenshot or use your browser's print function to save it as PDF.
+        </div>
+    </div>
+<?php elseif ($appointment['status'] === 'approved' && empty($appointment['priority_number'])): ?>
+    <div class="mt-2 pl-7">
+        <p class="text-sm text-yellow-600">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            Ticket will be available after priority number is assigned.
+        </p>
+    </div>
+<?php endif; ?>
 
                                         <!-- Rescheduled Notice -->
                                         <?php if ($appointment['status'] === 'rescheduled'): ?>
@@ -1768,21 +1786,26 @@ try {
     }
 
     function downloadAppointmentTicket(appointmentId) {
-        // Show loading indicator
-        const button = event.target;
-        const originalText = button.innerHTML;
-        button.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...';
-        button.disabled = true;
-        
-        // Start download
-        window.location.href = '<?= $_SERVER['PHP_SELF'] ?>?tab=appointments&download_ticket=' + appointmentId;
-        
-        // Reset button after 3 seconds
-        setTimeout(() => {
-            button.innerHTML = originalText;
-            button.disabled = false;
-        }, 3000);
-    }
+    // Show loading indicator
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...';
+    button.disabled = true;
+    
+    // Download PDF version
+    window.open('generate_ticket.php?appointment_id=' + appointmentId, '_blank');
+    
+    // Reset button after 3 seconds
+    setTimeout(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }, 3000);
+}
+
+function previewAppointmentTicket(appointmentId) {
+    // Open HTML version for easy screenshot
+    window.open('ticket_preview.php?appointment_id=' + appointmentId, '_blank', 'width=600,height=800');
+}
 
     function validateHealthConcerns() {
         const checkboxes = document.querySelectorAll('input[name="health_concerns[]"]:checked');
