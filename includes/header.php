@@ -323,7 +323,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     }
 </style>
 
-<body class="bg-gray-100">
+<body class="bg-[#3290BF]">
     <?php if (isLoggedIn()): ?>
         <?php if (isAdmin()): ?>
             <!-- Admin Header -->
@@ -709,10 +709,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </style>
     </head>
     <body>
-        <nav class="bg-white text-black shadow-lg sticky top-0 z-50">
-            <div class="container mx-auto px-4 nav-container flex justify-between items-center">
+        <nav class="text-black py-10 px-10 sticky top-0 z-50">
+            <div class="mx-5 py-5 bg-[#FFFFFF] rounded-2xl flex shadow-2xl justify-between items-center">
                 <!-- Logo/Title with two-line text -->
-                <div class="flex items-center">
+                <div class="flex items-center mx-10">
                     <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg"
                          alt="Barangay Toong Logo" 
                          class="circle-image mr-4">
@@ -755,10 +755,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <!-- Book Appointment button - positioned to the right -->
                 <div class="hidden md:flex items-center">
                     <a href="#" onclick="openModal()"
-                        class="bg-[#FC566C] text-white hover:bg-[#f1233f] px-6 py-2 rounded-lg transition flex items-center gap-2 nav-link">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                        class="bg-[#3290BF] text-white hover:bg-[#f1233f] px-6 py-2 mx-10 rounded-full transition flex items-center nav-link">
                         Book Appointment
                     </a>
                 </div>
@@ -773,9 +770,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <a href="#" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded nav-link">Contact</a>
                     <a href="#" onclick="openModal()" 
                        class="block bg-[#FC566C] text-white hover:bg-[#f1233f] px-4 py-3 rounded-lg transition text-center mx-1 mt-2 flex items-center justify-center gap-2 nav-link">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
                         Book Appointment
                     </a>
                 </div>
