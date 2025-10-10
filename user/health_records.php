@@ -71,8 +71,8 @@ try {
             border-left: 4px solid #3b82f6;
         }
         .health-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
         .tab-content {
             display: none;
@@ -89,20 +89,23 @@ try {
             border-radius: 0.5rem;
             padding: 0.75rem 1rem;
             transition: all 0.2s;
+            border: 1px solid transparent;
         }
         .nav-pill.active {
             background-color: #eff6ff;
             color: #3b82f6;
+            border-color: #3b82f6;
         }
         .nav-pill:hover:not(.active) {
             background-color: #f9fafb;
         }
         .info-card {
             background: white;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
             padding: 1.5rem;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             margin-bottom: 1.5rem;
+            border: 1px solid #e5e7eb;
         }
         .info-label {
             color: #6b7280;
@@ -119,23 +122,38 @@ try {
             color: #9ca3af;
             font-style: italic;
         }
+        .status-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+        }
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        .section-title {
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
+    <div class="container mx-auto px-6 py-8 max-w-7xl">
         <!-- Header -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-            <div>
+            <div class="mb-6 md:mb-0">
                 <h1 class="text-3xl font-bold text-gray-800">My Health Profile</h1>
                 <p class="text-gray-600 mt-2">View your medical history and personal health information</p>
             </div>
-            <div class="mt-4 md:mt-0 flex items-center bg-white p-3 rounded-lg shadow-sm">
-                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+            <div class="flex items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
                     <i class="fas fa-user text-blue-500 text-xl"></i>
                 </div>
                 <div>
-                    <p class="font-medium"><?= htmlspecialchars($userFullName) ?></p>
-                    <p class="text-sm text-gray-500">Patient</p>
+                    <p class="font-semibold text-gray-800"><?= htmlspecialchars($userFullName) ?></p>
+                    <p class="text-sm text-gray-500">Patient ID: <?= !empty($patientInfo['id']) ? htmlspecialchars($patientInfo['id']) : 'N/A' ?></p>
                 </div>
             </div>
         </div>
@@ -155,17 +173,17 @@ try {
         <?php endif; ?>
 
         <!-- Tabs Navigation -->
-        <div class="bg-white rounded-lg shadow-sm p-2 mb-6 flex flex-wrap">
-            <button class="nav-pill active flex items-center mr-2 mb-2" data-tab="records">
+        <div class="bg-white rounded-xl shadow-sm p-3 mb-8 flex flex-wrap border border-gray-200">
+            <button class="nav-pill active flex items-center mr-3 mb-2" data-tab="records">
                 <i class="fas fa-file-medical mr-2"></i> Health Records
-                <span class="bg-blue-100 text-blue-800 text-xs font-medium ml-2 px-2 py-0.5 rounded-full">
+                <span class="bg-blue-100 text-blue-800 text-xs font-medium ml-2 px-2.5 py-1 rounded-full">
                     <?= count($healthRecords) ?>
                 </span>
             </button>
-            <button class="nav-pill flex items-center mr-2 mb-2" data-tab="profile">
+            <button class="nav-pill flex items-center mr-3 mb-2" data-tab="profile">
                 <i class="fas fa-user-circle mr-2"></i> Personal Info
             </button>
-            <button class="nav-pill flex items-center mr-2 mb-2" data-tab="medical">
+            <button class="nav-pill flex items-center mr-3 mb-2" data-tab="medical">
                 <i class="fas fa-heartbeat mr-2"></i> Medical Info
             </button>
         </div>
@@ -173,37 +191,44 @@ try {
         <!-- Health Records Tab -->
         <div id="records" class="tab-content active">
             <?php if (empty($healthRecords)): ?>
-                <div class="bg-white p-8 rounded-xl shadow-sm text-center">
-                    <i class="fas fa-file-medical-alt text-4xl text-gray-300 mb-4"></i>
-                    <h3 class="text-xl font-medium text-gray-600 mb-2">No health records yet</h3>
-                    <p class="text-gray-500">Your medical visit records will appear here.</p>
+                <div class="bg-white p-12 rounded-xl shadow-sm text-center border border-gray-200">
+                    <i class="fas fa-file-medical-alt text-5xl text-gray-300 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-gray-600 mb-2">No Health Records Found</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">Your medical visit records will appear here once you have appointments with our healthcare providers.</p>
                 </div>
             <?php else: ?>
-                <div class="grid grid-cols-1 gap-5">
+                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                     <?php foreach ($healthRecords as $record): ?>
-                        <div class="health-card bg-white rounded-xl shadow-sm p-5">
-                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
-                                <div class="mb-3 md:mb-0">
+                        <div class="health-card bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
                                     <h3 class="text-lg font-semibold text-gray-800"><?= ucfirst($record['visit_type'] ?? 'General') ?> Visit</h3>
-                                    <p class="text-gray-500 flex items-center mt-1">
+                                    <p class="text-gray-500 text-sm flex items-center mt-1">
                                         <i class="far fa-calendar-alt mr-2"></i> 
                                         <?= date('M d, Y', strtotime($record['visit_date'] ?? 'now')) ?>
                                     </p>
                                 </div>
-                                <span class="bg-blue-100 text-blue-800 text-xs font-medium px-3 py-1 rounded-full">
+                                <span class="status-badge bg-green-100 text-green-800">
                                     Completed
                                 </span>
                             </div>
                             
-                            <div class="mt-4 flex items-center text-gray-600">
+                            <div class="flex items-center text-gray-700 mb-4">
                                 <i class="fas fa-user-md text-blue-500 mr-2"></i>
                                 <span class="font-medium">Dr. <?= htmlspecialchars($record['doctor_name'] ?? 'Unknown') ?></span>
                             </div>
                             
-                            <div class="mt-5 pt-4 border-t border-gray-100">
+                            <?php if (!empty($record['diagnosis'])): ?>
+                                <div class="mb-4">
+                                    <p class="info-label">Diagnosis</p>
+                                    <p class="info-value text-sm line-clamp-2"><?= htmlspecialchars($record['diagnosis']) ?></p>
+                                </div>
+                            <?php endif; ?>
+                            
+                            <div class="pt-4 border-t border-gray-100">
                                 <button onclick="showRecordDetails(<?= htmlspecialchars(json_encode($record)) ?>)" 
-                                        class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center transition-colors">
-                                    <i class="fas fa-eye mr-2"></i> View Details
+                                        class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg flex items-center justify-center transition-colors font-medium">
+                                    <i class="fas fa-eye mr-2"></i> View Full Details
                                 </button>
                             </div>
                         </div>
@@ -214,43 +239,45 @@ try {
 
         <!-- Personal Profile Tab -->
         <div id="profile" class="tab-content">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <!-- Personal Information -->
                 <div class="info-card">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-user text-blue-500 mr-2"></i> Personal Information
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
+                        <i class="fas fa-user text-blue-500 mr-3"></i> Personal Information
                     </h3>
                     
-                    <div class="space-y-4">
-                        <div>
-                            <p class="info-label">Full Name</p>
-                            <p class="info-value"><?= htmlspecialchars($userFullName) ?></p>
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="info-label">Full Name</p>
+                                <p class="info-value"><?= htmlspecialchars($userFullName) ?></p>
+                            </div>
+                            <div>
+                                <p class="info-label">Email</p>
+                                <p class="info-value"><?= htmlspecialchars($userEmail) ?></p>
+                            </div>
                         </div>
                         
-                        <div>
-                            <p class="info-label">Email</p>
-                            <p class="info-value"><?= htmlspecialchars($userEmail) ?></p>
-                        </div>
-                        
-                        <div>
-                            <p class="info-label">Age</p>
-                            <p class="info-value"><?= !empty($patientInfo['age']) ? htmlspecialchars($patientInfo['age']) : '<span class="empty-value">Not provided</span>' ?></p>
-                        </div>
-                        
-                        <div>
-                            <p class="info-label">Gender</p>
-                            <p class="info-value"><?= !empty($patientInfo['gender']) ? htmlspecialchars($patientInfo['gender']) : '<span class="empty-value">Not provided</span>' ?></p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="info-label">Age</p>
+                                <p class="info-value"><?= !empty($patientInfo['age']) ? htmlspecialchars($patientInfo['age']) : '<span class="empty-value">Not provided</span>' ?></p>
+                            </div>
+                            <div>
+                                <p class="info-label">Gender</p>
+                                <p class="info-value"><?= !empty($patientInfo['gender']) ? htmlspecialchars($patientInfo['gender']) : '<span class="empty-value">Not provided</span>' ?></p>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Contact Information -->
                 <div class="info-card">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-address-card text-blue-500 mr-2"></i> Contact Information
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
+                        <i class="fas fa-address-card text-blue-500 mr-3"></i> Contact Information
                     </h3>
                     
-                    <div class="space-y-4">
+                    <div class="space-y-5">
                         <div>
                             <p class="info-label">Address</p>
                             <p class="info-value"><?= !empty($patientInfo['address']) ? htmlspecialchars($patientInfo['address']) : '<span class="empty-value">Not provided</span>' ?></p>
@@ -271,15 +298,15 @@ try {
                 </div>
                 
                 <!-- Account Information -->
-                <div class="info-card md:col-span-2">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-info-circle text-blue-500 mr-2"></i> Account Information
+                <div class="info-card lg:col-span-2">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
+                        <i class="fas fa-info-circle text-blue-500 mr-3"></i> Account Information
                     </h3>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div>
                             <p class="info-label">User ID</p>
-                            <p class="info-value"><?= htmlspecialchars($userId) ?></p>
+                            <p class="info-value font-mono"><?= htmlspecialchars($userId) ?></p>
                         </div>
                         
                         <div>
@@ -290,7 +317,7 @@ try {
                         <div>
                             <p class="info-label">Account Status</p>
                             <p class="info-value">
-                                <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                                <span class="status-badge bg-green-100 text-green-800">
                                     Active
                                 </span>
                             </p>
@@ -307,14 +334,14 @@ try {
 
         <!-- Medical Information Tab -->
         <div id="medical" class="tab-content">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <!-- Vital Statistics -->
                 <div class="info-card">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-chart-line text-blue-500 mr-2"></i> Vital Statistics
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
+                        <i class="fas fa-chart-line text-blue-500 mr-3"></i> Vital Statistics
                     </h3>
                     
-                    <div class="space-y-4">
+                    <div class="space-y-5">
                         <div>
                             <p class="info-label">Blood Type</p>
                             <p class="info-value"><?= !empty($medicalInfo['blood_type']) ? htmlspecialchars($medicalInfo['blood_type']) : '<span class="empty-value">Not recorded</span>' ?></p>
@@ -341,6 +368,9 @@ try {
                                     $bmi = $weight / ($height * $height);
                                     echo number_format($bmi, 1);
                                 ?>
+                                <span class="text-sm text-gray-500 ml-2">
+                                    (<?= $bmi < 18.5 ? 'Underweight' : ($bmi < 25 ? 'Normal' : ($bmi < 30 ? 'Overweight' : 'Obese')) ?>)
+                                </span>
                             </p>
                         </div>
                         <?php endif; ?>
@@ -349,11 +379,11 @@ try {
                 
                 <!-- Medical Details -->
                 <div class="info-card">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-stethoscope text-blue-500 mr-2"></i> Medical Details
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
+                        <i class="fas fa-stethoscope text-blue-500 mr-3"></i> Medical Details
                     </h3>
                     
-                    <div class="space-y-4">
+                    <div class="space-y-5">
                         <div>
                             <p class="info-label">Allergies</p>
                             <p class="info-value"><?= !empty($medicalInfo['allergies']) ? nl2br(htmlspecialchars($medicalInfo['allergies'])) : '<span class="empty-value">No allergies recorded</span>' ?></p>
@@ -372,9 +402,9 @@ try {
                 </div>
                 
                 <!-- Medical History -->
-                <div class="info-card md:col-span-2">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-history text-blue-500 mr-2"></i> Medical History
+                <div class="info-card lg:col-span-2">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
+                        <i class="fas fa-history text-blue-500 mr-3"></i> Medical History
                     </h3>
                     
                     <div>
@@ -384,9 +414,9 @@ try {
                 </div>
                 
                 <!-- Family History -->
-                <div class="info-card md:col-span-2">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-users text-blue-500 mr-2"></i> Family Medical History
+                <div class="info-card lg:col-span-2">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
+                        <i class="fas fa-users text-blue-500 mr-3"></i> Family Medical History
                     </h3>
                     
                     <div>
@@ -399,16 +429,21 @@ try {
     </div>
 
     <!-- Record Details Modal -->
-    <div id="recordModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-semibold">Health Record Details</h3>
-                <button onclick="document.getElementById('recordModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700 text-2xl">
+    <div id="recordModal" class="fixed inset-0 modal-overlay overflow-y-auto h-full w-full hidden z-50 transition-opacity duration-300">
+        <div class="relative top-10 mx-auto p-6 border w-11/12 md:w-3/4 lg:w-2/3 xl:w-1/2 shadow-xl rounded-xl bg-white transform transition-transform duration-300">
+            <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+                <h3 class="text-2xl font-bold text-gray-800">Health Record Details</h3>
+                <button onclick="closeRecordModal()" class="text-gray-500 hover:text-gray-700 text-2xl bg-gray-100 hover:bg-gray-200 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
                     &times;
                 </button>
             </div>
-            <div id="recordDetails" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+            <div id="recordDetails" class="space-y-6 max-h-[70vh] overflow-y-auto pr-4 custom-scrollbar">
                 <!-- Dynamic content will be inserted here -->
+            </div>
+            <div class="mt-6 pt-4 border-t border-gray-200 flex justify-end">
+                <button onclick="closeRecordModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2.5 rounded-lg font-medium transition-colors">
+                    Close
+                </button>
             </div>
         </div>
     </div>
@@ -439,67 +474,110 @@ try {
             // Format the record data with proper fallbacks
             const patientName = record.patient_name || '<?= htmlspecialchars($userFullName) ?>';
             const doctorName = record.doctor_name || 'Unknown';
-            const visitDate = record.visit_date ? new Date(record.visit_date).toLocaleDateString() : 'Unknown date';
+            const visitDate = record.visit_date ? new Date(record.visit_date).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                weekday: 'long'
+            }) : 'Unknown date';
             const visitType = record.visit_type ? record.visit_type.charAt(0).toUpperCase() + record.visit_type.slice(1) : 'General';
             const diagnosis = record.diagnosis || 'No diagnosis recorded';
             const treatment = record.treatment || 'No treatment recorded';
             const prescription = record.prescription || 'No prescription';
             const notes = record.notes || 'No additional notes';
-            const nextVisit = record.next_visit_date ? new Date(record.next_visit_date).toLocaleDateString() : null;
+            const nextVisit = record.next_visit_date ? new Date(record.next_visit_date).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric'
+            }) : null;
             
             detailsDiv.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <h4 class="font-medium text-gray-700">Patient</h4>
-                        <p>${patientName}</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h4 class="font-semibold text-blue-800 mb-2">Patient Information</h4>
+                        <p class="text-blue-700">${patientName}</p>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-gray-700">Doctor</h4>
-                        <p>${doctorName}</p>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h4 class="font-semibold text-green-800 mb-2">Attending Doctor</h4>
+                        <p class="text-green-700">Dr. ${doctorName}</p>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-gray-700">Date</h4>
-                        <p>${visitDate}</p>
+                    
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold text-gray-800 mb-2">Visit Date</h4>
+                        <p class="text-gray-700">${visitDate}</p>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-gray-700">Visit Type</h4>
-                        <p>${visitType}</p>
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <h4 class="font-semibold text-purple-800 mb-2">Visit Type</h4>
+                        <p class="text-purple-700">${visitType}</p>
                     </div>
-                    <div class="md:col-span-2">
-                        <h4 class="font-medium text-gray-700">Diagnosis</h4>
-                        <p class="whitespace-pre-line bg-gray-50 p-3 rounded">${diagnosis}</p>
+                    
+                    <div class="md:col-span-2 bg-white border border-gray-200 p-4 rounded-lg">
+                        <h4 class="font-semibold text-gray-800 mb-3 flex items-center">
+                            <i class="fas fa-diagnosis text-red-500 mr-2"></i> Diagnosis
+                        </h4>
+                        <p class="text-gray-700 whitespace-pre-line bg-gray-50 p-4 rounded border">${diagnosis}</p>
                     </div>
-                    <div class="md:col-span-2">
-                        <h4 class="font-medium text-gray-700">Treatment</h4>
-                        <p class="whitespace-pre-line bg-gray-50 p-3 rounded">${treatment}</p>
+                    
+                    <div class="md:col-span-2 bg-white border border-gray-200 p-4 rounded-lg">
+                        <h4 class="font-semibold text-gray-800 mb-3 flex items-center">
+                            <i class="fas fa-band-aid text-green-500 mr-2"></i> Treatment
+                        </h4>
+                        <p class="text-gray-700 whitespace-pre-line bg-gray-50 p-4 rounded border">${treatment}</p>
                     </div>
-                    <div class="md:col-span-2">
-                        <h4 class="font-medium text-gray-700">Prescription</h4>
-                        <p class="whitespace-pre-line bg-gray-50 p-3 rounded">${prescription}</p>
+                    
+                    <div class="md:col-span-2 bg-white border border-gray-200 p-4 rounded-lg">
+                        <h4 class="font-semibold text-gray-800 mb-3 flex items-center">
+                            <i class="fas fa-pills text-yellow-500 mr-2"></i> Prescription
+                        </h4>
+                        <p class="text-gray-700 whitespace-pre-line bg-gray-50 p-4 rounded border">${prescription}</p>
                     </div>
-                    <div class="md:col-span-2">
-                        <h4 class="font-medium text-gray-700">Notes</h4>
-                        <p class="whitespace-pre-line bg-gray-50 p-3 rounded">${notes}</p>
+                    
+                    <div class="md:col-span-2 bg-white border border-gray-200 p-4 rounded-lg">
+                        <h4 class="font-semibold text-gray-800 mb-3 flex items-center">
+                            <i class="fas fa-notes-medical text-blue-500 mr-2"></i> Additional Notes
+                        </h4>
+                        <p class="text-gray-700 whitespace-pre-line bg-gray-50 p-4 rounded border">${notes}</p>
                     </div>
+                    
                     ${nextVisit ? `
-                    <div class="md:col-span-2">
-                        <h4 class="font-medium text-gray-700">Next Visit</h4>
-                        <p>${nextVisit}</p>
+                    <div class="md:col-span-2 bg-orange-50 border border-orange-200 p-4 rounded-lg">
+                        <h4 class="font-semibold text-orange-800 mb-2 flex items-center">
+                            <i class="fas fa-calendar-check text-orange-500 mr-2"></i> Next Appointment
+                        </h4>
+                        <p class="text-orange-700 font-medium">${nextVisit}</p>
                     </div>
                     ` : ''}
                 </div>
             `;
             
             modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.style.opacity = '1';
+            }, 10);
+        }
+        
+        function closeRecordModal() {
+            const modal = document.getElementById('recordModal');
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
         }
         
         // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('recordModal');
             if (event.target === modal) {
-                modal.classList.add('hidden');
+                closeRecordModal();
             }
         };
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeRecordModal();
+            }
+        });
     </script>
 </body>
 </html>
