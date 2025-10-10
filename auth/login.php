@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <script>
                 setTimeout(function() {
-                    window.location.href = '/community-health-tracker/user/dashboard.php';
+                    window.location.href = '../user/dashboard.php';
                 }, 1000);
             </script>
             <style>
@@ -162,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <script>
                 setTimeout(function() {
-                    window.location.href = '/community-health-tracker/index.php';
+                    window.location.href = '../index.php';
                 }, 1000);
             </script>
             <style>

@@ -595,7 +595,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <!-- Barangay Toong Logo -->
-                        <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg" alt="Barangay Toong Logo"
+                        <img src="../asssets/images/logoCHMTracking.png" alt="Barangay Toong Logo"
                             class="logo-image">
                         <!-- Updated Header Title with Barangay Toong text -->
                         <div class="header-title-container">
@@ -610,7 +610,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <span class="font-medium"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
                         </div>
                         <!-- Enhanced Logout Button -->
-                        <a href="/community-health-tracker/auth/logout.php" class="logout-btn flex items-center space-x-2">
+                        <a href="../auth/logout_user.php" class="logout-btn flex items-center space-x-2">
                             <i class="fas fa-sign-out-alt"></i>
                             <span>Logout</span>
                         </a>
@@ -621,19 +621,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="container mx-auto px-4 flex items-center justify-between user-nav-container">
                         <div class="nav-tab-container">
                             <div class="nav-connection">
-                                <a href="/community-health-tracker/user/dashboard.php"
+                                <a href="dashboard.php"
                                     class="nav-tab <?= ($current_page == 'dashboard.php') ? 'active' : '' ?>">
                                     Dashboard
                                 </a>
                             </div>
                             <div class="nav-connection">
-                                <a href="/community-health-tracker/user/health_records.php"
+                                <a href="health_records.php"
                                     class="nav-tab <?= ($current_page == 'health_records.php') ? 'active' : '' ?>">
                                     My Record
                                 </a>
                             </div>
                             <div class="nav-connection">
-                                <a href="/community-health-tracker/user/announcements.php"
+                                <a href="announcements.php"
                                     class="nav-tab <?= ($current_page == 'announcements.php') ? 'active' : '' ?>">
                                     Announcements
                                 </a>
@@ -869,7 +869,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <p>Sign in to your resident account</p>
                         </div>
 
-                        <form method="POST" action="/community-health-tracker/auth/login.php" class="space-y-4">
+                        <form method="POST" action="auth/login.php" class="space-y-4">
 
                             <input type="hidden" name="role" value="user">
                             <div class="my-10 mx-auto w-full max-w-md">
@@ -1032,7 +1032,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <p class="text-gray-600 mt-1 text-sm md:text-base">Add your account credentials</p>
                         </div>
 
-                        <form method="POST" action="/community-health-tracker/auth/register.php" class="px-4 pb-6"
+                        <form method="POST" action="auth/register.php" class="px-4 pb-6"
                             id="secondRegisterForm">
                             <div class="mx-auto w-full max-w-md space-y-4">
                                 <!-- Hidden fields to pass data from first form -->
