@@ -27,9 +27,7 @@ if (ini_get("session.use_cookies")) {
 session_destroy();
 
 // Determine redirect URL
-$redirectUrl = ($redirectRole === 'admin' || $redirectRole === 'staff') 
-    ? '/community-health-tracker/index-admin-staff.php' 
-    : '/community-health-tracker/index.php';
+$redirectUrl = '../index-admin-staff.php' ;
 
 // Show loading animation before redirect
 echo <<<HTML

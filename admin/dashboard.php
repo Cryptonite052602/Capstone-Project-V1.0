@@ -182,7 +182,7 @@ try {
                 </h2>
                 
                 <div class="space-y-4">
-                    <a href="/community-health-tracker/admin/add-staff" class="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                    <a href="staff_docs.php" class="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                         <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center mr-3">
                             <i class="fas fa-user-plus text-white"></i>
                         </div>
@@ -192,7 +192,7 @@ try {
                         </div>
                     </a>
                     
-                    <a href="/community-health-tracker/admin/generate-report" class="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                    <a href="reports.php" class="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                         <div class="w-10 h-10 rounded-lg bg-green-600 flex items-center justify-center mr-3">
                             <i class="fas fa-file-export text-white"></i>
                         </div>

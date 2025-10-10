@@ -1,8 +1,6 @@
 <?php
 // Create the API endpoint file: /community-health-tracker/api/get_invoice.php
 // This should be a separate file, but here's the code for it:
-
-<?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
 

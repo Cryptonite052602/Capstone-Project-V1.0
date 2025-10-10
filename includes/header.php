@@ -12,6 +12,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -26,40 +27,48 @@ $current_page = basename($_SERVER['PHP_SELF']);
     .sidebar {
         transition: transform 0.3s ease-in-out;
     }
-    
+
     .sidebar-hidden {
         transform: translateX(-100%);
     }
-    
+
     /* Optional: Add overlay for mobile */
     .overlay {
         background: rgba(0, 0, 0, 0.5);
         transition: opacity 0.3s ease-in-out;
     }
-    
+
     .overlay-hidden {
         opacity: 0;
         pointer-events: none;
     }
-    
+
     /* Blinking colon animation */
     @keyframes blink {
-        0% { opacity: 1; }
-        50% { opacity: 0; }
-        100% { opacity: 1; }
+        0% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0;
+        }
+
+        100% {
+            opacity: 1;
+        }
     }
-    
+
     .blinking-colon {
         animation: blink 1s infinite;
     }
-    
+
     /* CLEAN: Simple Navigation Tab Styles */
     .nav-tab-container {
         display: flex;
         align-items: center;
         gap: 0.5rem;
     }
-    
+
     .nav-tab {
         position: relative;
         transition: all 0.3s ease;
@@ -68,12 +77,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
         font-weight: 600;
         z-index: 1;
     }
-    
+
     .nav-tab.active {
         background: rgba(255, 255, 255, 0.2);
         transform: translateY(-1px);
     }
-    
+
     .nav-tab.active::after {
         content: '';
         position: absolute;
@@ -85,12 +94,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
         background: white;
         border-radius: 2px;
     }
-    
+
     .nav-tab:hover:not(.active) {
         background: rgba(255, 255, 255, 0.1);
     }
 
-    
+
     /* CLEAN: Simple Logout Button */
     .logout-btn {
         background: #ef4444;
@@ -99,12 +108,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
         font-weight: 600;
         transition: all 0.3s ease;
     }
-    
+
     .logout-btn:hover {
         background: #dc2626;
         transform: translateY(-1px);
     }
-    
+
     /* NEW: Improved time display containers - Horizontal layout */
     .time-display-container {
         display: flex;
@@ -115,22 +124,22 @@ $current_page = basename($_SERVER['PHP_SELF']);
         margin-left: auto;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
-    
+
     .staff-time-container {
         background-color: rgba(255, 255, 255, 0.15);
     }
-    
+
     .user-time-container {
         background-color: rgba(255, 255, 255, 0.15);
     }
-    
+
     /* NEW: Horizontal time display styles */
     .time-display-horizontal {
         display: flex;
         align-items: center;
         gap: 0.75rem;
     }
-    
+
     .date-display-horizontal {
         display: flex;
         align-items: center;
@@ -139,7 +148,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         letter-spacing: 0.5px;
         white-space: nowrap;
     }
-    
+
     .time-display-main-horizontal {
         display: flex;
         align-items: center;
@@ -148,14 +157,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
         letter-spacing: 1px;
         white-space: nowrap;
     }
-    
+
     .time-separator {
         height: 24px;
         width: 1px;
         background: rgba(255, 255, 255, 0.4);
         margin: 0 0.5rem;
     }
-    
+
     .time-zone {
         font-size: 0.75rem;
         margin-left: 0.25rem;
@@ -163,7 +172,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         font-style: italic;
         font-weight: 500;
     }
-    
+
     /* Hidden refresh indicator */
     .refresh-indicator {
         position: absolute;
@@ -172,27 +181,27 @@ $current_page = basename($_SERVER['PHP_SELF']);
         overflow: hidden;
         opacity: 0;
     }
-    
+
     /* Form validation styles */
     .form-input:invalid {
         border-color: #fca5a5;
     }
-    
+
     .form-input:valid {
         border-color: #86efac;
     }
-    
+
     .continue-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
         transform: none;
     }
-    
+
     .continue-btn:disabled:hover {
         background: #FC566C;
         transform: none;
     }
-    
+
     /* Logo image styles */
     .logo-image {
         width: 65px;
@@ -201,13 +210,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
         object-fit: cover;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
-    
+
     /* Header title styles */
     .header-title-container {
         display: flex;
         flex-direction: column;
     }
-    
+
     .barangay-text {
         font-size: 0.875rem;
         font-weight: 500;
@@ -215,108 +224,110 @@ $current_page = basename($_SERVER['PHP_SELF']);
         margin-bottom: 2px;
         opacity: 0.9;
     }
-    
+
     .main-title {
         font-size: 1.5rem;
         font-weight: bold;
         line-height: 1.2;
     }
-    
+
     /* Responsive adjustments */
     @media (max-width: 1024px) {
-        .staff-nav-container, .user-nav-container {
+
+        .staff-nav-container,
+        .user-nav-container {
             flex-direction: column;
             gap: 0.5rem;
         }
-        
+
         .time-display-container {
             margin-left: 0;
             align-self: flex-end;
         }
-        
+
         .nav-tab-container {
             justify-content: center;
         }
     }
-    
+
     @media (max-width: 768px) {
         .time-display-container {
             padding: 0.5rem 1rem;
         }
-        
+
         .date-display-horizontal {
             font-size: 0.8rem;
         }
-        
+
         .time-display-main-horizontal {
             font-size: 0.9rem;
         }
-        
+
         .nav-tab {
             padding: 0.6rem 1.2rem;
             font-size: 0.9rem;
         }
-        
+
         .logout-btn {
             padding: 0.6rem 1.2rem;
             font-size: 0.9rem;
         }
-        
+
         .time-zone {
             display: none;
         }
-        
+
         .logo-image {
             width: 50px;
             height: 50px;
         }
-        
+
         .barangay-text {
             font-size: 0.8rem;
         }
-        
+
         .main-title {
             font-size: 1.25rem;
         }
     }
-    
+
     @media (max-width: 640px) {
         .time-display-horizontal {
             flex-direction: column;
             gap: 0.2rem;
         }
-        
+
         .time-separator {
             display: none;
         }
-        
+
         .date-display-horizontal {
             font-size: 0.75rem;
         }
-        
+
         .time-display-main-horizontal {
             font-size: 0.85rem;
         }
-        
+
         .nav-tab-container {
             flex-wrap: wrap;
             justify-content: center;
         }
-        
+
         .nav-tab {
             padding: 0.5rem 1rem;
             font-size: 0.85rem;
         }
-        
+
         .logo-image {
             width: 45px;
             height: 45px;
         }
-        
+
         .barangay-text {
             font-size: 0.75rem;
         }
-        
+
         .main-title {
             font-size: 1.1rem;
         }
@@ -329,17 +340,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <!-- Admin Header -->
             <nav class="bg-[#3C96E1] text-white shadow-lg sticky top-0 z-50 h-[80px]">
                 <div class="flex justify-between items-center h-full px-4">
-                    
+
                     <!-- LEFT: Hamburger + Profile -->
                     <div class="flex items-center space-x-4">
                         <!-- Hamburger -->
-                        <button id="hamburger" 
-                            class="h-10 w-8 cursor-pointer hover:text-gray-200 transition-colors"
+                        <button id="hamburger" class="h-10 w-8 cursor-pointer hover:text-gray-200 transition-colors"
                             onclick="toggleSidebar()">
-                            <svg xmlns="http://www.w3.org/2000/svg" 
-                                viewBox="0 0 24 24" fill="none" 
-                                stroke="currentColor" stroke-width="2" 
-                                class="w-6 h-6">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" class="w-6 h-6">
                                 <path d="M3 12h18M3 6h18M3 18h18" stroke-linecap="round" />
                             </svg>
                         </button>
@@ -353,31 +361,25 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- CENTER: Search -->
                     <div class="flex-1 flex items-center justify-center">
                         <div class="relative w-full max-w-md">
-                            <input 
-                                type="search" 
-                                placeholder="Search"
-                                class="h-10 w-full rounded-3xl pl-7 pr-10 border border-gray-300 
+                            <input type="search" placeholder="Search" class="h-10 w-full rounded-3xl pl-7 pr-10 border border-gray-300 
                                     focus:border-blue-500 focus:outline-none focus:ring-2 
-                                    focus:ring-blue-200 transition-colors text-black"
-                            >
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                class="h-5 w-5 absolute right-3 top-1/2 transform -translate-y-1/2 
-                                    text-gray-400 hover:text-gray-600 cursor-pointer transition-colors" 
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    focus:ring-blue-200 transition-colors text-black">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 absolute right-3 top-1/2 transform -translate-y-1/2 
+                                    text-gray-400 hover:text-gray-600 cursor-pointer transition-colors" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
                         </div>
                     </div>
-                    
+
                     <!-- RIGHT: Enhanced Logout Button -->
                     <div class="flex items-center">
-                        <a href="/community-health-tracker/auth/logout.php" 
-                            class="logout-btn flex items-center space-x-2">
+                        <a href="../auth/logout.php" class="logout-btn flex items-center space-x-2">
                             <i class="fas fa-sign-out-alt"></i>
                             <span>Logout</span>
                         </a>
@@ -386,15 +388,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </nav>
 
             <!-- SIDEBAR -->
-            <div id="sidebar" 
-                class="sidebar bg-white py-2 w-[90px] h-screen rounded-tr-lg rounded-br-lg 
+            <div id="sidebar" class="sidebar bg-white py-2 w-[90px] h-screen rounded-tr-lg rounded-br-lg 
                     shadow-[4px_4px_8px_0px_rgba(0,0,0,0.1)] fixed transition-all duration-300 
                     left-0 top-[80px] z-20 overflow-y-auto">
                 <div class="container mx-auto px-4">
                     <div class="ml-3 mt-7 space-y-[3rem]">
                         <!-- Dashboard -->
                         <div class="div">
-                            <a href="/community-health-tracker/admin/dashboard.php">
+                            <a href="../admin/dashboard.php">
                                 <svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="24.000000pt" height="24.000000pt"
                                     viewBox="0 0 24.000000 24.000000" preserveAspectRatio="xMidYMid meet">
                                     <g transform="translate(0.000000,24.000000) scale(0.100000,-0.100000)" fill="#FC566C"
@@ -409,7 +410,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                         <!-- Manage Accounts -->
                         <div class="div">
-                            <a href="/community-health-tracker/admin/manage_accounts.php">
+                            <a href="../admin/manage_accounts.php">
                                 <svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="24.000000pt" height="24.000000pt"
                                     viewBox="0 0 24.000000 24.000000" preserveAspectRatio="xMidYMid meet">
                                     <g transform="translate(0.000000,24.000000) scale(0.100000,-0.100000)" fill="#FC566C"
@@ -425,7 +426,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                         <!-- Patient Info -->
                         <div class="div">
-                            <a href="/community-health-tracker/admin/patient_info.php">
+                            <a href="../admin/patient_info.php">
                                 <svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="24.000000pt" height="24.000000pt"
                                     viewBox="0 0 24.000000 24.000000" preserveAspectRatio="xMidYMid meet">
                                     <g transform="translate(0.000000,24.000000) scale(0.100000,-0.100000)" fill="#FC566C"
@@ -442,14 +443,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                         <!-- Reports -->
                         <div class="div">
-                            <a href="/community-health-tracker/admin/reports.php">
+                            <a href="../admin/reports.php">
                                 <svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="24.000000pt" height="24.000000pt"
                                     viewBox="0 0 24.000000 24.000000" preserveAspectRatio="xMidYMid meet">
                                     <g transform="translate(0.000000,24.000000) scale(0.100000,-0.100000)" fill="#FC566C"
                                         stroke="none">
                                         <path
                                             d="M64 207 c-3 -8 -4 -45 -2 -83 l3 -69 70 0 70 0 3 53 c2 43 -1 58 -20 82 -20 24 -30 29 -71 29 -31 1 -49 -4 -53 -12z m62 -29 c4 -6 -3 -19 -16 -30 -28 -22 -30 -21 -23 15 5 28 26 36 39 15z m34 -46 c0 -5 -9 -17 -20 -27 -19 -18 -22 -18 -37 -2 -16 16 -16 17 4 17 12 0 25 5 28 10 8 12 25 13 25 2z" />
-                                        <path d="M30 115 c0 -88 7 -95 94 -95 77 0 71 18 -6 22 l-63 3 -3 73 c-4 95 -22 93 -22 -3z" />
+                                        <path
+                                            d="M30 115 c0 -88 7 -95 94 -95 77 0 71 18 -6 22 l-63 3 -3 73 c-4 95 -22 93 -22 -3z" />
                                     </g>
                                 </svg>
                             </a>
@@ -457,7 +459,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                         <!-- Appointments -->
                         <div class="div">
-                            <a href="/community-health-tracker/admin/appointments.php">
+                            <a href="../admin/appointments.php">
                                 <svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="22.000000pt" height="24.000000pt"
                                     viewBox="0 0 22.000000 24.000000" preserveAspectRatio="xMidYMid meet">
                                     <g transform="translate(0.000000,24.000000) scale(0.100000,-0.100000)" fill="#FC566C"
@@ -473,7 +475,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                         <!-- Schedules -->
                         <div class="div">
-                            <a href="/community-health-tracker/admin/staff_schedules.php">
+                            <a href="../admin/staff_schedules.php">
                                 <svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="24.000000pt" height="24.000000pt"
                                     viewBox="0 0 24.000000 24.000000" preserveAspectRatio="xMidYMid meet">
                                     <g transform="translate(0.000000,24.000000) scale(0.100000,-0.100000)" fill="#FC566C"
@@ -488,7 +490,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                     <!-- LOGOUT CONTENT -->
                     <div class="ml-3.5 mt-[8rem]">
-                        <a href="/community-health-tracker/auth/logout.php">
+                        <a href="../auth/logout.php">
                             <svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="22.000000pt" height="22.000000pt"
                                 viewBox="0 0 22.000000 22.000000" preserveAspectRatio="xMidYMid meet">
                                 <g transform="translate(0.000000,22.000000) scale(0.100000,-0.100000)" fill="#000000"
@@ -521,21 +523,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <!-- Barangay Toong Logo -->
-                        <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg" 
-                             alt="Barangay Toong Logo" 
-                             class="logo-image">
+                        <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg" alt="Barangay Toong Logo"
+                            class="logo-image">
                         <!-- Updated Header Title with Barangay Toong text -->
                         <div class="header-title-container">
                             <div class="barangay-text">Barangay Toong</div>
                             <a href="/community-health-tracker/" class="main-title">Health Center Admin Panel</a>
                         </div>
                     </div>
-                    
+
                     <div class="flex items-center space-x-4">
                         <span class="font-medium">Welcome, <?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
                         <!-- Enhanced Logout Button -->
-                        <a href="/community-health-tracker/auth/logout.php" 
-                           class="logout-btn flex items-center space-x-2">
+                        <a href="/community-health-tracker/auth/logout.php" class="logout-btn flex items-center space-x-2">
                             <i class="fas fa-sign-out-alt"></i>
                             <span>Logout</span>
                         </a>
@@ -546,25 +546,25 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="container mx-auto px-4 flex items-center justify-between staff-nav-container">
                         <div class="nav-tab-container">
                             <div class="nav-connection">
-                                <a href="/community-health-tracker/staff/dashboard.php" 
-                                   class="nav-tab <?= ($current_page == 'dashboard.php') ? 'active' : '' ?>">
+                                <a href="/community-health-tracker/staff/dashboard.php"
+                                    class="nav-tab <?= ($current_page == 'dashboard.php') ? 'active' : '' ?>">
                                     Dashboard
                                 </a>
                             </div>
                             <div class="nav-connection">
-                                <a href="/community-health-tracker/staff/existing_info_patients.php" 
-                                   class="nav-tab <?= ($current_page == 'existing_info_patients.php') ? 'active' : '' ?>">
+                                <a href="/community-health-tracker/staff/existing_info_patients.php"
+                                    class="nav-tab <?= ($current_page == 'existing_info_patients.php') ? 'active' : '' ?>">
                                     Medical Records
                                 </a>
                             </div>
                             <div class="nav-connection">
-                                <a href="/community-health-tracker/staff/announcements.php" 
-                                   class="nav-tab <?= ($current_page == 'announcements.php') ? 'active' : '' ?>">
+                                <a href="/community-health-tracker/staff/announcements.php"
+                                    class="nav-tab <?= ($current_page == 'announcements.php') ? 'active' : '' ?>">
                                     Announcements
                                 </a>
                             </div>
                         </div>
-                        
+
                         <!-- NEW: Date and Time Display - Horizontal layout on the right side -->
                         <div class="time-display-container staff-time-container">
                             <div class="time-display-horizontal">
@@ -595,9 +595,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <!-- Barangay Toong Logo -->
-                        <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg" 
-                             alt="Barangay Toong Logo" 
-                             class="logo-image">
+                        <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg" alt="Barangay Toong Logo"
+                            class="logo-image">
                         <!-- Updated Header Title with Barangay Toong text -->
                         <div class="header-title-container">
                             <div class="barangay-text">Barangay Toong</div>
@@ -611,8 +610,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <span class="font-medium"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
                         </div>
                         <!-- Enhanced Logout Button -->
-                        <a href="/community-health-tracker/auth/logout.php"
-                            class="logout-btn flex items-center space-x-2">
+                        <a href="/community-health-tracker/auth/logout.php" class="logout-btn flex items-center space-x-2">
                             <i class="fas fa-sign-out-alt"></i>
                             <span>Logout</span>
                         </a>
@@ -624,24 +622,24 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <div class="nav-tab-container">
                             <div class="nav-connection">
                                 <a href="/community-health-tracker/user/dashboard.php"
-                                   class="nav-tab <?= ($current_page == 'dashboard.php') ? 'active' : '' ?>">
+                                    class="nav-tab <?= ($current_page == 'dashboard.php') ? 'active' : '' ?>">
                                     Dashboard
                                 </a>
                             </div>
                             <div class="nav-connection">
                                 <a href="/community-health-tracker/user/health_records.php"
-                                   class="nav-tab <?= ($current_page == 'health_records.php') ? 'active' : '' ?>">
+                                    class="nav-tab <?= ($current_page == 'health_records.php') ? 'active' : '' ?>">
                                     My Record
                                 </a>
                             </div>
                             <div class="nav-connection">
                                 <a href="/community-health-tracker/user/announcements.php"
-                                   class="nav-tab <?= ($current_page == 'announcements.php') ? 'active' : '' ?>">
+                                    class="nav-tab <?= ($current_page == 'announcements.php') ? 'active' : '' ?>">
                                     Announcements
                                 </a>
                             </div>
                         </div>
-                        
+
                         <!-- NEW: Date and Time Display - Horizontal layout on the right side -->
                         <div class="time-display-container user-time-container">
                             <div class="time-display-horizontal">
@@ -673,12 +671,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
             .mobile-menu {
                 display: none;
             }
+
             .mobile-menu.active {
                 display: block;
             }
+
             .touch-target {
                 position: relative;
             }
+
             .touch-target::before {
                 content: '';
                 position: absolute;
@@ -688,6 +689,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 width: 40px;
                 height: 40px;
             }
+
             .circle-image {
                 width: 65px;
                 height: 65px;
@@ -695,787 +697,829 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 object-fit: cover;
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             }
+
             .nav-container {
                 padding-top: 1rem;
                 padding-bottom: 1rem;
             }
+
             .logo-text {
                 line-height: 1.2;
             }
+
             .nav-link {
                 font-size: 1.1rem;
                 padding: 0.5rem 1rem;
             }
         </style>
-    </head>
-    <body>
-        <nav class="text-black py-10 px-10 sticky top-0 z-50">
-            <div class="mx-5 py-5 bg-[#FFFFFF] rounded-2xl flex shadow-2xl justify-between items-center">
-                <!-- Logo/Title with two-line text -->
-                <div class="flex items-center mx-10">
-                    <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg"
-                         alt="Barangay Toong Logo" 
-                         class="circle-image mr-4">
-                    <div class="logo-text">
-                        <div class="font-bold text-xl leading-tight">Barangay Toong</div>
-                        <div class="text-lg text-gray-700">Monitoring and Tracking</div>
-                    </div>
-                </div>
+        </head>
 
-                <!-- Mobile menu button - hidden on desktop -->
-                <button class="md:hidden touch-target p-2" onclick="toggleMobileMenu()">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                    </svg>
-                </button>
-
-                <!-- Desktop navigation - centered nav list -->
-                <div class="hidden md:flex items-center flex-1 justify-center">
-                    <!-- Centered nav links -->
-                    <ul class="flex items-center space-x-8 font-semibold">
-                        <li>
-                            <a href="#"
-                                class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Home</a>
-                        </li>
-                        <li>
-                            <a href="#"
-                                class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">About</a>
-                        </li>
-                        <li>
-                            <a href="#"
-                                class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Services</a>
-                        </li>
-                        <li>
-                            <a href="#"
-                                class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Contact</a>
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- Book Appointment button - positioned to the right -->
-                <div class="hidden md:flex items-center">
-                    <a href="#" onclick="openModal()"
-                        class="bg-[#3290BF] text-white hover:bg-[#f1233f] px-6 py-2 mx-10 rounded-full transition flex items-center nav-link">
-                        Book Appointment
-                    </a>
-                </div>
-            </div>
-
-            <!-- Mobile menu content - only shows on mobile -->
-            <div id="mobile-menu" class="mobile-menu md:hidden bg-white border-t">
-                <div class="px-2 pt-2 pb-3 space-y-1">
-                    <a href="#" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded nav-link">Home</a>
-                    <a href="#" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded nav-link">About</a>
-                    <a href="#" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded nav-link">Services</a>
-                    <a href="#" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded nav-link">Contact</a>
-                    <a href="#" onclick="openModal()" 
-                       class="block bg-[#FC566C] text-white hover:bg-[#f1233f] px-4 py-3 rounded-lg transition text-center mx-1 mt-2 flex items-center justify-center gap-2 nav-link">
-                        Book Appointment
-                    </a>
-                </div>
-            </div>
-        </nav>
-
-        <style>
-            /* Mobile menu styles */
-            .mobile-menu {
-                transition: all 0.3s ease;
-                max-height: 0;
-                overflow: hidden;
-            }
-            
-            .mobile-menu-open {
-                max-height: 1000px;
-            }
-            
-            /* Better touch targets for mobile */
-            .touch-target {
-                min-height: 48px;
-                min-width: 48px;
-            }
-        </style>
-
-        <script>
-            // Mobile menu toggle
-            function toggleMobileMenu() {
-                const mobileMenu = document.getElementById('mobile-menu');
-                mobileMenu.classList.toggle('mobile-menu-open');
-            }
-            
-            // Close mobile menu when clicking outside
-            document.addEventListener('click', function(event) {
-                const mobileMenu = document.getElementById('mobile-menu');
-                const mobileMenuButton = document.querySelector('.md\\:hidden.touch-target');
-                
-                if (mobileMenu && mobileMenuButton && 
-                    !mobileMenu.contains(event.target) && 
-                    !mobileMenuButton.contains(event.target) &&
-                    mobileMenu.classList.contains('mobile-menu-open')) {
-                    mobileMenu.classList.remove('mobile-menu-open');
-                }
-            });
-        </script>
-
-        <!-- Login Modal -->
-        <div id="loginModal"
-            class="fixed inset-0 hidden z-50 h-full w-full backdrop-blur-sm bg-black/30 flex justify-center items-center">
-            <div class="relative bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl mx-auto h-[650px] mt-[5px]">
-
-                <!-- Close Icon (X) -->
-                <button onclick="closeModal()"
-                    class="absolute top-5 right-6 text-white text-bold bg-black rounded-full p-2 hover:bg-gray-800">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-
-                <div id="mainModal">
-                    <div class="flex mx-3 my-10 h-[50px]">
-                        <img src="./asssets/images/check-icon.png" alt="check-icon" class="h-15 w-15">
-                        <p class="text-[15px] text-justify font-medium text-center justify-center">To access
-                            records
-                            and appointments, please log in with your authorized account or register for a new
-                            account to securely continue using the system today online.</p>
-                    </div>
-
-                    <div class="flex text-white gap-4 mx-4 h-[60px] text-center justify-center text-lg">
-                        <button id="openLogin"
-                            class="bg-[#FC566C] w-[300px] h-[60px] rounded flex items-center justify-center hover:bg-[#f1233f]">
-                            Login
-                        </button>
-
-                        <button id="openRegister"
-                            class="bg-[#FC566C] w-[300px] h-[60px] rounded flex items-center justify-center hover:bg-[#f1233f]">
-                            Register
-                        </button>
-                    </div>
-
-                    <div class="m-4 h-[390px]">
-                        <img src="./asssets/images/healthcare.png" alt="" class="w-full h-full object-cover">
-                    </div>
-                </div>
-
-                <!-- New Login Form Modal -->
-                <div id="loginFormModal" class="hidden animate__animated animate__fadeInRight px-4">
-                    <div class="items-center text-center mt-10">
-                        <h2 class="text-[25px] text-[#FC566C] font-semibold">Access Your Account</h2>
-                        <p>Sign in to your resident account</p>
-                    </div>
-
-                    <form method="POST" action="/community-health-tracker/auth/login.php" class="space-y-4">
-
-                    <input type="hidden" name="role" value="user">
-                        <div class="my-10 mx-auto w-full max-w-md">
-                            <!-- Username -->
-                            <div class="mb-4">
-                                <label class="block text-left" for="">Username <span
-                                        class="text-red-500">*</span></label>
-                                <input type="text" name="username" id="username" placeholder="Enter Username" class="mt-2 w-full p-4 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#3C96E1] form-input" />
-                            </div>
-
-                            <!-- Password -->
-                            <div class="mb-4">
-                                <label class="block text-left" for="password">Password <span
-                                        class="text-red-500">*</span></label>
-                                <div class="relative mt-2">
-                                    <input id="password" name="password" type="password" placeholder="Password" class="w-full p-4 pr-10 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#3C96E1] form-input" />
-                                    <button type="button" onclick="togglePassword()"
-                                        class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
-                                        <i id="eyeIcon" class="fas fa-eye"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Forgot Password -->
-                            <div class="mt-3 font-medium text-left text-md">
-                                <a href="#" class="text-black hover:underline">Forgot your password?</a>
-                            </div>
-
-                            <!-- Login Button -->
-                            <div class="mt-6">
-                                <button type="submit"
-                                    class="bg-[#FC566C] w-full p-3 rounded text-white hover:bg-[#f1233f]">Login</button>
-                            </div>
-
-                            <!-- Register Link -->
-                            <div class="flex justify-center mt-5 text-md font-semibold space-x-1">
-                                <p>Don't have an account?</p>
-                                <button id="loginToRegister" type="button"
-                                    class="text-[#FC566C] hover:underline">Register</button>
-                            </div>
+        <body>
+            <nav class="text-black py-10 px-9 sticky top-0 z-50">
+                <div class="mx-5 py-5 bg-[#FFFFFF] rounded-2xl flex shadow-2xl justify-between items-center">
+                    <!-- Logo/Title with two-line text -->
+                    <div class="flex items-center mx-16">
+                        <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg" alt="Barangay Toong Logo"
+                            class="circle-image mr-4">
+                        <div class="logo-text">
+                            <div class="font-bold text-xl leading-tight">Barangay Toong</div>
+                            <div class="text-lg text-gray-700">Monitoring and Tracking</div>
                         </div>
-                    </form>
-                </div>
-
-                <!-- First Registration Modal -->
-                <div id="registerFormModal" class="hidden animate__animated animate__fadeInRight">
-                    <div class="items-center text-center pt-4 md:pt-6 pb-2 md:pb-4 px-4">
-                        <h2 class="text-xl md:text-[25px] font-bold text-[#FC566C]">Register Your Account</h2>
-                        <p class="text-sm md:text-base mt-1">Sign up to your resident account</p>
                     </div>
-                    
-                    <?php if (!empty($error)): ?>
-                        <div class="mx-auto w-full max-w-lg bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 text-sm md:text-base" role="alert">
-                            <span class="block sm:inline"><?php echo htmlspecialchars($error); ?></span>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if (!empty($success)): ?>
-                        <div class="mx-auto w-full max-w-lg bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4 text-sm md:text-base" role="alert">
-                            <span class="block sm:inline"><?php echo htmlspecialchars($success); ?></span>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <form id="firstRegisterForm" class="space-y-4">
-                        <div class="mx-auto w-full max-w-lg px-4 md:px-6 pb-4">
-                            <div class="mb-4">
-                                <label for="full_name" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
-                                <input type="text" id="full_name" name="full_name" placeholder="Full Name" 
-                                    value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>"
-                                    class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input" required />
-                            </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                <div>
-                                    <label for="age" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Age <span class="text-red-500">*</span></label>
-                                    <input type="number" id="age" name="age" placeholder="Age" min="1" max="120"
-                                        value="<?php echo isset($_POST['age']) ? htmlspecialchars($_POST['age']) : ''; ?>"
-                                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input" required />
-                                </div>
-
-                                <div>
-                                    <label for="gender" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Gender <span class="text-red-500">*</span></label>
-                                    <select id="gender" name="gender" 
-                                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input" required>
-                                        <option value="" disabled selected>Select Gender</option>
-                                        <option value="male" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'male') ? 'selected' : ''; ?>>Male</option>
-                                        <option value="female" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'female') ? 'selected' : ''; ?>>Female</option>
-                                        <option value="other" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'other') ? 'selected' : ''; ?>>Other</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label for="contact" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Contact Number <span class="text-red-500">*</span></label>
-                                    <input type="tel" id="contact" name="contact" placeholder="Contact Number"
-                                        value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>"
-                                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input" required />
-                                </div>
-                            </div>
-
-                            <div class="mb-6">
-                                <label for="address" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Address<span class="text-red-500">*</span></label>
-                                <input type="text" id="address" name="address" placeholder="Address"
-                                    value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>"
-                                    class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input" required />
-                            </div>
-
-                            <button type="button" id="openSecondRegister"
-                                class="bg-[#FC566C] w-full p-3 rounded-md text-white hover:bg-[#f1233f] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base font-medium transition-colors duration-200 continue-btn"
-                                disabled>
-                                Continue
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2" fill="none"
-                                    viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
-
-                            <div class="flex flex-col md:flex-row justify-center mt-4 text-sm md:text-base font-medium space-y-1 md:space-y-0 md:space-x-1">
-                                <p>Already have an account?</p>
-                                <button id="registerToLogin" type="button"
-                                    class="text-[#FC566C] hover:underline">Login</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Second Registration Modal -->
-                <div id="secondRegisterFormModal" class="hidden animate__animated animate__fadeInRight">
-                    <button class="h-8 w-8 rounded-full mt-4 ml-4 flex items-center justify-center hover:bg-gray-100 transition-colors" id="backToFirstRegister" aria-label="Back">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-[#FC566C]">
-                            <path d="M15.75 19.5L8.25 12l7.5-7.5v15z" />
+                    <!-- Mobile menu button - hidden on desktop -->
+                    <button class="md:hidden touch-target p-2" onclick="toggleMobileMenu()">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 6h16M4 12h16M4 18h16"></path>
                         </svg>
                     </button>
 
-                    <div class="items-center text-center pt-2 md:pt-4 pb-2 md:pb-4 px-4">
-                        <h2 class="text-xl md:text-2xl font-bold text-[#FC566C]">Complete Your Registration</h2>
-                        <p class="text-gray-600 mt-1 text-sm md:text-base">Add your account credentials</p>
+                    <!-- Desktop navigation - centered nav list -->
+                    <div class="hidden md:flex items-center flex-1 justify-center">
+                        <!-- Centered nav links -->
+                        <ul class="flex items-center space-x-8 font-semibold">
+                            <li>
+                                <a href="#"
+                                    class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Home</a>
+                            </li>
+                            <li>
+                                <a href="#"
+                                    class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">About</a>
+                            </li>
+                            <li>
+                                <a href="#"
+                                    class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Services</a>
+                            </li>
+                            <li>
+                                <a href="#"
+                                    class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Contact</a>
+                            </li>
+                        </ul>
                     </div>
 
-                    <form method="POST" action="/community-health-tracker/auth/register.php" class="px-4 pb-6" id="secondRegisterForm">
-                        <div class="mx-auto w-full max-w-md space-y-4">
-                            <!-- Hidden fields to pass data from first form -->
-                            <input type="hidden" name="full_name" id="hidden_full_name" value="">
-                            <input type="hidden" name="age" id="hidden_age" value="">
-                            <input type="hidden" name="gender" id="hidden_gender" value="">
-                            <input type="hidden" name="contact" id="hidden_contact" value="">
-                            <input type="hidden" name="address" id="hidden_address" value="">
-                            
-                            <div class="space-y-4">
-                                <div>
-                                    <label for="username" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Username <span class="text-red-500">*</span></label>
-                                    <input type="text" id="username" name="username" placeholder="Username"
-                                        value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>"
-                                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input" required />
-                                </div>
-                                
-                                <div>
-                                    <label for="email" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
-                                    <input type="email" id="email" name="email" placeholder="Email"
-                                        value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"
-                                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input" required />
-                                </div>
+                    <!-- Book Appointment button - positioned to the right -->
+                    <div class="hidden md:flex items-center">
+                        <a href="#" onclick="openModal()"
+                            class="bg-[#3290BF] mx-16 py-4  px-8 text-lg hover:bg-[#5EB0D9] text-white rounded-full">
+                            Book Appointment
+                        </a>
+                    </div>
+                </div>
 
-                                <div>
-                                    <label for="password" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Password <span class="text-red-500">*</span></label>
-                                    <input type="password" id="password" name="password" placeholder="Password (min 8 characters)"
-                                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input" 
-                                        minlength="8" required />
-                                    <p class="text-xs text-gray-500 mt-1">Password must be at least 8 characters</p>
-                                </div>
+                <!-- Mobile menu content - only shows on mobile -->
+                <div id="mobile-menu" class="mobile-menu md:hidden bg-white border-t">
+                    <div class="px-2 pt-2 pb-3 space-y-1">
+                        <a href="#" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded nav-link">Home</a>
+                        <a href="#" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded nav-link">About</a>
+                        <a href="#" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded nav-link">Services</a>
+                        <a href="#" class="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded nav-link">Contact</a>
+                        <a href="#" onclick="openModal()"
+                            class="block bg-[#FC566C] text-white hover:bg-[#f1233f] px-5 py-3 rounded-lg transition text-center mx-1 mt-2 flex items-center justify-center gap-2 nav-link">
+                            Book Appointment
+                        </a>
+                    </div>
+                </div>
+            </nav>
 
-                                <div>
-                                    <label for="confirm_password" class="block text-sm md:text-base font-medium text-gray-700 mb-1">Confirm Password <span class="text-red-500">*</span></label>
-                                    <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password"
-                                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input" 
-                                        minlength="8" required />
-                                    <p id="passwordMatchError" class="text-xs text-red-500 mt-1 hidden">Passwords do not match</p>
-                                </div>
-                            </div>
+            <style>
+                /* Mobile menu styles */
+                .mobile-menu {
+                    transition: all 0.3s ease;
+                    max-height: 0;
+                    overflow: hidden;
+                }
 
-                            <button type="submit" id="submitButton"
-                                class="bg-[#FC566C] w-full p-3 rounded-md mt-2 text-white hover:bg-[#f1233f] transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base continue-btn">
-                                Complete Registration
+                .mobile-menu-open {
+                    max-height: 1000px;
+                }
+
+                /* Better touch targets for mobile */
+                .touch-target {
+                    min-height: 48px;
+                    min-width: 48px;
+                }
+            </style>
+
+            <script>
+                // Mobile menu toggle
+                function toggleMobileMenu() {
+                    const mobileMenu = document.getElementById('mobile-menu');
+                    mobileMenu.classList.toggle('mobile-menu-open');
+                }
+
+                // Close mobile menu when clicking outside
+                document.addEventListener('click', function (event) {
+                    const mobileMenu = document.getElementById('mobile-menu');
+                    const mobileMenuButton = document.querySelector('.md\\:hidden.touch-target');
+
+                    if (mobileMenu && mobileMenuButton &&
+                        !mobileMenu.contains(event.target) &&
+                        !mobileMenuButton.contains(event.target) &&
+                        mobileMenu.classList.contains('mobile-menu-open')) {
+                        mobileMenu.classList.remove('mobile-menu-open');
+                    }
+                });
+            </script>
+
+            <!-- Login Modal -->
+            <div id="loginModal"
+                class="fixed inset-0 hidden z-50 h-full w-full backdrop-blur-sm bg-black/30 flex justify-center items-center">
+                <div class="relative bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl mx-auto h-[650px] mt-[5px]">
+
+                    <!-- Close Icon (X) -->
+                    <button onclick="closeModal()"
+                        class="absolute top-5 right-6 text-white text-bold bg-black rounded-full p-2 hover:bg-gray-800">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+
+                    <div id="mainModal">
+                        <div class="flex mx-3 my-10 h-[50px]">
+                            <img src="./asssets/images/check-icon.png" alt="check-icon" class="h-15 w-15">
+                            <p class="text-[15px] text-justify font-medium text-center justify-center">To access
+                                records
+                                and appointments, please log in with your authorized account or register for a new
+                                account to securely continue using the system today online.</p>
+                        </div>
+
+                        <div class="flex text-white gap-4 mx-4 h-[60px] text-center justify-center text-lg">
+                            <button id="openLogin"
+                                class="bg-[#FC566C] w-[300px] h-[60px] rounded flex items-center justify-center hover:bg-[#f1233f]">
+                                Login
+                            </button>
+
+                            <button id="openRegister"
+                                class="bg-[#FC566C] w-[300px] h-[60px] rounded flex items-center justify-center hover:bg-[#f1233f]">
+                                Register
                             </button>
                         </div>
-                    </form>
+
+                        <div class="m-4 h-[390px]">
+                            <img src="./asssets/images/healthcare.png" alt="" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+
+                    <!-- New Login Form Modal -->
+                    <div id="loginFormModal" class="hidden animate__animated animate__fadeInRight px-4">
+                        <div class="items-center text-center mt-10">
+                            <h2 class="text-[25px] text-[#FC566C] font-semibold">Access Your Account</h2>
+                            <p>Sign in to your resident account</p>
+                        </div>
+
+                        <form method="POST" action="/community-health-tracker/auth/login.php" class="space-y-4">
+
+                            <input type="hidden" name="role" value="user">
+                            <div class="my-10 mx-auto w-full max-w-md">
+                                <!-- Username -->
+                                <div class="mb-4">
+                                    <label class="block text-left" for="">Username <span
+                                            class="text-red-500">*</span></label>
+                                    <input type="text" name="username" id="username" placeholder="Enter Username"
+                                        class="mt-2 w-full p-4 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#3C96E1] form-input" />
+                                </div>
+
+                                <!-- Password -->
+                                <div class="mb-4">
+                                    <label class="block text-left" for="password">Password <span
+                                            class="text-red-500">*</span></label>
+                                    <div class="relative mt-2">
+                                        <input id="password" name="password" type="password" placeholder="Password"
+                                            class="w-full p-4 pr-10 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#3C96E1] form-input" />
+                                        <button type="button" onclick="togglePassword()"
+                                            class="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500">
+                                            <i id="eyeIcon" class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Forgot Password -->
+                                <div class="mt-3 font-medium text-left text-md">
+                                    <a href="#" class="text-black hover:underline">Forgot your password?</a>
+                                </div>
+
+                                <!-- Login Button -->
+                                <div class="mt-6">
+                                    <button type="submit"
+                                        class="bg-[#FC566C] w-full p-3 rounded text-white hover:bg-[#f1233f]">Login</button>
+                                </div>
+
+                                <!-- Register Link -->
+                                <div class="flex justify-center mt-5 text-md font-semibold space-x-1">
+                                    <p>Don't have an account?</p>
+                                    <button id="loginToRegister" type="button"
+                                        class="text-[#FC566C] hover:underline">Register</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- First Registration Modal -->
+                    <div id="registerFormModal" class="hidden animate__animated animate__fadeInRight">
+                        <div class="items-center text-center pt-4 md:pt-6 pb-2 md:pb-4 px-4">
+                            <h2 class="text-xl md:text-[25px] font-bold text-[#FC566C]">Register Your Account</h2>
+                            <p class="text-sm md:text-base mt-1">Sign up to your resident account</p>
+                        </div>
+
+                        <?php if (!empty($error)): ?>
+                            <div class="mx-auto w-full max-w-lg bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 text-sm md:text-base"
+                                role="alert">
+                                <span class="block sm:inline"><?php echo htmlspecialchars($error); ?></span>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if (!empty($success)): ?>
+                            <div class="mx-auto w-full max-w-lg bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4 text-sm md:text-base"
+                                role="alert">
+                                <span class="block sm:inline"><?php echo htmlspecialchars($success); ?></span>
+                            </div>
+                        <?php endif; ?>
+
+                        <form id="firstRegisterForm" class="space-y-4">
+                            <div class="mx-auto w-full max-w-lg px-4 md:px-6 pb-4">
+                                <div class="mb-4">
+                                    <label for="full_name"
+                                        class="block text-sm md:text-base font-medium text-gray-700 mb-1">Full Name <span
+                                            class="text-red-500">*</span></label>
+                                    <input type="text" id="full_name" name="full_name" placeholder="Full Name"
+                                        value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>"
+                                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input"
+                                        required />
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                    <div>
+                                        <label for="age"
+                                            class="block text-sm md:text-base font-medium text-gray-700 mb-1">Age <span
+                                                class="text-red-500">*</span></label>
+                                        <input type="number" id="age" name="age" placeholder="Age" min="1" max="120"
+                                            value="<?php echo isset($_POST['age']) ? htmlspecialchars($_POST['age']) : ''; ?>"
+                                            class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input"
+                                            required />
+                                    </div>
+
+                                    <div>
+                                        <label for="gender"
+                                            class="block text-sm md:text-base font-medium text-gray-700 mb-1">Gender <span
+                                                class="text-red-500">*</span></label>
+                                        <select id="gender" name="gender"
+                                            class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input"
+                                            required>
+                                            <option value="" disabled selected>Select Gender</option>
+                                            <option value="male" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'male') ? 'selected' : ''; ?>>Male</option>
+                                            <option value="female" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'female') ? 'selected' : ''; ?>>Female</option>
+                                            <option value="other" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'other') ? 'selected' : ''; ?>>Other</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label for="contact"
+                                            class="block text-sm md:text-base font-medium text-gray-700 mb-1">Contact Number
+                                            <span class="text-red-500">*</span></label>
+                                        <input type="tel" id="contact" name="contact" placeholder="Contact Number"
+                                            value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>"
+                                            class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input"
+                                            required />
+                                    </div>
+                                </div>
+
+                                <div class="mb-6">
+                                    <label for="address"
+                                        class="block text-sm md:text-base font-medium text-gray-700 mb-1">Address<span
+                                            class="text-red-500">*</span></label>
+                                    <input type="text" id="address" name="address" placeholder="Address"
+                                        value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>"
+                                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input"
+                                        required />
+                                </div>
+
+                                <button type="button" id="openSecondRegister"
+                                    class="bg-[#FC566C] w-full p-3 rounded-md text-white hover:bg-[#f1233f] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base font-medium transition-colors duration-200 continue-btn"
+                                    disabled>
+                                    Continue
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+
+                                <div
+                                    class="flex flex-col md:flex-row justify-center mt-4 text-sm md:text-base font-medium space-y-1 md:space-y-0 md:space-x-1">
+                                    <p>Already have an account?</p>
+                                    <button id="registerToLogin" type="button"
+                                        class="text-[#FC566C] hover:underline">Login</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Second Registration Modal -->
+                    <div id="secondRegisterFormModal" class="hidden animate__animated animate__fadeInRight">
+                        <button
+                            class="h-8 w-8 rounded-full mt-4 ml-4 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                            id="backToFirstRegister" aria-label="Back">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                                class="w-5 h-5 text-[#FC566C]">
+                                <path d="M15.75 19.5L8.25 12l7.5-7.5v15z" />
+                            </svg>
+                        </button>
+
+                        <div class="items-center text-center pt-2 md:pt-4 pb-2 md:pb-4 px-4">
+                            <h2 class="text-xl md:text-2xl font-bold text-[#FC566C]">Complete Your Registration</h2>
+                            <p class="text-gray-600 mt-1 text-sm md:text-base">Add your account credentials</p>
+                        </div>
+
+                        <form method="POST" action="/community-health-tracker/auth/register.php" class="px-4 pb-6"
+                            id="secondRegisterForm">
+                            <div class="mx-auto w-full max-w-md space-y-4">
+                                <!-- Hidden fields to pass data from first form -->
+                                <input type="hidden" name="full_name" id="hidden_full_name" value="">
+                                <input type="hidden" name="age" id="hidden_age" value="">
+                                <input type="hidden" name="gender" id="hidden_gender" value="">
+                                <input type="hidden" name="contact" id="hidden_contact" value="">
+                                <input type="hidden" name="address" id="hidden_address" value="">
+
+                                <div class="space-y-4">
+                                    <div>
+                                        <label for="username"
+                                            class="block text-sm md:text-base font-medium text-gray-700 mb-1">Username <span
+                                                class="text-red-500">*</span></label>
+                                        <input type="text" id="username" name="username" placeholder="Username"
+                                            value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>"
+                                            class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input"
+                                            required />
+                                    </div>
+
+                                    <div>
+                                        <label for="email"
+                                            class="block text-sm md:text-base font-medium text-gray-700 mb-1">Email <span
+                                                class="text-red-500">*</span></label>
+                                        <input type="email" id="email" name="email" placeholder="Email"
+                                            value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"
+                                            class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input"
+                                            required />
+                                    </div>
+
+                                    <div>
+                                        <label for="password"
+                                            class="block text-sm md:text-base font-medium text-gray-700 mb-1">Password <span
+                                                class="text-red-500">*</span></label>
+                                        <input type="password" id="password" name="password"
+                                            placeholder="Password (min 8 characters)"
+                                            class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input"
+                                            minlength="8" required />
+                                        <p class="text-xs text-gray-500 mt-1">Password must be at least 8 characters</p>
+                                    </div>
+
+                                    <div>
+                                        <label for="confirm_password"
+                                            class="block text-sm md:text-base font-medium text-gray-700 mb-1">Confirm
+                                            Password <span class="text-red-500">*</span></label>
+                                        <input type="password" id="confirm_password" name="confirm_password"
+                                            placeholder="Confirm Password"
+                                            class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm md:text-base form-input"
+                                            minlength="8" required />
+                                        <p id="passwordMatchError" class="text-xs text-red-500 mt-1 hidden">Passwords do not
+                                            match</p>
+                                    </div>
+                                </div>
+
+                                <button type="submit" id="submitButton"
+                                    class="bg-[#FC566C] w-full p-3 rounded-md mt-2 text-white hover:bg-[#f1233f] transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base continue-btn">
+                                    Complete Registration
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
-        </div>
-    <?php endif; ?>
+        <?php endif; ?>
 
-    <main class="container mx-auto mt-24"> <!-- Added mt-24 to account for the fixed header height -->
-        <!-- Your main content here -->
-    </main>
+        <main class="container mx-auto mt-24"> <!-- Added mt-24 to account for the fixed header height -->
+            <!-- Your main content here -->
+        </main>
 
-    <!-- Hidden refresh indicator -->
-    <div id="refreshIndicator" class="refresh-indicator"></div>
+        <!-- Hidden refresh indicator -->
+        <div id="refreshIndicator" class="refresh-indicator"></div>
 
-    <script>
-        // Function to update Philippine time in real-time
-        function updatePhilippineTime() {
-            const now = new Date();
-            
-            // Get the current time in the Philippines (UTC+8)
-            // Since we're using the server's timezone setting (Asia/Manila),
-            // we can use local time methods
-            const hours = now.getHours();
-            const minutes = now.getMinutes().toString().padStart(2, '0');
-            const seconds = now.getSeconds().toString().padStart(2, '0');
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            
-            // Convert to 12-hour format
-            let hours12 = hours % 12;
-            hours12 = hours12 ? hours12 : 12; // Convert 0 to 12
-            const hoursStr = hours12.toString().padStart(2, '0');
-            
-            // Format date
-            const options = { month: 'short', day: 'numeric', year: 'numeric' };
-            const dateStr = now.toLocaleDateString('en-US', options);
-            
-            // Update the elements for user
-            if (document.getElementById('ph-date')) {
-                document.getElementById('ph-date').textContent = dateStr;
-                document.getElementById('ph-hours').textContent = hoursStr;
-                document.getElementById('ph-minutes').textContent = minutes;
-                document.getElementById('ph-seconds').textContent = seconds;
-                document.getElementById('ph-ampm').textContent = ampm;
-            }
-            
-            // Update the elements for staff
-            if (document.getElementById('staff-ph-date')) {
-                document.getElementById('staff-ph-date').textContent = dateStr;
-                document.getElementById('staff-ph-hours').textContent = hoursStr;
-                document.getElementById('staff-ph-minutes').textContent = minutes;
-                document.getElementById('staff-ph-seconds').textContent = seconds;
-                document.getElementById('staff-ph-ampm').textContent = ampm;
-            }
-            
-            // Update the hidden refresh indicator (for debugging/verification)
-            document.getElementById('refreshIndicator').textContent = `Last refresh: ${now.toLocaleTimeString()}`;
-        }
-        
-        // Update time immediately and then every second
-        updatePhilippineTime();
-        let timeInterval = setInterval(updatePhilippineTime, 1000);
-        
-        // Advanced time synchronization function
-        function synchronizeTime() {
-            const now = new Date();
-            const milliseconds = now.getMilliseconds();
-            
-            // Calculate delay to sync with the next second change
-            const delay = 1000 - milliseconds;
-            
-            // Clear existing interval
-            clearInterval(timeInterval);
-            
-            // Set new interval that starts at the next second
-            setTimeout(() => {
-                updatePhilippineTime();
-                timeInterval = setInterval(updatePhilippineTime, 1000);
-            }, delay);
-        }
-        
-        // Start synchronized timekeeping
-        synchronizeTime();
-        
-        // Clean Navigation Tab Interaction
-        document.addEventListener('DOMContentLoaded', function() {
-            const navTabs = document.querySelectorAll('.nav-tab');
-            
-            navTabs.forEach(tab => {
-                tab.addEventListener('click', function(e) {
-                    // Prevent default if it's not a link
-                    if (this.getAttribute('href') === '#') {
-                        e.preventDefault();
-                    }
-                    
-                    // Remove active class from all tabs
-                    navTabs.forEach(t => t.classList.remove('active'));
-                    
-                    // Add active class to clicked tab
-                    this.classList.add('active');
-                    
-                    // Store active state in sessionStorage
-                    sessionStorage.setItem('activeNav', this.getAttribute('href'));
-                });
-            });
-            
-            // Check if there's an active nav stored
-            const activeNav = sessionStorage.getItem('activeNav');
-            if (activeNav) {
-                const activeTab = document.querySelector(`.nav-tab[href="${activeNav}"]`);
-                if (activeTab) {
-                    // Remove active class from all tabs first
-                    navTabs.forEach(tab => tab.classList.remove('active'));
-                    // Add active class to stored tab
-                    activeTab.classList.add('active');
+        <script>
+            // Function to update Philippine time in real-time
+            function updatePhilippineTime() {
+                const now = new Date();
+
+                // Get the current time in the Philippines (UTC+8)
+                // Since we're using the server's timezone setting (Asia/Manila),
+                // we can use local time methods
+                const hours = now.getHours();
+                const minutes = now.getMinutes().toString().padStart(2, '0');
+                const seconds = now.getSeconds().toString().padStart(2, '0');
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+
+                // Convert to 12-hour format
+                let hours12 = hours % 12;
+                hours12 = hours12 ? hours12 : 12; // Convert 0 to 12
+                const hoursStr = hours12.toString().padStart(2, '0');
+
+                // Format date
+                const options = { month: 'short', day: 'numeric', year: 'numeric' };
+                const dateStr = now.toLocaleDateString('en-US', options);
+
+                // Update the elements for user
+                if (document.getElementById('ph-date')) {
+                    document.getElementById('ph-date').textContent = dateStr;
+                    document.getElementById('ph-hours').textContent = hoursStr;
+                    document.getElementById('ph-minutes').textContent = minutes;
+                    document.getElementById('ph-seconds').textContent = seconds;
+                    document.getElementById('ph-ampm').textContent = ampm;
                 }
+
+                // Update the elements for staff
+                if (document.getElementById('staff-ph-date')) {
+                    document.getElementById('staff-ph-date').textContent = dateStr;
+                    document.getElementById('staff-ph-hours').textContent = hoursStr;
+                    document.getElementById('staff-ph-minutes').textContent = minutes;
+                    document.getElementById('staff-ph-seconds').textContent = seconds;
+                    document.getElementById('staff-ph-ampm').textContent = ampm;
+                }
+
+                // Update the hidden refresh indicator (for debugging/verification)
+                document.getElementById('refreshIndicator').textContent = `Last refresh: ${now.toLocaleTimeString()}`;
             }
-            
-            // Background time synchronization
-            function backgroundTimeSync() {
-                // Check time accuracy every 30 seconds
-                setInterval(() => {
-                    const now = new Date();
-                    const expectedSeconds = (now.getSeconds() + 1) % 60;
-                    
-                    // Schedule a check for the next second
-                    setTimeout(() => {
-                        const checkTime = new Date();
-                        if (checkTime.getSeconds() !== expectedSeconds) {
-                            // Time is out of sync, resynchronize
-                            synchronizeTime();
+
+            // Update time immediately and then every second
+            updatePhilippineTime();
+            let timeInterval = setInterval(updatePhilippineTime, 1000);
+
+            // Advanced time synchronization function
+            function synchronizeTime() {
+                const now = new Date();
+                const milliseconds = now.getMilliseconds();
+
+                // Calculate delay to sync with the next second change
+                const delay = 1000 - milliseconds;
+
+                // Clear existing interval
+                clearInterval(timeInterval);
+
+                // Set new interval that starts at the next second
+                setTimeout(() => {
+                    updatePhilippineTime();
+                    timeInterval = setInterval(updatePhilippineTime, 1000);
+                }, delay);
+            }
+
+            // Start synchronized timekeeping
+            synchronizeTime();
+
+            // Clean Navigation Tab Interaction
+            document.addEventListener('DOMContentLoaded', function () {
+                const navTabs = document.querySelectorAll('.nav-tab');
+
+                navTabs.forEach(tab => {
+                    tab.addEventListener('click', function (e) {
+                        // Prevent default if it's not a link
+                        if (this.getAttribute('href') === '#') {
+                            e.preventDefault();
                         }
-                    }, 1000 - now.getMilliseconds());
-                }, 30000); // Check every 30 seconds
-            }
-            
-            // Start background time synchronization
-            backgroundTimeSync();
-            
-            // REGISTRATION FORM VALIDATION FUNCTIONALITY
-            const firstRegisterForm = document.getElementById('firstRegisterForm');
-            const secondRegisterForm = document.getElementById('secondRegisterForm');
-            const openSecondRegister = document.getElementById('openSecondRegister');
-            const backToFirstRegister = document.getElementById('backToFirstRegister');
-            const registerFormModal = document.getElementById('registerFormModal');
-            const secondRegisterFormModal = document.getElementById('secondRegisterFormModal');
-            const password = document.getElementById('password');
-            const confirmPassword = document.getElementById('confirm_password');
-            const passwordMatchError = document.getElementById('passwordMatchError');
-            const submitButton = document.getElementById('submitButton');
 
-            // Get all required fields from first form
-            const firstFormRequiredFields = firstRegisterForm.querySelectorAll('[required]');
-            
-            // Function to check if all required fields in first form are filled
-            function checkFirstFormCompletion() {
-                let allFilled = true;
-                
+                        // Remove active class from all tabs
+                        navTabs.forEach(t => t.classList.remove('active'));
+
+                        // Add active class to clicked tab
+                        this.classList.add('active');
+
+                        // Store active state in sessionStorage
+                        sessionStorage.setItem('activeNav', this.getAttribute('href'));
+                    });
+                });
+
+                // Check if there's an active nav stored
+                const activeNav = sessionStorage.getItem('activeNav');
+                if (activeNav) {
+                    const activeTab = document.querySelector(`.nav-tab[href="${activeNav}"]`);
+                    if (activeTab) {
+                        // Remove active class from all tabs first
+                        navTabs.forEach(tab => tab.classList.remove('active'));
+                        // Add active class to stored tab
+                        activeTab.classList.add('active');
+                    }
+                }
+
+                // Background time synchronization
+                function backgroundTimeSync() {
+                    // Check time accuracy every 30 seconds
+                    setInterval(() => {
+                        const now = new Date();
+                        const expectedSeconds = (now.getSeconds() + 1) % 60;
+
+                        // Schedule a check for the next second
+                        setTimeout(() => {
+                            const checkTime = new Date();
+                            if (checkTime.getSeconds() !== expectedSeconds) {
+                                // Time is out of sync, resynchronize
+                                synchronizeTime();
+                            }
+                        }, 1000 - now.getMilliseconds());
+                    }, 30000); // Check every 30 seconds
+                }
+
+                // Start background time synchronization
+                backgroundTimeSync();
+
+                // REGISTRATION FORM VALIDATION FUNCTIONALITY
+                const firstRegisterForm = document.getElementById('firstRegisterForm');
+                const secondRegisterForm = document.getElementById('secondRegisterForm');
+                const openSecondRegister = document.getElementById('openSecondRegister');
+                const backToFirstRegister = document.getElementById('backToFirstRegister');
+                const registerFormModal = document.getElementById('registerFormModal');
+                const secondRegisterFormModal = document.getElementById('secondRegisterFormModal');
+                const password = document.getElementById('password');
+                const confirmPassword = document.getElementById('confirm_password');
+                const passwordMatchError = document.getElementById('passwordMatchError');
+                const submitButton = document.getElementById('submitButton');
+
+                // Get all required fields from first form
+                const firstFormRequiredFields = firstRegisterForm.querySelectorAll('[required]');
+
+                // Function to check if all required fields in first form are filled
+                function checkFirstFormCompletion() {
+                    let allFilled = true;
+
+                    firstFormRequiredFields.forEach(field => {
+                        if (!field.value.trim()) {
+                            allFilled = false;
+                        }
+                    });
+
+                    openSecondRegister.disabled = !allFilled;
+                }
+
+                // Add event listeners to first form fields
                 firstFormRequiredFields.forEach(field => {
-                    if (!field.value.trim()) {
-                        allFilled = false;
+                    field.addEventListener('input', checkFirstFormCompletion);
+                    field.addEventListener('change', checkFirstFormCompletion);
+                });
+
+                // Initial check
+                checkFirstFormCompletion();
+
+                // Store form data when moving to second form
+                openSecondRegister.addEventListener('click', function (e) {
+                    e.preventDefault();
+
+                    // Transfer data to hidden fields in second form
+                    document.getElementById('hidden_full_name').value = document.getElementById('full_name').value;
+                    document.getElementById('hidden_age').value = document.getElementById('age').value;
+                    document.getElementById('hidden_gender').value = document.getElementById('gender').value;
+                    document.getElementById('hidden_contact').value = document.getElementById('contact').value;
+                    document.getElementById('hidden_address').value = document.getElementById('address').value;
+
+                    // Hide first modal, show second modal
+                    registerFormModal.classList.add('hidden');
+                    secondRegisterFormModal.classList.remove('hidden');
+
+                    // Scroll to top of second form on mobile
+                    if (window.innerWidth <= 768) {
+                        window.scrollTo(0, 0);
                     }
                 });
-                
-                openSecondRegister.disabled = !allFilled;
-            }
-            
-            // Add event listeners to first form fields
-            firstFormRequiredFields.forEach(field => {
-                field.addEventListener('input', checkFirstFormCompletion);
-                field.addEventListener('change', checkFirstFormCompletion);
-            });
-            
-            // Initial check
-            checkFirstFormCompletion();
 
-            // Store form data when moving to second form
-            openSecondRegister.addEventListener('click', function(e) {
-                e.preventDefault();
-                
-                // Transfer data to hidden fields in second form
-                document.getElementById('hidden_full_name').value = document.getElementById('full_name').value;
-                document.getElementById('hidden_age').value = document.getElementById('age').value;
-                document.getElementById('hidden_gender').value = document.getElementById('gender').value;
-                document.getElementById('hidden_contact').value = document.getElementById('contact').value;
-                document.getElementById('hidden_address').value = document.getElementById('address').value;
-                
-                // Hide first modal, show second modal
-                registerFormModal.classList.add('hidden');
-                secondRegisterFormModal.classList.remove('hidden');
-                
-                // Scroll to top of second form on mobile
-                if (window.innerWidth <= 768) {
-                    window.scrollTo(0, 0);
+                // Go back to first form
+                backToFirstRegister.addEventListener('click', function () {
+                    secondRegisterFormModal.classList.add('hidden');
+                    registerFormModal.classList.remove('hidden');
+
+                    // Scroll to top of first form on mobile
+                    if (window.innerWidth <= 768) {
+                        window.scrollTo(0, 0);
+                    }
+                });
+
+                // Password matching validation
+                function validatePasswordMatch() {
+                    if (password.value && confirmPassword.value && password.value !== confirmPassword.value) {
+                        confirmPassword.classList.add('border-red-500');
+                        passwordMatchError.classList.remove('hidden');
+                        submitButton.disabled = true;
+                        return false;
+                    } else {
+                        confirmPassword.classList.remove('border-red-500');
+                        passwordMatchError.classList.add('hidden');
+
+                        // Only enable if all required fields are filled
+                        const allFilled = Array.from(secondRegisterForm.querySelectorAll('[required]')).every(
+                            field => field.value.trim()
+                        );
+
+                        submitButton.disabled = !allFilled;
+                        return true;
+                    }
                 }
-            });
-            
-            // Go back to first form
-            backToFirstRegister.addEventListener('click', function() {
-                secondRegisterFormModal.classList.add('hidden');
-                registerFormModal.classList.remove('hidden');
-                
-                // Scroll to top of first form on mobile
-                if (window.innerWidth <= 768) {
-                    window.scrollTo(0, 0);
-                }
-            });
-            
-            // Password matching validation
-            function validatePasswordMatch() {
-                if (password.value && confirmPassword.value && password.value !== confirmPassword.value) {
-                    confirmPassword.classList.add('border-red-500');
-                    passwordMatchError.classList.remove('hidden');
-                    submitButton.disabled = true;
-                    return false;
-                } else {
-                    confirmPassword.classList.remove('border-red-500');
-                    passwordMatchError.classList.add('hidden');
-                    
-                    // Only enable if all required fields are filled
+
+                // Check if all required fields in second form are filled
+                function checkSecondFormCompletion() {
                     const allFilled = Array.from(secondRegisterForm.querySelectorAll('[required]')).every(
                         field => field.value.trim()
                     );
-                    
-                    submitButton.disabled = !allFilled;
-                    return true;
+
+                    // Only enable if passwords match (if both password fields have values)
+                    const passwordsMatch = !password.value || !confirmPassword.value || password.value === confirmPassword.value;
+
+                    submitButton.disabled = !allFilled || !passwordsMatch;
+                }
+
+                // Add event listeners to second form fields
+                const secondFormFields = secondRegisterForm.querySelectorAll('input');
+                secondFormFields.forEach(field => {
+                    field.addEventListener('input', function () {
+                        if (field.id === 'password' || field.id === 'confirm_password') {
+                            validatePasswordMatch();
+                        } else {
+                            checkSecondFormCompletion();
+                        }
+                    });
+
+                    field.addEventListener('change', function () {
+                        if (field.id === 'password' || field.id === 'confirm_password') {
+                            validatePasswordMatch();
+                        } else {
+                            checkSecondFormCompletion();
+                        }
+                    });
+                });
+
+                // Initial check for second form
+                checkSecondFormCompletion();
+
+                // Form submission validation
+                if (secondRegisterForm) {
+                    secondRegisterForm.addEventListener('submit', function (e) {
+                        if (!validatePasswordMatch()) {
+                            e.preventDefault();
+                            return false;
+                        }
+                        return true;
+                    });
+                }
+
+                // Handle mobile virtual keyboard issues
+                if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                    const inputs = document.querySelectorAll('input, select');
+                    inputs.forEach(input => {
+                        input.addEventListener('focus', function () {
+                            // Scroll the input into view with some padding
+                            setTimeout(() => {
+                                this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }, 300);
+                        });
+                    });
+                }
+            });
+
+            // Page visibility API to optimize time updates
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) {
+                    // Page is hidden, reduce update frequency to save resources
+                    clearInterval(timeInterval);
+                    timeInterval = setInterval(updatePhilippineTime, 5000); // Update every 5 seconds when tab is hidden
+                } else {
+                    // Page is visible, resume normal update frequency
+                    clearInterval(timeInterval);
+                    synchronizeTime(); // Resync time when returning to the tab
+                }
+            });
+
+            // Modal functions
+            function openModal() {
+                document.getElementById("loginModal").classList.remove("hidden");
+                document.getElementById("loginModal").classList.add("flex");
+            }
+
+            function closeModal() {
+                document.getElementById("loginModal").classList.remove("flex");
+                document.getElementById("loginModal").classList.add("hidden");
+            }
+
+            const openLoginBtn = document.getElementById('openLogin');
+            const openRegisterBtn = document.getElementById('openRegister');
+            const mainModal = document.getElementById('mainModal');
+            const loginFormModal = document.getElementById('loginFormModal');
+            const registerFormModal = document.getElementById('registerFormModal');
+            const secondRegisterFormModal = document.getElementById('secondRegisterFormModal');
+
+            openLoginBtn.addEventListener('click', () => {
+                mainModal.classList.add('hidden');
+                loginFormModal.classList.remove('hidden');
+            });
+
+            openRegisterBtn.addEventListener('click', () => {
+                mainModal.classList.add('hidden');
+                registerFormModal.classList.remove('hidden');
+            });
+
+            // From Login modal → to Register modal
+            document.getElementById('loginToRegister').addEventListener('click', function () {
+                document.getElementById('loginFormModal').classList.add('hidden');
+                document.getElementById('registerFormModal').classList.remove('hidden');
+            });
+
+            document.getElementById('registerToLogin').addEventListener('click', function () {
+                document.getElementById('registerFormModal').classList.add('hidden');
+                document.getElementById('loginFormModal').classList.remove('hidden');
+            });
+
+            document.getElementById('openSecondRegister').addEventListener('click', function (e) {
+                e.preventDefault(); // Prevent form submission
+                registerFormModal.classList.add('hidden');
+                secondRegisterFormModal.classList.remove('hidden');
+            });
+
+            // Back button from second registration form to first registration form
+            document.getElementById('backToFirstRegister').addEventListener('click', function () {
+                secondRegisterFormModal.classList.add('hidden');
+                registerFormModal.classList.remove('hidden');
+            });
+
+            // Also update the registerToLogin button to hide the second form if it's visible
+            document.getElementById('registerToLogin').addEventListener('click', function () {
+                registerFormModal.classList.add('hidden');
+                secondRegisterFormModal.classList.add('hidden');
+                loginFormModal.classList.remove('hidden');
+            });
+
+            function backToMainModal() {
+                mainModal.classList.remove('hidden');
+                loginFormModal.classList.add('hidden');
+                registerFormModal.classList.add('hidden');
+            }
+
+            function togglePassword() {
+                const input = document.getElementById("password");
+                const icon = document.getElementById("eyeIcon");
+
+                if (input.type === "password") {
+                    input.type = "text";
+                    icon.classList.remove("fa-eye");
+                    icon.classList.add("fa-eye-slash");
+                } else {
+                    input.type = "password";
+                    icon.classList.remove("fa-eye-slash");
+                    icon.classList.add("fa-eye");
                 }
             }
 
-            // Check if all required fields in second form are filled
-            function checkSecondFormCompletion() {
-                const allFilled = Array.from(secondRegisterForm.querySelectorAll('[required]')).every(
-                    field => field.value.trim()
-                );
-                
-                // Only enable if passwords match (if both password fields have values)
-                const passwordsMatch = !password.value || !confirmPassword.value || password.value === confirmPassword.value;
-                
-                submitButton.disabled = !allFilled || !passwordsMatch;
-            }
-            
-            // Add event listeners to second form fields
-            const secondFormFields = secondRegisterForm.querySelectorAll('input');
-            secondFormFields.forEach(field => {
-                field.addEventListener('input', function() {
-                    if (field.id === 'password' || field.id === 'confirm_password') {
-                        validatePasswordMatch();
-                    } else {
-                        checkSecondFormCompletion();
-                    }
-                });
-                
-                field.addEventListener('change', function() {
-                    if (field.id === 'password' || field.id === 'confirm_password') {
-                        validatePasswordMatch();
-                    } else {
-                        checkSecondFormCompletion();
-                    }
-                });
+            document.getElementById('backToFirstRegister').addEventListener('click', function () {
+                secondRegisterFormModal.classList.add('hidden');
+                registerFormModal.classList.remove('hidden');
             });
 
-            // Initial check for second form
-            checkSecondFormCompletion();
-
-            // Form submission validation
-            if (secondRegisterForm) {
-                secondRegisterForm.addEventListener('submit', function(e) {
-                    if (!validatePasswordMatch()) {
-                        e.preventDefault();
-                        return false;
-                    }
-                    return true;
-                });
-            }
-            
-            // Handle mobile virtual keyboard issues
-            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                const inputs = document.querySelectorAll('input, select');
-                inputs.forEach(input => {
-                    input.addEventListener('focus', function() {
-                        // Scroll the input into view with some padding
-                        setTimeout(() => {
-                            this.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }, 300);
-                    });
-                });
-            }
-        });
-        
-        // Page visibility API to optimize time updates
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                // Page is hidden, reduce update frequency to save resources
-                clearInterval(timeInterval);
-                timeInterval = setInterval(updatePhilippineTime, 5000); // Update every 5 seconds when tab is hidden
-            } else {
-                // Page is visible, resume normal update frequency
-                clearInterval(timeInterval);
-                synchronizeTime(); // Resync time when returning to the tab
-            }
-        });
-        
-        // Modal functions
-        function openModal() {
-            document.getElementById("loginModal").classList.remove("hidden");
-            document.getElementById("loginModal").classList.add("flex");
-        }
-
-        function closeModal() {
-            document.getElementById("loginModal").classList.remove("flex");
-            document.getElementById("loginModal").classList.add("hidden");
-        }
-        
-        const openLoginBtn = document.getElementById('openLogin');
-        const openRegisterBtn = document.getElementById('openRegister');
-        const mainModal = document.getElementById('mainModal');
-        const loginFormModal = document.getElementById('loginFormModal');
-        const registerFormModal = document.getElementById('registerFormModal');
-        const secondRegisterFormModal = document.getElementById('secondRegisterFormModal');
-
-        openLoginBtn.addEventListener('click', () => {
-            mainModal.classList.add('hidden');
-            loginFormModal.classList.remove('hidden');
-        });
-
-        openRegisterBtn.addEventListener('click', () => {
-            mainModal.classList.add('hidden');
-            registerFormModal.classList.remove('hidden');
-        });
-        
-        // From Login modal → to Register modal
-        document.getElementById('loginToRegister').addEventListener('click', function () {
-            document.getElementById('loginFormModal').classList.add('hidden');
-            document.getElementById('registerFormModal').classList.remove('hidden');
-        });
-        
-        document.getElementById('registerToLogin').addEventListener('click', function () {
-            document.getElementById('registerFormModal').classList.add('hidden');
-            document.getElementById('loginFormModal').classList.remove('hidden');
-        });
-        
-        document.getElementById('openSecondRegister').addEventListener('click', function (e) {
-            e.preventDefault(); // Prevent form submission
-            registerFormModal.classList.add('hidden');
-            secondRegisterFormModal.classList.remove('hidden');
-        });
-
-        // Back button from second registration form to first registration form
-        document.getElementById('backToFirstRegister').addEventListener('click', function () {
-            secondRegisterFormModal.classList.add('hidden');
-            registerFormModal.classList.remove('hidden');
-        });
-
-        // Also update the registerToLogin button to hide the second form if it's visible
-        document.getElementById('registerToLogin').addEventListener('click', function () {
-            registerFormModal.classList.add('hidden');
-            secondRegisterFormModal.classList.add('hidden');
-            loginFormModal.classList.remove('hidden');
-        });
-        
-        function backToMainModal() {
-            mainModal.classList.remove('hidden');
-            loginFormModal.classList.add('hidden');
-            registerFormModal.classList.add('hidden');
-        }
-        
-        function togglePassword() {
-            const input = document.getElementById("password");
-            const icon = document.getElementById("eyeIcon");
-
-            if (input.type === "password") {
-                input.type = "text";
-                icon.classList.remove("fa-eye");
-                icon.classList.add("fa-eye-slash");
-            } else {
-                input.type = "password";
-                icon.classList.remove("fa-eye-slash");
-                icon.classList.add("fa-eye");
-            }
-        }
-        
-        document.getElementById('backToFirstRegister').addEventListener('click', function () {
-            secondRegisterFormModal.classList.add('hidden');
-            registerFormModal.classList.remove('hidden');
-        });
-        
-        // JavaScript function to toggle sidebar
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('overlay');
-            
-            // Toggle sidebar visibility
-            sidebar.classList.toggle('sidebar-hidden');
-            
-            // Toggle overlay for mobile (optional)
-            if (overlay) {
-                overlay.classList.toggle('overlay-hidden');
-            }
-        }
-
-        // Optional: Close sidebar when pressing Escape key
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
+            // JavaScript function to toggle sidebar
+            function toggleSidebar() {
                 const sidebar = document.getElementById('sidebar');
                 const overlay = document.getElementById('overlay');
-                
-                // Hide sidebar if it's visible
-                if (!sidebar.classList.contains('sidebar-hidden')) {
-                    sidebar.classList.add('sidebar-hidden');
+
+                // Toggle sidebar visibility
+                sidebar.classList.toggle('sidebar-hidden');
+
+                // Toggle overlay for mobile (optional)
+                if (overlay) {
+                    overlay.classList.toggle('overlay-hidden');
+                }
+            }
+
+            // Optional: Close sidebar when pressing Escape key
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    const sidebar = document.getElementById('sidebar');
+                    const overlay = document.getElementById('overlay');
+
+                    // Hide sidebar if it's visible
+                    if (!sidebar.classList.contains('sidebar-hidden')) {
+                        sidebar.classList.add('sidebar-hidden');
+                        if (overlay) {
+                            overlay.classList.add('overlay-hidden');
+                        }
+                    }
+                }
+            });
+
+            // Optional: Handle window resize to show/hide sidebar appropriately
+            window.addEventListener('resize', function () {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('overlay');
+
+                // On larger screens, ensure sidebar is visible
+                if (window.innerWidth >= 1024) { // lg breakpoint
+                    sidebar.classList.remove('sidebar-hidden');
                     if (overlay) {
                         overlay.classList.add('overlay-hidden');
                     }
                 }
-            }
-        });
+            });
+        </script>
+    </body>
 
-        // Optional: Handle window resize to show/hide sidebar appropriately
-        window.addEventListener('resize', function() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('overlay');
-            
-            // On larger screens, ensure sidebar is visible
-            if (window.innerWidth >= 1024) { // lg breakpoint
-                sidebar.classList.remove('sidebar-hidden');
-                if (overlay) {
-                    overlay.classList.add('overlay-hidden');
-                }
-            }
-        });
-    </script>
-</body>
 </html>

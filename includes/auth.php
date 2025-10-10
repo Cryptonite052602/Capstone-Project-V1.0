@@ -20,7 +20,7 @@ function isUser() {
 
 function redirectIfNotLoggedIn() {
     if (!isLoggedIn()) {
-        header('Location: /community-health-tracker/auth/login.php');
+        header('Location: ../index-admin-staff.php');
         exit();
     }
 }
