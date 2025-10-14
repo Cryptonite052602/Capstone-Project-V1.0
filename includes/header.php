@@ -715,11 +715,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </head>
 
         <body>
-            <nav class="text-black py-10 px-9 sticky top-0 z-50">
-                <div class="mx-5 py-5 bg-[#FFFFFF] rounded-2xl flex shadow-2xl justify-between items-center">
+            <nav class="text-black py-10 px-4 sm:px-14 sticky top-0 z-50">
+                <div class="py-5 bg-[#FFFFFF] rounded-2xl flex shadow-2xl justify-between items-center">
                     <!-- Logo/Title with two-line text -->
-                    <div class="flex items-center mx-16">
-                        <img src="/community-health-tracker/asssets/images/Barangay Toong.jpg" alt="Barangay Toong Logo"
+                    <div class="flex items-center mx-8 sm:mx-16">
+                        <img src="asssets/images/toong-logo.png" alt="Barangay Toong Logo"
                             class="circle-image mr-4">
                         <div class="logo-text">
                             <div class="font-bold text-xl leading-tight">Barangay Toong</div>
@@ -728,8 +728,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     </div>
 
                     <!-- Mobile menu button - hidden on desktop -->
-                    <button class="md:hidden touch-target p-2" onclick="toggleMobileMenu()">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button class="md:hidden mx-8 touch-target p-2" onclick="toggleMobileMenu()">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M4 6h16M4 12h16M4 18h16"></path>
                         </svg>

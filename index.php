@@ -27,17 +27,33 @@ try {
     <!-- Public Announcements Banner -->
 
     <!-- Hero Section - Adjusted to start right below header -->
-    <div class="bg-[#0073D3] rounded-2xl -mt-20 mb-14 relative overflow-hidden mx-7 sm:mx-8 md:mx-14 md:h-[40rem]">
+    <div class="bg-[#0073D3] rounded-2xl -mt-20 mb-14 relative overflow-hidden mx-4 sm:mx-6 md:mx-14 md:h-[40rem]">
         <div class="flex flex-col md:flex-row h-full">
             <!-- LEFT -->
-            <div class="bg-white w-full md:w-1/2 h-[20rem] md:h-auto flex items-center justify-center">
-                <p class="text-[#0073D3] font-semibold text-xl"></p>
+            <div
+                class="relative bg-white w-full md:w-1/2 h-[22rem] md:h-auto flex items-center justify-center overflow-hidden p-6 sm:p-10">
+
+                <!-- IMAGE BACKGROUND -->
+                <img src="asssets/images/hand-image.png" alt="Hand image"
+                    class="absolute w-[18rem] sm:w-[24rem] md:w-[30rem] h-[18rem] sm:h-[24rem] md:h-[30rem] object-contain opacity-70 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+
+                <!-- TEXT CONTENT -->
+                <div class="relative z-10 space-y-2 sm:space-y-3">
+                    <h1 class="font-bold text-3xl sm:text-4xl md:text-5xl text-[#0D1B2A]">Barangay Toong</h1>
+                    <h2 class="font-semibold text-xl sm:text-2xl md:text-3xl text-[#1B263B]">Health and Monitoring and Tracking</h2>
+                    <p class="text-[#415A77] text-base sm:text-lg md:text-xl">Matinud-anong pagbantay sa panglawas sa barangay | V1.0</p>
+                    <div class="text-white bg-[#3290BF] w-[18rem] text-center py-4 rounded-full hover:bg-[#69AAD6]">
+                        <a href="">
+                            <p class="font-bold text-md">Learn more about your Health</p>
+                        </a>
+                    </div>
+                </div>
             </div>
 
             <!-- RIGHT -->
-            <div class="bg-white w-full md:w-1/2">
+            <div class="bg-white w-full md:w-1/2 h-[22rem] md:h-auto">
                 <img src="asssets/images/right-image.png" alt="Right section image"
-                    class="w-full h-[20rem] md:h-full object-cover object-center" />
+                    class="w-full h-full object-cover object-center" />
             </div>
         </div>
     </div>
