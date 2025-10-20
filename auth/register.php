@@ -14,9 +14,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $confirmPassword = trim($_POST['confirm_password'] ?? '');
     $fullName = trim($_POST['full_name'] ?? '');
     $age = intval($_POST['age'] ?? 0);
-    $gender = trim($_POST['gender'] ?? ''); // Added gender field
+    $gender = trim($_POST['gender'] ?? '');
     $address = trim($_POST['address'] ?? '');
+    $sitio = trim($_POST['sitio'] ?? '');
     $contact = trim($_POST['contact'] ?? '');
+    
+    // Identity verification fields
+    $verificationMethod = trim($_POST['verification_method'] ?? 'manual_verification');
+    $verificationNotes = trim($_POST['verification_notes'] ?? '');
+    $verificationConsent = isset($_POST['verification_consent']) ? 1 : 0;
     
     // Validate required fields
     if (empty($username)) {
@@ -44,14 +50,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
     
-    if (empty($gender)) { // Added gender validation
+    if (empty($gender)) {
         showGlassModal('error', 'Gender is required.');
+        exit();
+    }
+    
+    if (empty($sitio)) {
+        showGlassModal('error', 'Sitio is required.');
         exit();
     }
     
     if ($password !== $confirmPassword) {
         showGlassModal('error', 'Passwords do not match.');
         exit();
+    }
+    
+    // Validate identity verification based on method
+    if ($verificationMethod === 'id_upload') {
+        if (empty($_FILES['id_image']['name'])) {
+            showGlassModal('error', 'ID document is required for ID upload verification.');
+            exit();
+        }
+        
+        if (!$verificationConsent) {
+            showGlassModal('error', 'You must consent to ID verification to proceed.');
+            exit();
+        }
+        
+        // Validate file upload
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+        $maxFileSize = 5 * 1024 * 1024; // 5MB
+        
+        if ($_FILES['id_image']['size'] > $maxFileSize) {
+            showGlassModal('error', 'File size exceeds 5MB limit.');
+            exit();
+        }
+        
+        $fileType = mime_content_type($_FILES['id_image']['tmp_name']);
+        if (!in_array($fileType, $allowedTypes)) {
+            showGlassModal('error', 'Invalid file type. Only JPEG, PNG, GIF, and PDF files are allowed.');
+            exit();
+        }
     }
     
     // Check if username or email exists
@@ -76,16 +115,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
     
+    // Handle file upload if ID verification method is selected
+    $idImagePath = null;
+    if ($verificationMethod === 'id_upload' && isset($_FILES['id_image']) && $_FILES['id_image']['error'] === UPLOAD_ERR_OK) {
+        $uploadDir = __DIR__ . '/../uploads/id_documents/';
+        
+        // Create upload directory if it doesn't exist
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        
+        // Generate unique filename
+        $fileExtension = pathinfo($_FILES['id_image']['name'], PATHINFO_EXTENSION);
+        $filename = 'id_' . $username . '_' . time() . '.' . $fileExtension;
+        $idImagePath = 'uploads/id_documents/' . $filename;
+        $fullPath = $uploadDir . $filename;
+        
+        if (!move_uploaded_file($_FILES['id_image']['tmp_name'], $fullPath)) {
+            showGlassModal('error', 'Failed to upload ID document. Please try again.');
+            exit();
+        }
+    }
+    
     // Proceed with registration
     try {
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-        // Updated query to include gender
-        $stmt = $pdo->prepare("INSERT INTO sitio1_users (username, email, password, full_name, age, gender, address, contact, approved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)");
-        $stmt->execute([$username, $email, $hashedPassword, $fullName, $age, $gender, $address, $contact]);
         
-        showGlassModal('success', 'Registration Successful', 'Your Account is Pending Approval by Staff. You will receive an email notification once your registration is approved or declined by the staff.');
+        // Insert user with verification data
+        $stmt = $pdo->prepare("INSERT INTO sitio1_users 
+            (username, email, password, full_name, age, gender, address, sitio, contact, 
+             verification_method, id_image_path, verification_notes, verification_consent, approved) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
+        
+        $stmt->execute([
+            $username, 
+            $email, 
+            $hashedPassword, 
+            $fullName, 
+            $age, 
+            $gender, 
+            $address, 
+            $sitio,
+            $contact,
+            $verificationMethod,
+            $idImagePath,
+            $verificationNotes,
+            $verificationConsent
+        ]);
+        
+        // Generate success message based on verification method
+        $successMessage = 'Registration Successful';
+        $description = 'Your Account is Pending Approval by Staff. ';
+        
+        if ($verificationMethod === 'id_upload') {
+            $description .= 'Your ID document has been uploaded and will be reviewed.';
+        } else {
+            $description .= 'Staff will contact you using the provided contact information to complete verification.';
+        }
+        
+        $description .= ' You will receive an email notification once your registration is approved or declined by the staff.';
+        
+        showGlassModal('success', $successMessage, $description);
         exit();
+        
     } catch (PDOException $e) {
+        // Clean up uploaded file if registration fails
+        if ($idImagePath && file_exists(__DIR__ . '/../' . $idImagePath)) {
+            unlink(__DIR__ . '/../' . $idImagePath);
+        }
+        
         showGlassModal('error', 'Registration failed: ' . $e->getMessage());
         exit();
     }
