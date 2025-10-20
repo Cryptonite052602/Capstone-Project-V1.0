@@ -191,7 +191,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     }
 
     .form-input:valid {
-        border-color: #86efac;
+        border-color: #74b4fdff;
     }
 
     /* Updated Registration Button Styles with Rounded XL Sides */
@@ -214,11 +214,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
     /* First Registration Modal Button (Red) */
     .continue-btn {
-        background-color: #FC566C !important;
+        background-color: #4A90E2 !important;
     }
 
     .continue-btn:hover {
-        background-color: #f1233f !important;
+        background-color: #337ed3ff !important;
         transform: translateY(-1px) !important;
         box-shadow: 0 4px 8px rgba(252, 86, 108, 0.3) !important;
     }
@@ -246,7 +246,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     }
 
     .continue-btn:disabled {
-        background-color: #FC566C !important;
+        background-color: #4A90E2 !important;
     }
 
     .complete-btn:disabled {
@@ -624,7 +624,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         <?php elseif (isStaff()): ?>
             <!-- Staff Header -->
-            <nav class="bg-red-600 text-white shadow-lg sticky top-0 z-50">
+            <nav class="bg-[#3C96E1] text-white shadow-lg sticky top-0 z-50">
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <!-- Barangay Toong Logo -->
@@ -640,14 +640,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="flex items-center space-x-4">
                         <span class="font-medium">Welcome, <?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
                         <!-- Enhanced Logout Button -->
-                        <a href="/community-health-tracker/auth/logout.php" class="logout-btn flex items-center space-x-2">
-                            <i class="fas fa-sign-out-alt"></i>
-                            <span>Logout</span>
-                        </a>
+                        <a href="/community-health-tracker/auth/logout.php"
+   class="flex items-center space-x-2 px-7 py-3 m-2 rounded-full bg-white text-[#3C96E1] hover:bg-[#2B7CC9] hover:text-white transition duration-300">
+    <i class="fas fa-sign-out-alt"></i>
+    <span>Logout</span>
+</a>
+
                     </div>
                 </div>
 
-                <div class="bg-red-700 py-3">
+                <div class="bg-[#2B7CC9] py-3">
                     <div class="container mx-auto px-4 flex items-center justify-between staff-nav-container">
                         <div class="nav-tab-container">
                             <div class="nav-connection">
@@ -696,7 +698,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         <?php elseif (isUser()): ?>
             <!-- User Header -->
-            <nav class="bg-purple-600 text-white shadow-lg sticky top-0 z-50">
+            <nav class="bg-[#3C96E1] text-white shadow-lg sticky top-0 z-50">
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <!-- Barangay Toong Logo -->
@@ -715,14 +717,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <span class="font-medium"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
                         </div>
                         <!-- Enhanced Logout Button -->
-                        <a href="../auth/logout_user.php" class="logout-btn flex items-center space-x-2">
+                        <a href="../auth/logout_user.php" class="flex items-center space-x-2 px-7 py-3 m-2 rounded-full bg-white text-[#3C96E1] hover:bg-[#2B7CC9] hover:text-white transition duration-300"">
                             <i class="fas fa-sign-out-alt"></i>
                             <span>Logout</span>
                         </a>
                     </div>
                 </div>
 
-                <div class="bg-purple-700 py-3">
+                <div class="bg-[#2B7CC9] py-3">
                     <div class="container mx-auto px-4 flex items-center justify-between user-nav-container">
                         <div class="nav-tab-container">
                             <div class="nav-connection">
@@ -949,7 +951,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             <!-- Main Title - Bigger -->
             <div class="text-center mb-2 mx-4">
-                <h1 class="text-2xl font-bold text-[#FC566C]">Barangay Toong Cebu City</h1>
+                <h1 class="text-2xl font-bold text-[#4A90E2]">Barangay Toong Cebu City</h1>
             </div>
 
             <!-- Instruction Text - Smaller -->
@@ -998,7 +1000,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             <!-- Main Title - consistent styling -->
             <div class="text-center mb-6 mx-4">
-                <h2 class="text-xl font-bold text-[#FC566C]">Access Your Account</h2>
+                <h2 class="text-xl font-bold text-[#4A90E2]">Access Your Account</h2>
                 <p class="text-gray-600 mt-2 text-sm">Sign in to your resident account</p>
             </div>
 
@@ -1042,7 +1044,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="flex justify-center text-sm font-medium space-x-1 mt-4">
                         <p class="text-gray-600">Don't have an account?</p>
                         <button id="loginToRegister" type="button"
-                            class="text-[#FC566C] hover:underline">Register</button>
+                            class="text-[#4A90E2] hover:underline">Register</button>
                     </div>
                 </div>
             </form>
@@ -1067,7 +1069,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             <!-- Main Title - consistent styling -->
             <div class="text-center mb-6 mx-4">
-                <h2 class="text-xl font-bold text-[#FC566C]">Register Your Account</h2>
+                <h2 class="text-xl font-bold text-[#4A90E2]">Register Your Account</h2>
                 <p class="text-gray-600 mt-2 text-sm">Sign up to your resident account</p>
             </div>
 
@@ -1146,10 +1148,45 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         </p>
                     </div>
 
+                    <!-- New Sitio Field -->
+                    <div>
+                        <label for="sitio" class="block text-sm font-medium text-gray-700 mb-2">Sitio <span class="text-red-500">*</span></label>
+                        <select id="sitio" name="sitio"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
+                            required>
+                            <option value="" disabled selected>Select your Sitio</option>
+                            <option value="Sitio Sagingan">Sitio Sagingan — banana grove</option>
+                            <option value="Sitio Tuburan">Sitio Tuburan — spring or water source</option>
+                            <option value="Sitio Malipayon">Sitio Malipayon — joyful place</option>
+                            <option value="Sitio Kabugason">Sitio Kabugason — sunrise spot</option>
+                            <option value="Sitio Panaghiusa">Sitio Panaghiusa — unity</option>
+                            <option value="Sitio Lantawan">Sitio Lantawan — lookout point</option>
+                            <option value="Sitio Kalubihan">Sitio Kalubihan — coconut grove</option>
+                            <option value="Sitio Buntod">Sitio Buntod — small hill</option>
+                            <option value="Sitio Tagbaw">Sitio Tagbaw — lush greenery</option>
+                            <option value="Sitio Huni sa Hangin">Sitio Huni sa Hangin — sound of the wind</option>
+                            <option value="Sitio Katilingban">Sitio Katilingban — community</option>
+                            <option value="Sitio Banikanhon">Sitio Banikanhon — native identity</option>
+                            <option value="Sitio Datu Balas">Sitio Datu Balas — chieftain of the sands</option>
+                            <option value="Sitio Sinugdanan">Sitio Sinugdanan — origin or beginning</option>
+                            <option value="Sitio Kabilin">Sitio Kabilin — heritage</option>
+                            <option value="Sitio Alima">Sitio Alima — care or compassion</option>
+                            <option value="Sitio Pundok">Sitio Pundok — gathering place</option>
+                            <option value="Sitio Bahandi">Sitio Bahandi — treasure</option>
+                            <option value="Sitio Damgo">Sitio Damgo — dream</option>
+                            <option value="Sitio Kalinaw">Sitio Kalinaw — peace</option>
+                            <option value="Sitio Bulawanong Adlaw">Sitio Bulawanong Adlaw — golden sun</option>
+                            <option value="Sitio Padayon">Sitio Padayon — keep moving forward</option>
+                            <option value="Sitio Himaya">Sitio Himaya — glory</option>
+                            <option value="Sitio Panamkon">Sitio Panamkon — vision or hope</option>
+                            <option value="Sitio Sidlakan">Sitio Sidlakan — eastern light or sunrise</option>
+                        </select>
+                    </div>
+
                     <!-- Continue Button - consistent styling -->
                     <div class="mt-6">
                         <button type="button" id="openSecondRegister"
-                            class="continue-btn bg-[#FC566C] w-full rounded-full text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98] text-lg h-14"
+                            class="continue-btn bg-[#4A90E2] w-full rounded-full text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98] text-lg h-14"
                             disabled>
                             Continue
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2" fill="none"
@@ -1164,7 +1201,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="flex flex-col sm:flex-row justify-center text-sm font-medium space-y-1 sm:space-y-0 sm:space-x-1 mt-4">
                         <p class="text-gray-600">Already have an account?</p>
                         <button id="registerToLogin" type="button"
-                            class="text-[#FC566C] hover:underline">Login</button>
+                            class="text-[#4A90E2] hover:underline">Login</button>
                     </div>
                 </div>
             </form>
@@ -1213,6 +1250,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <input type="hidden" name="gender" id="hidden_gender" value="">
                     <input type="hidden" name="contact" id="hidden_contact" value="">
                     <input type="hidden" name="address" id="hidden_address" value="">
+                    <input type="hidden" name="sitio" id="hidden_sitio" value="">
 
                     <div class="space-y-6">
                         <div>
@@ -1333,6 +1371,51 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </div>
     </div>
 </div>
+
+<script>
+    // Sitio Field Validation - Add this to your existing script
+function validateFirstForm() {
+    const fullName = document.getElementById('full_name').value.trim();
+    const age = document.getElementById('age').value;
+    const gender = document.getElementById('gender').value;
+    const contact = document.getElementById('contact').value.trim();
+    const sitio = document.getElementById('sitio').value;
+    const continueBtn = document.getElementById('openSecondRegister');
+    
+    // Enable button only if all required fields are filled (including sitio)
+    if (fullName && age && gender && contact && sitio) {
+        continueBtn.disabled = false;
+    } else {
+        continueBtn.disabled = true;
+    }
+}
+
+// Add event listener for sitio field
+document.getElementById('sitio').addEventListener('change', validateFirstForm);
+
+// Transfer sitio data from first to second form
+document.getElementById('openSecondRegister').addEventListener('click', function() {
+    // Get values from first form
+    const fullName = document.getElementById('full_name').value;
+    const age = document.getElementById('age').value;
+    const gender = document.getElementById('gender').value;
+    const contact = document.getElementById('contact').value;
+    const address = document.getElementById('address').value;
+    const sitio = document.getElementById('sitio').value; // Get sitio value
+    
+    // Set values to hidden fields in second form
+    document.getElementById('hidden_full_name').value = fullName;
+    document.getElementById('hidden_age').value = age;
+    document.getElementById('hidden_gender').value = gender;
+    document.getElementById('hidden_contact').value = contact;
+    document.getElementById('hidden_address').value = address;
+    document.getElementById('hidden_sitio').value = sitio; // Set sitio value
+    
+    // Show second form and hide first form
+    document.getElementById('registerFormModal').classList.add('hidden');
+    document.getElementById('secondRegisterFormModal').classList.remove('hidden');
+});
+</script>
 
 <script>
 // Address field auto-population
@@ -1884,6 +1967,139 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial validation
     validateVerificationSection();
+});
+        </script>
+
+        <script>
+            // Enhanced ID verification functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // ID Verification Method Toggle
+    const verificationMethodRadios = document.querySelectorAll('input[name="verification_method"]');
+    const idUploadSection = document.getElementById('idUploadSection');
+    const manualVerificationSection = document.getElementById('manualVerificationSection');
+    const idImageInput = document.getElementById('id_image');
+    const filePreview = document.getElementById('filePreview');
+    const previewImage = document.getElementById('previewImage');
+    const verificationConsent = document.querySelector('input[name="verification_consent"]');
+    const submitButton = document.getElementById('submitButton');
+
+    // Toggle verification sections based on selection
+    verificationMethodRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'id_upload') {
+                idUploadSection.classList.remove('hidden');
+                manualVerificationSection.classList.add('hidden');
+                // Make consent required for ID upload
+                if (verificationConsent) {
+                    verificationConsent.required = true;
+                }
+            } else {
+                idUploadSection.classList.add('hidden');
+                manualVerificationSection.classList.remove('hidden');
+                // Remove required for manual verification
+                if (verificationConsent) {
+                    verificationConsent.required = false;
+                }
+            }
+            validateVerificationSection();
+        });
+    });
+
+    // File preview functionality
+    if (idImageInput) {
+        idImageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewImage.src = e.target.result;
+                        filePreview.classList.remove('hidden');
+                    }
+                    reader.readAsDataURL(file);
+                } else if (file.type === 'application/pdf') {
+                    // Show PDF placeholder
+                    previewImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE0IDJINmEyIDIgMCAwIDAtMiAydjE2YTIgMiAwIDAgMCAyIDJoMTJhMiAyIDAgMCAwIDItMlY4eiIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMTQgMnY2aDYiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+';
+                    previewImage.alt = 'PDF Document';
+                    filePreview.classList.remove('hidden');
+                } else {
+                    filePreview.classList.add('hidden');
+                }
+            } else {
+                filePreview.classList.add('hidden');
+            }
+            validateVerificationSection();
+        });
+    }
+
+    // Consent checkbox validation
+    if (verificationConsent) {
+        verificationConsent.addEventListener('change', validateVerificationSection);
+    }
+
+    // Validate verification section
+    function validateVerificationSection() {
+        const selectedMethod = document.querySelector('input[name="verification_method"]:checked');
+        if (!selectedMethod) return;
+
+        let isValid = true;
+
+        if (selectedMethod.value === 'id_upload') {
+            const hasFile = idImageInput && idImageInput.files.length > 0;
+            const hasConsent = verificationConsent && verificationConsent.checked;
+            isValid = hasFile && hasConsent;
+        }
+
+        // Update submit button state
+        if (submitButton) {
+            const allFilled = Array.from(document.querySelectorAll('#secondRegisterForm [required]')).every(
+                field => field.value.trim()
+            );
+            
+            submitButton.disabled = !allFilled || !isValid;
+        }
+    }
+
+    // Add validation for file size
+    if (idImageInput) {
+        idImageInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file && file.size > 5 * 1024 * 1024) {
+                alert('File size exceeds 5MB limit. Please choose a smaller file.');
+                this.value = '';
+                filePreview.classList.add('hidden');
+                validateVerificationSection();
+            }
+        });
+    }
+
+    // Initial validation
+    validateVerificationSection();
+
+    // Form submission enhancement
+    const secondRegisterForm = document.getElementById('secondRegisterForm');
+    if (secondRegisterForm) {
+        secondRegisterForm.addEventListener('submit', function(e) {
+            // Additional validation before submission
+            const selectedMethod = document.querySelector('input[name="verification_method"]:checked');
+            
+            if (selectedMethod && selectedMethod.value === 'id_upload') {
+                if (!idImageInput.files.length) {
+                    e.preventDefault();
+                    alert('Please upload an ID document for verification.');
+                    return false;
+                }
+                
+                if (!verificationConsent.checked) {
+                    e.preventDefault();
+                    alert('You must consent to ID verification to proceed.');
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+    }
 });
         </script>
         
