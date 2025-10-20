@@ -27,7 +27,7 @@ if (ini_get("session.use_cookies")) {
 session_destroy();
 
 // Determine redirect URL
-$redirectUrl = '../index-admin-staff.php' ;
+$redirectUrl = '../index-admin-staff.php';
 
 // Show loading animation before redirect
 echo <<<HTML
@@ -42,34 +42,45 @@ echo <<<HTML
 <body class="bg-gray-100">
     <div class="fixed inset-0 flex items-center justify-center">
         <div class="absolute inset-0 bg-black bg-opacity-20 backdrop-blur-sm"></div>
-        <div class="relative bg-white/50 backdrop-blur-lg rounded-xl p-8 max-w-md w-full shadow-lg border border-white/30 animate-fade-in">
-            <div class="flex flex-col items-center">
-                <div class="relative w-16 h-16 mb-4">
-                    <div class="absolute inset-0 rounded-full border-4 border-blue-500/80 border-t-transparent animate-spin"></div>
-                    <div class="absolute inset-2 rounded-full border-4 border-blue-500/80 border-t-transparent animate-spin" style="animation-delay: -0.3s"></div>
-                    <div class="absolute inset-1 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-500/90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="relative bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl border border-gray-200 animate-fade-in">
+            <div class="flex flex-col items-center text-center">
+                <!-- Loading Spinner -->
+                <div class="relative w-20 h-20 mb-6">
+                    <div class="absolute inset-0 rounded-full border-4 border-blue-100"></div>
+                    <div class="absolute inset-0 rounded-full border-4 border-blue-400 border-t-transparent animate-spin"></div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                         </svg>
                     </div>
                 </div>
-                <h3 class="text-xl font-semibold text-gray-800 mb-2">Logging Out</h3>
-                <p class="text-gray-600 text-center">Please wait while we securely sign you out...</p>
+                
+                <!-- Title -->
+                <h3 class="text-2xl font-semibold text-gray-800 mb-3">Logging Out</h3>
+                
+                <!-- Instruction -->
+                <p class="text-gray-600 text-lg">Please wait while we securely sign you out...</p>
             </div>
         </div>
     </div>
     <script>
         setTimeout(function() {
             window.location.href = '$redirectUrl';
-        }, 1000);
+        }, 1500);
     </script>
     <style>
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { 
+                opacity: 0; 
+                transform: translateY(20px) scale(0.95); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
+            }
         }
         .animate-fade-in {
-            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
