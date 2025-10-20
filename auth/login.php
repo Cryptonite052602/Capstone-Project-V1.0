@@ -1,5 +1,4 @@
 <?php
-
 require_once __DIR__ . '/../includes/auth.php';
 
 // If already logged in, redirect
@@ -33,34 +32,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <body class="bg-gray-100">
             <div class="fixed inset-0 flex items-center justify-center">
                 <div class="absolute inset-0 bg-black bg-opacity-20 backdrop-blur-sm"></div>
-                <div class="relative bg-white/50 backdrop-blur-lg rounded-xl p-8 max-w-md w-full shadow-lg border border-white/30 animate-fade-in">
-                    <div class="flex flex-col items-center">
-                        <div class="relative w-16 h-16 mb-4">
-                            <div class="absolute inset-0 rounded-full border-4 border-red-500/80 border-t-transparent animate-spin"></div>
-                            <div class="absolute inset-2 rounded-full border-4 border-red-500/80 border-t-transparent animate-spin" style="animation-delay: -0.3s"></div>
-                            <div class="absolute inset-1 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-500/90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div class="relative bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl border border-gray-200 animate-fade-in">
+                    <div class="flex flex-col items-center text-center">
+                        <!-- Error Spinner -->
+                        <div class="relative w-20 h-20 mb-6">
+                            <div class="absolute inset-0 rounded-full border-4 border-red-100"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-red-400 border-t-transparent animate-spin"></div>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </div>
                         </div>
-                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Please fill in all fields</h3>
-                        <p class="text-gray-600 text-center">Redirecting you back...</p>
+                        
+                        <!-- Title -->
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-3">Missing Information</h3>
+                        
+                        <!-- Instruction -->
+                        <p class="text-gray-600 text-lg">Please fill in all fields</p>
                     </div>
                 </div>
             </div>
             <script>
                 setTimeout(function() {
                     window.location.href = '/community-health-tracker/index.php';
-                }, 1000);
+                }, 1500);
             </script>
             <style>
                 @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
+                    from { 
+                        opacity: 0; 
+                        transform: translateY(20px) scale(0.95); 
+                    }
+                    to { 
+                        opacity: 1; 
+                        transform: translateY(0) scale(1); 
+                    }
                 }
                 .animate-fade-in {
-                    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                    animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
                 @keyframes spin {
                     0% { transform: rotate(0deg); }
@@ -91,34 +101,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <body class="bg-gray-100">
             <div class="fixed inset-0 flex items-center justify-center">
                 <div class="absolute inset-0 bg-black bg-opacity-20 backdrop-blur-sm"></div>
-                <div class="relative bg-white/50 backdrop-blur-lg rounded-xl p-8 max-w-md w-full shadow-lg border border-white/30 animate-fade-in">
-                    <div class="flex flex-col items-center">
-                        <div class="relative w-16 h-16 mb-4">
-                            <div class="absolute inset-0 rounded-full border-4 border-green-500/80 border-t-transparent animate-spin"></div>
-                            <div class="absolute inset-2 rounded-full border-4 border-green-500/80 border-t-transparent animate-spin" style="animation-delay: -0.3s"></div>
-                            <div class="absolute inset-1 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-500/90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div class="relative bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl border border-gray-200 animate-fade-in">
+                    <div class="flex flex-col items-center text-center">
+                        <!-- Success Spinner -->
+                        <div class="relative w-20 h-20 mb-6">
+                            <div class="absolute inset-0 rounded-full border-4 border-green-100"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-green-400 border-t-transparent animate-spin"></div>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                 </svg>
                             </div>
                         </div>
-                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Login successful!</h3>
-                        <p class="text-gray-600 text-center">Redirecting to dashboard...</p>
+                        
+                        <!-- Title -->
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-3">Login Successful</h3>
+                        
+                        <!-- Instruction -->
+                        <p class="text-gray-600 text-lg">Redirecting to dashboard...</p>
                     </div>
                 </div>
             </div>
             <script>
                 setTimeout(function() {
                     window.location.href = '../user/dashboard.php';
-                }, 1000);
+                }, 1500);
             </script>
             <style>
                 @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
+                    from { 
+                        opacity: 0; 
+                        transform: translateY(20px) scale(0.95); 
+                    }
+                    to { 
+                        opacity: 1; 
+                        transform: translateY(0) scale(1); 
+                    }
                 }
                 .animate-fade-in {
-                    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                    animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
                 @keyframes spin {
                     0% { transform: rotate(0deg); }
@@ -144,34 +165,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <body class="bg-gray-100">
             <div class="fixed inset-0 flex items-center justify-center">
                 <div class="absolute inset-0 bg-black bg-opacity-20 backdrop-blur-sm"></div>
-                <div class="relative bg-white/50 backdrop-blur-lg rounded-xl p-8 max-w-md w-full shadow-lg border border-white/30 animate-fade-in">
-                    <div class="flex flex-col items-center">
-                        <div class="relative w-16 h-16 mb-4">
-                            <div class="absolute inset-0 rounded-full border-4 border-red-500/80 border-t-transparent animate-spin"></div>
-                            <div class="absolute inset-2 rounded-full border-4 border-red-500/80 border-t-transparent animate-spin" style="animation-delay: -0.3s"></div>
-                            <div class="absolute inset-1 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-500/90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <div class="relative bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl border border-gray-200 animate-fade-in">
+                    <div class="flex flex-col items-center text-center">
+                        <!-- Error Spinner -->
+                        <div class="relative w-20 h-20 mb-6">
+                            <div class="absolute inset-0 rounded-full border-4 border-red-100"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-red-400 border-t-transparent animate-spin"></div>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                                 </svg>
                             </div>
                         </div>
-                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Invalid credentials</h3>
-                        <p class="text-gray-600 text-center">Please try again...</p>
+                        
+                        <!-- Title -->
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-3">Invalid Credentials</h3>
+                        
+                        <!-- Instruction -->
+                        <p class="text-gray-600 text-lg">Please check your username and password</p>
                     </div>
                 </div>
             </div>
             <script>
                 setTimeout(function() {
                     window.location.href = '../index.php';
-                }, 1000);
+                }, 1500);
             </script>
             <style>
                 @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
+                    from { 
+                        opacity: 0; 
+                        transform: translateY(20px) scale(0.95); 
+                    }
+                    to { 
+                        opacity: 1; 
+                        transform: translateY(0) scale(1); 
+                    }
                 }
                 .animate-fade-in {
-                    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                    animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
                 @keyframes spin {
                     0% { transform: rotate(0deg); }
