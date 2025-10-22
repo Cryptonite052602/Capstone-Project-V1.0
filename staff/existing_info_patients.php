@@ -11,9 +11,8 @@ if (!isStaff()) {
 $message = '';
 $error = '';
 
-// Handle form submission for editing health info - MODIFIED VALIDATION
+// Handle form submission for editing health info
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_health_info'])) {
-    // Validate required fields but allow gender to be auto-populated from patient table if empty
     $required = ['patient_id', 'height', 'weight', 'blood_type'];
     $missing = array();
     
@@ -34,7 +33,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_health_info'])) 
                 $gender = $patient['gender'];
             }
         } catch (PDOException $e) {
-            // If we can't get gender from database, add it to missing fields
             $missing[] = 'gender';
         }
     }
@@ -92,11 +90,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_health_info'])) 
                 $message = "Patient health information saved successfully!";
             }
             
-            // Refresh health info after update
-            $stmt = $pdo->prepare("SELECT * FROM existing_info_patients WHERE patient_id = ?");
-            $stmt->execute([$patient_id]);
-            $health_info = $stmt->fetch(PDO::FETCH_ASSOC);
-            
         } catch (PDOException $e) {
             $error = "Error saving patient health information: " . $e->getMessage();
         }
@@ -109,6 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_patient'])) {
     $age = intval($_POST['age']);
     $gender = trim($_POST['gender']);
     $address = trim($_POST['address']);
+    $sitio = trim($_POST['sitio']);
     $contact = trim($_POST['contact']);
     $lastCheckup = trim($_POST['last_checkup']);
     $userId = !empty($_POST['user_id']) ? intval($_POST['user_id']) : null;
@@ -127,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_patient'])) {
             // Start transaction
             $pdo->beginTransaction();
             
-            // Insert into main patients table (removed consultation_type)
+            // Insert into main patients table (sitio field removed since column doesn't exist)
             $stmt = $pdo->prepare("INSERT INTO sitio1_patients 
                 (full_name, age, gender, address, contact, last_checkup, added_by, user_id) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
@@ -151,7 +145,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_patient'])) {
             
             $pdo->commit();
             
-            // Set success message and redirect
             $_SESSION['success_message'] = 'Patient record added successfully! Patient ID: ' . $patientCount;
             header('Location: existing_info_patients.php?tab=patients-tab');
             exit();
@@ -170,7 +163,7 @@ if (isset($_SESSION['success_message'])) {
     unset($_SESSION['success_message']);
 }
 
-// Handle patient deletion - MODIFIED TO PRESERVE USER_ID
+// Handle patient deletion
 if (isset($_GET['delete_patient'])) {
     $patientId = $_GET['delete_patient'];
     
@@ -184,7 +177,7 @@ if (isset($_GET['delete_patient'])) {
         $patient = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($patient) {
-            // Insert into deleted_patients table - preserve the user_id
+            // Insert into deleted_patients table (sitio field removed)
             $stmt = $pdo->prepare("INSERT INTO deleted_patients 
                 (original_id, full_name, age, gender, address, contact, last_checkup, added_by, user_id, deleted_at, deleted_by) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)");
@@ -197,7 +190,7 @@ if (isset($_GET['delete_patient'])) {
                 $patient['contact'], 
                 $patient['last_checkup'], 
                 $patient['added_by'],
-                $patient['user_id'], // This preserves the user linkage for restoration
+                $patient['user_id'],
                 $_SESSION['user']['id']
             ]);
             
@@ -223,9 +216,7 @@ if (isset($_GET['delete_patient'])) {
     }
 }
 
-
-
-// Handle patient restoration - MODIFIED TO ENSURE GENDER IS PRESERVED
+// Handle patient restoration
 if (isset($_GET['restore_patient'])) {
     $patientId = $_GET['restore_patient'];
     
@@ -239,7 +230,7 @@ if (isset($_GET['restore_patient'])) {
         $archivedPatient = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($archivedPatient) {
-            // Restore to main patients table - preserve the user_id
+            // Restore to main patients table (sitio field removed)
             $stmt = $pdo->prepare("INSERT INTO sitio1_patients 
                 (id, full_name, age, gender, address, contact, last_checkup, added_by, user_id, created_at) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
@@ -252,7 +243,7 @@ if (isset($_GET['restore_patient'])) {
                 $archivedPatient['contact'], 
                 $archivedPatient['last_checkup'], 
                 $archivedPatient['added_by'],
-                $archivedPatient['user_id'] // This preserves the user linkage
+                $archivedPatient['user_id']
             ]);
             
             // Also restore health info with gender
@@ -280,65 +271,12 @@ if (isset($_GET['restore_patient'])) {
     }
 }
 
-// Handle patient restoration - ADD THIS CODE AFTER THE DELETION HANDLING
-if (isset($_GET['restore_patient'])) {
-    $patientId = $_GET['restore_patient'];
-    
-    try {
-        // Start transaction
-        $pdo->beginTransaction();
-        
-        // Get archived patient data including user_id
-        $stmt = $pdo->prepare("SELECT * FROM deleted_patients WHERE original_id = ? AND deleted_by = ?");
-        $stmt->execute([$patientId, $_SESSION['user']['id']]);
-        $archivedPatient = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($archivedPatient) {
-            // Restore to main patients table - preserve the user_id
-            $stmt = $pdo->prepare("INSERT INTO sitio1_patients 
-                (id, full_name, age, gender, address, contact, last_checkup, added_by, user_id, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-            $stmt->execute([
-                $archivedPatient['original_id'], 
-                $archivedPatient['full_name'], 
-                $archivedPatient['age'], 
-                $archivedPatient['gender'], 
-                $archivedPatient['address'], 
-                $archivedPatient['contact'], 
-                $archivedPatient['last_checkup'], 
-                $archivedPatient['added_by'],
-                $archivedPatient['user_id'] // This preserves the user linkage
-            ]);
-            
-            // Also restore health info if it exists in archive (you might need to implement this)
-            // For now, we'll just create an empty health record
-            $stmt = $pdo->prepare("INSERT IGNORE INTO existing_info_patients (patient_id) VALUES (?)");
-            $stmt->execute([$patientId]);
-            
-            // Delete from archive
-            $stmt = $pdo->prepare("DELETE FROM deleted_patients WHERE original_id = ?");
-            $stmt->execute([$patientId]);
-            
-            $pdo->commit();
-            
-            $_SESSION['success_message'] = 'Patient record restored successfully!';
-            header('Location: deleted_patients.php');
-            exit();
-        } else {
-            $error = 'Archived patient not found!';
-        }
-    } catch (PDOException $e) {
-        $pdo->rollBack();
-        $error = 'Error restoring patient record: ' . $e->getMessage();
-    }
-}
-
-// Handle converting user to patient - MODIFIED TO ENSURE GENDER IS SET
+// Handle converting user to patient - FIXED: Removed sitio from patient insert
 if (isset($_GET['convert_to_patient'])) {
     $userId = $_GET['convert_to_patient'];
     
     try {
-        // Get user details including gender
+        // Get user details including gender and sitio
         $stmt = $pdo->prepare("SELECT * FROM sitio1_users WHERE id = ? AND approved = 1");
         $stmt->execute([$userId]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -355,17 +293,22 @@ if (isset($_GET['convert_to_patient'])) {
                 // Start transaction
                 $pdo->beginTransaction();
                 
-                // Insert into main patients table with gender from user
+                // Insert into main patients table with gender from user (sitio removed)
                 $stmt = $pdo->prepare("INSERT INTO sitio1_patients 
                     (full_name, age, gender, address, contact, added_by, user_id) 
                     VALUES (?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([
-                    $user['full_name'], $user['age'], $user['gender'], $user['address'], $user['contact'],
-                    $_SESSION['user']['id'], $userId
+                    $user['full_name'], 
+                    $user['age'], 
+                    $user['gender'], 
+                    $user['address'], 
+                    $user['contact'],
+                    $_SESSION['user']['id'], 
+                    $userId
                 ]);
                 $patientId = $pdo->lastInsertId();
                 
-                // Insert medical info with gender from user - ADD ALL REQUIRED FIELDS
+                // Insert medical info with gender from user
                 $stmt = $pdo->prepare("INSERT INTO existing_info_patients 
                     (patient_id, gender, height, weight, blood_type) 
                     VALUES (?, ?, 0, 0, '')");
@@ -393,9 +336,6 @@ $searchBy = isset($_GET['search_by']) ? trim($_GET['search_by']) : 'name';
 // Get patient ID if selected
 $selectedPatientId = isset($_GET['patient_id']) ? $_GET['patient_id'] : (isset($_POST['patient_id']) ? $_POST['patient_id'] : '');
 
-// Check if view printed information is requested
-$viewPrinted = isset($_GET['view_printed']) && $_GET['view_printed'] == 'true';
-
 // Get list of patients matching search
 $patients = [];
 $searchedUsers = [];
@@ -403,7 +343,7 @@ if (!empty($searchTerm)) {
     try {
         if ($searchBy === 'unique_number') {
             // Search by unique number from sitio1_users table
-            $query = "SELECT id, full_name, email, age, gender, address, contact, unique_number, 'user' as type
+            $query = "SELECT id, full_name, email, age, gender, address, sitio, contact, unique_number, 'user' as type
                      FROM sitio1_users 
                      WHERE approved = 1 AND unique_number LIKE ? 
                      ORDER BY full_name LIMIT 10";
@@ -412,7 +352,7 @@ if (!empty($searchTerm)) {
             $stmt->execute(["%$searchTerm%"]);
             $searchedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } else {
-            // Search by name (default) - FIXED: removed consultation_type and added gender
+            // Search by name (default) - sitio removed from patient query
             $query = "SELECT p.id, p.full_name, p.age, p.gender, e.blood_type, e.height, e.weight
                      FROM sitio1_patients p 
                      LEFT JOIN existing_info_patients e ON p.id = e.patient_id 
@@ -432,7 +372,7 @@ if (!empty($searchTerm)) {
 try {
     $stmt = $pdo->prepare("SELECT p.*, e.height, e.weight, e.blood_type, e.allergies,
                           e.medical_history, e.current_medications, e.family_history,
-                          u.unique_number, u.email as user_email
+                          u.unique_number, u.email as user_email, u.sitio as user_sitio
                           FROM sitio1_patients p
                           LEFT JOIN existing_info_patients e ON p.id = e.patient_id
                           LEFT JOIN sitio1_users u ON p.user_id = u.id
@@ -444,11 +384,11 @@ try {
     $error = "Error fetching patient records: " . $e->getMessage();
 }
 
-// Get existing health info if patient is selected - MODIFIED TO GET GENDER
+// Get existing health info if patient is selected
 if (!empty($selectedPatientId)) {
     try {
-        // Get basic patient info - FIXED: added gender field
-        $stmt = $pdo->prepare("SELECT p.*, u.unique_number, u.email as user_email 
+        // Get basic patient info
+        $stmt = $pdo->prepare("SELECT p.*, u.unique_number, u.email as user_email, u.sitio as user_sitio
                               FROM sitio1_patients p 
                               LEFT JOIN sitio1_users u ON p.user_id = u.id
                               WHERE p.id = ? AND p.added_by = ?");
@@ -552,7 +492,6 @@ if (!empty($selectedPatientId)) {
             font-size: 0.75rem;
             font-weight: 600;
         }
-        /* Custom button styles */
         .btn-view {
             background-color: #3498db;
             color: white;
@@ -585,6 +524,86 @@ if (!empty($selectedPatientId)) {
         .btn-add-patient:hover {
             background-color: #27ae60;
             transform: translateY(-2px);
+        }
+        
+        /* Enhanced modal styles */
+        #viewModal {
+            backdrop-filter: blur(5px);
+            transition: opacity 0.3s ease;
+        }
+        
+        #viewModal > div {
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        
+        #viewModal[style*="display: flex"] > div {
+            transform: scale(1);
+        }
+        
+        /* Custom scrollbar for modal */
+        #viewModal ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #viewModal ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        
+        #viewModal ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        
+        #viewModal ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Ensure form elements are properly sized */
+        #modalContent input:not([type="checkbox"]):not([type="radio"]),
+        #modalContent select,
+        #modalContent textarea {
+            min-height: 48px;
+            font-size: 16px; /* Prevent zoom on iOS */
+        }
+        
+        #modalContent .grid {
+            gap: 1.5rem;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 1024px) {
+            #viewModal > div {
+                margin: 1rem;
+                max-height: calc(100vh - 2rem);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            #viewModal > div {
+                margin: 0.5rem;
+                max-height: calc(100vh - 1rem);
+            }
+            
+            #viewModal .p-8 {
+                padding: 1.5rem;
+            }
+        }
+        
+        .custom-notification {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
     </style>
 </head>
@@ -726,6 +745,7 @@ if (!empty($selectedPatientId)) {
                                                     <th>Email</th>
                                                     <th>Age</th>
                                                     <th>Gender</th>
+                                                    <th>Sitio</th>
                                                     <th>Contact</th>
                                                     <th>Unique Number</th>
                                                     <th>Actions</th>
@@ -739,6 +759,7 @@ if (!empty($selectedPatientId)) {
                                                         <td><?= htmlspecialchars($user['email']) ?></td>
                                                         <td><?= $user['age'] ?? 'N/A' ?></td>
                                                         <td><?= htmlspecialchars($user['gender'] ?? 'N/A') ?></td>
+                                                        <td><?= htmlspecialchars($user['sitio'] ?? 'N/A') ?></td>
                                                         <td><?= htmlspecialchars($user['contact'] ?? 'N/A') ?></td>
                                                         <td class="font-semibold text-primary"><?= htmlspecialchars($user['unique_number'] ?? 'N/A') ?></td>
                                                         <td>
@@ -799,6 +820,9 @@ if (!empty($selectedPatientId)) {
                                             <td>
                                                 <?php if (!empty($patient['unique_number'])): ?>
                                                     <span class="user-badge">Registered User</span>
+                                                    <?php if (!empty($patient['user_sitio'])): ?>
+                                                        <br><small class="text-gray-500"><?= htmlspecialchars($patient['user_sitio']) ?></small>
+                                                    <?php endif; ?>
                                                 <?php else: ?>
                                                     <span class="text-gray-500">Regular Patient</span>
                                                 <?php endif; ?>
@@ -857,6 +881,39 @@ if (!empty($selectedPatientId)) {
                         <div>
                             <label for="address" class="block text-gray-700 mb-2 font-medium">Address</label>
                             <input type="text" id="address" name="address" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+
+                        <!-- Sitio Field (for future use when column is added) -->
+                        <div>
+                            <label for="sitio" class="block text-gray-700 mb-2 font-medium">Sitio</label>
+                            <select id="sitio" name="sitio" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                                <option value="">Select Sitio</option>
+                                <option value="Sitio Sagingan">Sitio Sagingan — banana grove</option>
+                                <option value="Sitio Tuburan">Sitio Tuburan — spring or water source</option>
+                                <option value="Sitio Malipayon">Sitio Malipayon — joyful place</option>
+                                <option value="Sitio Kabugason">Sitio Kabugason — sunrise spot</option>
+                                <option value="Sitio Panaghiusa">Sitio Panaghiusa — unity</option>
+                                <option value="Sitio Lantawan">Sitio Lantawan — lookout point</option>
+                                <option value="Sitio Kalubihan">Sitio Kalubihan — coconut grove</option>
+                                <option value="Sitio Buntod">Sitio Buntod — small hill</option>
+                                <option value="Sitio Tagbaw">Sitio Tagbaw — lush greenery</option>
+                                <option value="Sitio Huni sa Hangin">Sitio Huni sa Hangin — sound of the wind</option>
+                                <option value="Sitio Katilingban">Sitio Katilingban — community</option>
+                                <option value="Sitio Banikanhon">Sitio Banikanhon — native identity</option>
+                                <option value="Sitio Datu Balas">Sitio Datu Balas — chieftain of the sands</option>
+                                <option value="Sitio Sinugdanan">Sitio Sinugdanan — origin or beginning</option>
+                                <option value="Sitio Kabilin">Sitio Kabilin — heritage</option>
+                                <option value="Sitio Alima">Sitio Alima — care or compassion</option>
+                                <option value="Sitio Pundok">Sitio Pundok — gathering place</option>
+                                <option value="Sitio Bahandi">Sitio Bahandi — treasure</option>
+                                <option value="Sitio Damgo">Sitio Damgo — dream</option>
+                                <option value="Sitio Kalinaw">Sitio Kalinaw — peace</option>
+                                <option value="Sitio Bulawanong Adlaw">Sitio Bulawanong Adlaw — golden sun</option>
+                                <option value="Sitio Padayon">Sitio Padayon — keep moving forward</option>
+                                <option value="Sitio Himaya">Sitio Himaya — glory</option>
+                                <option value="Sitio Panamkon">Sitio Panamkon — vision or hope</option>
+                                <option value="Sitio Sidlakan">Sitio Sidlakan — eastern light or sunrise</option>
+                            </select>
                         </div>
                         
                         <div>
@@ -931,76 +988,172 @@ if (!empty($selectedPatientId)) {
         </div>
     </div>
     
-    <!-- View/Edit Modal -->
+    <!-- Enhanced Wider Modal -->
     <div id="viewModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 modal" style="display: none;">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-screen overflow-y-auto">
-            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-xl font-semibold text-secondary">Patient Health Information</h3>
-                <button onclick="closeViewModal()" class="text-gray-500 hover:text-gray-700">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-y-auto">
+            <div class="p-8 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-primary to-blue-600 text-white rounded-t-2xl">
+                <h3 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-user-injured mr-3 text-white"></i>Patient Health Information
+                </h3>
+                <button onclick="closeViewModal()" class="text-white hover:text-gray-200 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full w-10 h-10 flex items-center justify-center transition duration-200">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
             
-            <div class="p-6">
-                <div id="modalContent">
+            <div class="p-8 bg-gray-50">
+                <div id="modalContent" class="min-h-[500px]">
                     <!-- Content will be loaded via AJAX -->
+                    <div class="flex justify-center items-center py-20">
+                        <div class="text-center">
+                            <i class="fas fa-spinner fa-spin text-5xl text-primary mb-4"></i>
+                            <p class="text-lg text-gray-600 font-medium">Loading patient data...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <div class="p-6 border-t border-gray-200 flex justify-end space-x-4">
-    <button onclick="closeViewModal()" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition">
-        <i class="fas fa-times mr-2"></i>Close
-    </button>
-    <button onclick="printPatientRecord()" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 transition">
-        <i class="fas fa-print mr-2"></i>Print
-    </button>
-    <button onclick="exportToExcel()" class="px-4 py-2 bg-success text-white rounded-md hover:bg-green-700 transition">
-        <i class="fas fa-file-excel mr-2"></i>Excel
-    </button>
-    <button onclick="exportToPDF()" class="px-4 py-2 bg-danger text-white rounded-md hover:bg-red-700 transition">
-        <i class="fas fa-file-pdf mr-2"></i>PDF
-    </button>
-</div>
+            <div class="p-8 border-t border-gray-200 bg-white rounded-b-2xl">
+                <div class="flex flex-wrap justify-between items-center gap-4">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                            <i class="fas fa-info-circle mr-1"></i>View and edit patient information
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="closeViewModal()" class="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-full hover:bg-gray-50 transition font-semibold shadow-sm hover:shadow-md flex items-center">
+                            <i class="fas fa-times mr-2"></i>Close
+                        </button>
+                        <button onclick="printPatientRecord()" class="px-6 py-3 bg-blue-100 text-primary rounded-full hover:bg-blue-200 transition font-semibold shadow-sm hover:shadow-md flex items-center">
+                            <i class="fas fa-print mr-2"></i>Print
+                        </button>
+                        <button onclick="exportToExcel()" class="px-6 py-3 bg-green-100 text-success rounded-full hover:bg-green-200 transition font-semibold shadow-sm hover:shadow-md flex items-center">
+                            <i class="fas fa-file-excel mr-2"></i>Excel
+                        </button>
+                        <button onclick="exportToPDF()" class="px-6 py-3 bg-red-100 text-danger rounded-full hover:bg-red-200 transition font-semibold shadow-sm hover:shadow-md flex items-center">
+                            <i class="fas fa-file-pdf mr-2"></i>PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // Consolidated export/print functions
+        // Enhanced modal functions
+        function openViewModal(patientId) {
+            // Show loading state with better styling
+            document.getElementById('modalContent').innerHTML = `
+                <div class="flex justify-center items-center py-20">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin text-5xl text-primary mb-4"></i>
+                        <p class="text-lg text-gray-600 font-medium">Loading patient data...</p>
+                        <p class="text-sm text-gray-500 mt-2">Please wait while we retrieve the information</p>
+                    </div>
+                </div>
+            `;
+            
+            // Show modal with smooth animation
+            const modal = document.getElementById('viewModal');
+            modal.style.display = 'flex';
+            modal.style.opacity = '0';
+            
+            // Animate modal appearance
+            setTimeout(() => {
+                modal.style.opacity = '1';
+                modal.style.transition = 'opacity 0.3s ease';
+            }, 10);
+            
+            // Load patient data via AJAX
+            fetch(`./get_patient_data.php?id=${patientId}`)
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('modalContent').innerHTML = data;
+                    
+                    // Add custom styling for the loaded content
+                    const modalContent = document.getElementById('modalContent');
+                    const forms = modalContent.querySelectorAll('form');
+                    forms.forEach(form => {
+                        form.classList.add('w-full', 'max-w-full');
+                        
+                        // Make form containers wider
+                        const containers = form.querySelectorAll('.grid, .flex');
+                        containers.forEach(container => {
+                            container.classList.add('w-full');
+                        });
+                        
+                        // Make input fields larger and more visible
+                        const inputs = form.querySelectorAll('input, select, textarea');
+                        inputs.forEach(input => {
+                            if (!input.classList.contains('readonly-field')) {
+                                input.classList.add('text-lg', 'px-4', 'py-3');
+                            }
+                        });
+                    });
+                })
+                .catch(error => {
+                    document.getElementById('modalContent').innerHTML = `
+                        <div class="text-center py-12 bg-red-50 rounded-xl border-2 border-red-200">
+                            <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-4"></i>
+                            <h3 class="text-xl font-semibold text-red-700 mb-2">Error Loading Patient Data</h3>
+                            <p class="text-red-600 mb-4">Unable to load patient information. Please try again.</p>
+                            <button onclick="openViewModal(${patientId})" class="px-6 py-3 bg-primary text-white rounded-full hover:bg-blue-700 transition font-semibold">
+                                <i class="fas fa-redo mr-2"></i>Retry
+                            </button>
+                        </div>
+                    `;
+                });
+        }
+        
+        // Enhanced close modal function
+        function closeViewModal() {
+            const modal = document.getElementById('viewModal');
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+        
+        // Enhanced export functions
         function printPatientRecord() {
             const patientId = getPatientId();
             if (patientId) {
-                window.open(`/community-health-tracker/api/print_patient.php?id=${patientId}`, '_blank');
+                const printWindow = window.open(`/community-health-tracker/api/print_patient.php?id=${patientId}`, '_blank', 'width=1200,height=800');
+                if (printWindow) {
+                    printWindow.focus();
+                }
             } else {
-                alert('No patient selected');
+                showNotification('error', 'No patient selected for printing');
             }
         }
 
         function exportToExcel() {
             const patientId = getPatientId();
             if (patientId) {
+                showNotification('info', 'Preparing Excel export...');
                 window.location.href = `/community-health-tracker/api/export_patient.php?id=${patientId}&format=excel`;
             } else {
-                alert('No patient selected');
+                showNotification('error', 'No patient selected for export');
             }
         }
 
         function exportToPDF() {
             const patientId = getPatientId();
             if (patientId) {
+                showNotification('info', 'Generating PDF document...');
                 window.location.href = `/community-health-tracker/api/export_patient.php?id=${patientId}&format=pdf`;
             } else {
-                alert('No patient selected');
+                showNotification('error', 'No patient selected for export');
             }
         }
 
-        // Helper function to get patient ID
+        // Enhanced patient ID detection
         function getPatientId() {
-            // Try multiple possible selectors to find the patient ID
             const selectors = [
                 '#healthInfoForm input[name="patient_id"]',
                 'input[name="patient_id"]',
                 '[name="patient_id"]',
-                '#patient_id'
+                '#patient_id',
+                '.patient-id-input'
             ];
             
             for (const selector of selectors) {
@@ -1010,11 +1163,68 @@ if (!empty($selectedPatientId)) {
                 }
             }
             
+            // Try to get from URL if modal is open
+            const modalContent = document.getElementById('modalContent');
+            if (modalContent) {
+                const hiddenInputs = modalContent.querySelectorAll('input[type="hidden"]');
+                for (const input of hiddenInputs) {
+                    if (input.name === 'patient_id' && input.value) {
+                        return input.value;
+                    }
+                }
+            }
+            
             return null;
         }
-    </script>
 
-    <script>
+        // Notification function
+        function showNotification(type, message) {
+            // Remove existing notifications
+            const existingNotifications = document.querySelectorAll('.custom-notification');
+            existingNotifications.forEach(notification => notification.remove());
+            
+            const notification = document.createElement('div');
+            notification.className = `custom-notification fixed top-6 right-6 z-50 px-6 py-4 rounded-xl shadow-lg border-2 ${
+                type === 'error' ? 'bg-red-100 text-red-800 border-red-200' :
+                type === 'success' ? 'bg-green-100 text-green-800 border-green-200' :
+                'bg-blue-100 text-blue-800 border-blue-200'
+            }`;
+            
+            const icon = type === 'error' ? 'fa-exclamation-circle' :
+                       type === 'success' ? 'fa-check-circle' : 'fa-info-circle';
+            
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${icon} mr-3 text-xl"></i>
+                    <span class="font-semibold">${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 5000);
+        }
+
+        // Enhanced modal close on outside click
+        window.onclick = function(event) {
+            const modal = document.getElementById('viewModal');
+            if (event.target === modal) {
+                closeViewModal();
+            }
+        };
+
+        // Add keyboard support for modal
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeViewModal();
+            }
+        });
+
         // Auto-hide messages after 3 seconds
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(function() {
@@ -1090,47 +1300,6 @@ if (!empty($selectedPatientId)) {
                 if (tabButton) tabButton.click();
             }
         });
-        
-        // Open view modal
-        function openViewModal(patientId) {
-            // Show loading state
-            document.getElementById('modalContent').innerHTML = `
-                <div class="flex justify-center items-center py-12">
-                    <i class="fas fa-spinner fa-spin text-4xl text-primary"></i>
-                </div>
-            `;
-            
-            // Show modal
-            document.getElementById('viewModal').style.display = 'flex';
-            
-            // Load patient data via AJAX - updated path for consistency
-            fetch(`./get_patient_data.php?id=${patientId}`)
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('modalContent').innerHTML = data;
-                })
-                .catch(error => {
-                    document.getElementById('modalContent').innerHTML = `
-                        <div class="text-center py-8 text-danger">
-                            <i class="fas fa-exclamation-circle text-3xl mb-3"></i>
-                            <p>Error loading patient data. Please try again.</p>
-                        </div>
-                    `;
-                });
-        }
-        
-        // Close view modal
-        function closeViewModal() {
-            document.getElementById('viewModal').style.display = 'none';
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('viewModal');
-            if (event.target === modal) {
-                closeViewModal();
-            }
-        };
         
         // Clear search on page refresh
         if (window.history.replaceState && !window.location.search.includes('search=')) {
