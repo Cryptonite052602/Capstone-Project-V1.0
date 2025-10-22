@@ -26,10 +26,10 @@ try {
 }
 
 try {
-    // Get basic patient info with COALESCE for gender
+    // Get basic patient info - FIXED: Removed COALESCE for sitio since it doesn't exist in patients table
     $stmt = $pdo->prepare("SELECT p.*, 
                           COALESCE(e.gender, p.gender) as display_gender,
-                          u.unique_number, u.email as user_email, u.id as user_id
+                          u.unique_number, u.email as user_email, u.id as user_id, u.sitio as user_sitio
                           FROM sitio1_patients p 
                           LEFT JOIN sitio1_users u ON p.user_id = u.id
                           LEFT JOIN existing_info_patients e ON p.id = e.patient_id
@@ -130,6 +130,11 @@ try {
                     <label class="block text-gray-700 mb-2 font-medium">Address</label>
                     <div class="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-800 readonly-field">' . htmlspecialchars($patient['address'] ?? 'Not specified') . '</div>
                 </div>
+
+                <div>
+                    <label class="block text-gray-700 mb-2 font-medium">Sitio</label>
+                    <div class="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-800 readonly-field">' . htmlspecialchars($patient['user_sitio'] ?? 'Not specified') . '</div>
+                </div>
                 
                 <div>
                     <label class="block text-gray-700 mb-2 font-medium">Contact Number</label>
@@ -223,6 +228,38 @@ try {
                     <label for="address" class="block text-gray-700 mb-2 font-medium">Address</label>
                     <input type="text" id="address" name="address" value="' . htmlspecialchars($patient['address'] ?? '') . '" 
                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                </div>
+
+                <div>
+                    <label for="sitio" class="block text-gray-700 mb-2 font-medium">Sitio</label>
+                    <select id="sitio" name="sitio" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="">Select Sitio</option>
+                        <option value="Sitio Sagingan" ' . (($patient['sitio'] ?? '') == 'Sitio Sagingan' ? 'selected' : '') . '>Sitio Sagingan — banana grove</option>
+                        <option value="Sitio Tuburan" ' . (($patient['sitio'] ?? '') == 'Sitio Tuburan' ? 'selected' : '') . '>Sitio Tuburan — spring or water source</option>
+                        <option value="Sitio Malipayon" ' . (($patient['sitio'] ?? '') == 'Sitio Malipayon' ? 'selected' : '') . '>Sitio Malipayon — joyful place</option>
+                        <option value="Sitio Kabugason" ' . (($patient['sitio'] ?? '') == 'Sitio Kabugason' ? 'selected' : '') . '>Sitio Kabugason — sunrise spot</option>
+                        <option value="Sitio Panaghiusa" ' . (($patient['sitio'] ?? '') == 'Sitio Panaghiusa' ? 'selected' : '') . '>Sitio Panaghiusa — unity</option>
+                        <option value="Sitio Lantawan" ' . (($patient['sitio'] ?? '') == 'Sitio Lantawan' ? 'selected' : '') . '>Sitio Lantawan — lookout point</option>
+                        <option value="Sitio Kalubihan" ' . (($patient['sitio'] ?? '') == 'Sitio Kalubihan' ? 'selected' : '') . '>Sitio Kalubihan — coconut grove</option>
+                        <option value="Sitio Buntod" ' . (($patient['sitio'] ?? '') == 'Sitio Buntod' ? 'selected' : '') . '>Sitio Buntod — small hill</option>
+                        <option value="Sitio Tagbaw" ' . (($patient['sitio'] ?? '') == 'Sitio Tagbaw' ? 'selected' : '') . '>Sitio Tagbaw — lush greenery</option>
+                        <option value="Sitio Huni sa Hangin" ' . (($patient['sitio'] ?? '') == 'Sitio Huni sa Hangin' ? 'selected' : '') . '>Sitio Huni sa Hangin — sound of the wind</option>
+                        <option value="Sitio Katilingban" ' . (($patient['sitio'] ?? '') == 'Sitio Katilingban' ? 'selected' : '') . '>Sitio Katilingban — community</option>
+                        <option value="Sitio Banikanhon" ' . (($patient['sitio'] ?? '') == 'Sitio Banikanhon' ? 'selected' : '') . '>Sitio Banikanhon — native identity</option>
+                        <option value="Sitio Datu Balas" ' . (($patient['sitio'] ?? '') == 'Sitio Datu Balas' ? 'selected' : '') . '>Sitio Datu Balas — chieftain of the sands</option>
+                        <option value="Sitio Sinugdanan" ' . (($patient['sitio'] ?? '') == 'Sitio Sinugdanan' ? 'selected' : '') . '>Sitio Sinugdanan — origin or beginning</option>
+                        <option value="Sitio Kabilin" ' . (($patient['sitio'] ?? '') == 'Sitio Kabilin' ? 'selected' : '') . '>Sitio Kabilin — heritage</option>
+                        <option value="Sitio Alima" ' . (($patient['sitio'] ?? '') == 'Sitio Alima' ? 'selected' : '') . '>Sitio Alima — care or compassion</option>
+                        <option value="Sitio Pundok" ' . (($patient['sitio'] ?? '') == 'Sitio Pundok' ? 'selected' : '') . '>Sitio Pundok — gathering place</option>
+                        <option value="Sitio Bahandi" ' . (($patient['sitio'] ?? '') == 'Sitio Bahandi' ? 'selected' : '') . '>Sitio Bahandi — treasure</option>
+                        <option value="Sitio Damgo" ' . (($patient['sitio'] ?? '') == 'Sitio Damgo' ? 'selected' : '') . '>Sitio Damgo — dream</option>
+                        <option value="Sitio Kalinaw" ' . (($patient['sitio'] ?? '') == 'Sitio Kalinaw' ? 'selected' : '') . '>Sitio Kalinaw — peace</option>
+                        <option value="Sitio Bulawanong Adlaw" ' . (($patient['sitio'] ?? '') == 'Sitio Bulawanong Adlaw' ? 'selected' : '') . '>Sitio Bulawanong Adlaw — golden sun</option>
+                        <option value="Sitio Padayon" ' . (($patient['sitio'] ?? '') == 'Sitio Padayon' ? 'selected' : '') . '>Sitio Padayon — keep moving forward</option>
+                        <option value="Sitio Himaya" ' . (($patient['sitio'] ?? '') == 'Sitio Himaya' ? 'selected' : '') . '>Sitio Himaya — glory</option>
+                        <option value="Sitio Panamkon" ' . (($patient['sitio'] ?? '') == 'Sitio Panamkon' ? 'selected' : '') . '>Sitio Panamkon — vision or hope</option>
+                        <option value="Sitio Sidlakan" ' . (($patient['sitio'] ?? '') == 'Sitio Sidlakan' ? 'selected' : '') . '>Sitio Sidlakan — eastern light or sunrise</option>
+                    </select>
                 </div>
                 
                 <div>
@@ -509,7 +546,7 @@ try {
     }
     </style>';
 
-            // Add JavaScript for form validation and visit functionality
+    // Add JavaScript for form validation and visit functionality
     echo '
     <script>
     // Form validation function
