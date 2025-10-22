@@ -16,7 +16,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Community Health Tracker</title>
+    <title>Barangay Toong Health Monitoring and Tracking</title>
+    <link rel="icon" type="image/png" href="../asssets/images/toong-logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/community-health-tracker/assets/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -1149,39 +1150,29 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     </div>
 
                     <!-- New Sitio Field -->
-                    <div>
-                        <label for="sitio" class="block text-sm font-medium text-gray-700 mb-2">Sitio <span class="text-red-500">*</span></label>
-                        <select id="sitio" name="sitio"
-                            class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
-                            required>
-                            <option value="" disabled selected>Select your Sitio</option>
-                            <option value="Sitio Sagingan">Sitio Sagingan — banana grove</option>
-                            <option value="Sitio Tuburan">Sitio Tuburan — spring or water source</option>
-                            <option value="Sitio Malipayon">Sitio Malipayon — joyful place</option>
-                            <option value="Sitio Kabugason">Sitio Kabugason — sunrise spot</option>
-                            <option value="Sitio Panaghiusa">Sitio Panaghiusa — unity</option>
-                            <option value="Sitio Lantawan">Sitio Lantawan — lookout point</option>
-                            <option value="Sitio Kalubihan">Sitio Kalubihan — coconut grove</option>
-                            <option value="Sitio Buntod">Sitio Buntod — small hill</option>
-                            <option value="Sitio Tagbaw">Sitio Tagbaw — lush greenery</option>
-                            <option value="Sitio Huni sa Hangin">Sitio Huni sa Hangin — sound of the wind</option>
-                            <option value="Sitio Katilingban">Sitio Katilingban — community</option>
-                            <option value="Sitio Banikanhon">Sitio Banikanhon — native identity</option>
-                            <option value="Sitio Datu Balas">Sitio Datu Balas — chieftain of the sands</option>
-                            <option value="Sitio Sinugdanan">Sitio Sinugdanan — origin or beginning</option>
-                            <option value="Sitio Kabilin">Sitio Kabilin — heritage</option>
-                            <option value="Sitio Alima">Sitio Alima — care or compassion</option>
-                            <option value="Sitio Pundok">Sitio Pundok — gathering place</option>
-                            <option value="Sitio Bahandi">Sitio Bahandi — treasure</option>
-                            <option value="Sitio Damgo">Sitio Damgo — dream</option>
-                            <option value="Sitio Kalinaw">Sitio Kalinaw — peace</option>
-                            <option value="Sitio Bulawanong Adlaw">Sitio Bulawanong Adlaw — golden sun</option>
-                            <option value="Sitio Padayon">Sitio Padayon — keep moving forward</option>
-                            <option value="Sitio Himaya">Sitio Himaya — glory</option>
-                            <option value="Sitio Panamkon">Sitio Panamkon — vision or hope</option>
-                            <option value="Sitio Sidlakan">Sitio Sidlakan — eastern light or sunrise</option>
-                        </select>
-                    </div>
+<div>
+    <label for="sitio" class="block text-sm font-medium text-gray-700 mb-2">Sitio <span class="text-red-500">*</span></label>
+    <select id="sitio" name="sitio"
+        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
+        required>
+        <option value="" disabled selected>Select your Sitio</option>
+        <option value="Proper Toong">Proper Toong</option>
+        <option value="Lower Toong">Lower Toong</option>
+        <option value="Buacao">Buacao</option>
+        <option value="Angay-Angay">Angay-Angay</option>
+        <option value="Badiang">Badiang</option>
+        <option value="Candahat">Candahat</option>
+        <option value="NapNapan">NapNapan</option>
+        <option value="Buyo">Buyo</option>
+        <option value="Kalumboyan">Kalumboyan</option>
+        <option value="Bugna">Bugna</option>
+        <option value="Kaangking">Kaangking</option>
+        <option value="Caolong">Caolong</option>
+        <option value="Acasia">Acasia</option>
+        <option value="Buad">Buad</option>
+        <option value="Pangpang">Pangpang</option>
+    </select>
+</div>
 
                     <!-- Continue Button - consistent styling -->
                     <div class="mt-6">
