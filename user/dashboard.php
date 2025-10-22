@@ -222,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
     }
 }
 
-// Handle appointment cancellation - FIXED: Only allow cancellation for pending appointments
+// Handle appointment cancellation - Only allow cancellation for pending appointments that haven't passed
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])) {
     $userAppointmentId = $_POST['appointment_id'];
     $cancelReason = trim($_POST['cancel_reason'] ?? '');
@@ -247,13 +247,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
     }
     
     try {
-        // Check if appointment belongs to user and is PENDING (not approved)
+        // Check if appointment belongs to user, is PENDING, and hasn't passed
         $stmt = $pdo->prepare("
             SELECT ua.id, ua.status, a.date, a.start_time
             FROM user_appointments ua
             JOIN sitio1_appointments a ON ua.appointment_id = a.id
             WHERE ua.id = ? AND ua.user_id = ? 
-            AND ua.status = 'pending'  -- ONLY allow cancellation of pending appointments
+            AND ua.status = 'pending'
+            AND (a.date > CURDATE() OR (a.date = CURDATE() AND a.start_time > TIME(NOW())))
         ");
         $stmt->execute([$userAppointmentId, $userId]);
         $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -261,7 +262,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
         if (!$appointment) {
             // Check why it can't be cancelled
             $checkStmt = $pdo->prepare("
-                SELECT ua.status, a.date, a.start_time
+                SELECT ua.status, a.date, a.start_time,
+                       (a.date < CURDATE() OR (a.date = CURDATE() AND a.start_time < TIME(NOW()))) as is_past
                 FROM user_appointments ua
                 JOIN sitio1_appointments a ON ua.appointment_id = a.id
                 WHERE ua.id = ? AND ua.user_id = ?
@@ -271,20 +273,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
             
             if (!$appointmentInfo) {
                 throw new Exception('Appointment not found or you do not have permission to cancel it.');
-            } elseif ($appointmentInfo['status'] === 'approved') {
-                throw new Exception('Approved appointments cannot be cancelled by users. Please contact support.');
-            } elseif ($appointmentInfo['status'] === 'completed') {
-                throw new Exception('Completed appointments cannot be cancelled.');
-            } elseif ($appointmentInfo['status'] === 'cancelled') {
-                throw new Exception('This appointment has already been cancelled.');
-            } elseif ($appointmentInfo['status'] === 'rejected') {
-                throw new Exception('This appointment has been rejected by staff.');
+            } elseif ($appointmentInfo['status'] !== 'pending') {
+                throw new Exception('Only pending appointments can be cancelled.');
+            } elseif ($appointmentInfo['is_past']) {
+                throw new Exception('Past appointments cannot be cancelled.');
             } else {
                 throw new Exception('Appointment cannot be cancelled at this time.');
             }
         }
         
-        // UPDATE the appointment status to cancelled instead of deleting
+        // UPDATE the appointment status to cancelled
         $stmt = $pdo->prepare("
             UPDATE user_appointments 
             SET status = 'cancelled', cancel_reason = ?, cancelled_at = NOW()
@@ -865,27 +863,27 @@ try {
         </div>
 
         <!-- Error Modal -->
-        <div id="error-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="error-modal-backdrop"></div>
-            <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full opacity-0 scale-95" id="error-modal-content">
-                <div class="p-6 text-center">
-                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                        <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </div>
-                    <h3 class="mt-3 text-lg font-medium text-gray-900">Booking Error</h3>
-                    <div class="mt-2 px-4 py-3">
-                        <p class="text-sm text-gray-500" id="error-message"></p>
-                    </div>
-                    <div class="mt-4">
-                        <button type="button" onclick="hideModal('error')" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 modal-button">
-                            Try Again
-                        </button>
-                    </div>
-                </div>
+<div id="error-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="error-modal-backdrop"></div>
+    <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full opacity-0 scale-95" id="error-modal-content">
+        <div class="p-6 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </div>
+            <h3 class="mt-3 text-lg font-medium text-gray-900">Booking Error</h3>
+            <div class="mt-2 px-4 py-3">
+                <p class="text-sm text-gray-500" id="error-message"></p>
+            </div>
+            <div class="mt-4">
+                <button type="button" onclick="hideModal('error')" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 modal-button">
+                    Try Again
+                </button>
             </div>
         </div>
+    </div>
+</div>
 
         <!-- Session Notification Modal -->
         <?php if (isset($_SESSION['notification'])): ?>
@@ -1526,15 +1524,6 @@ try {
             <strong>Priority Number:</strong> <?= htmlspecialchars($appointment['priority_number']) ?>
         </p>
         <div class="flex flex-wrap gap-2">
-            <?php if (!empty($appointment['invoice_number'])): ?>
-                <button onclick="downloadInvoice(<?= $appointment['id'] ?>)" 
-                        class="bg-blue-100 text-blue-800 px-3 py-2 rounded-full text-sm font-medium hover:bg-blue-200 flex items-center transition duration-200 ease-in-out transform hover:scale-105 download-btn">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Download Invoice
-                </button>
-            <?php endif; ?>
             
             <button onclick="previewAppointmentTicket(<?= $appointment['id'] ?>)" 
                     class="bg-purple-100 text-purple-800 px-3 py-2 rounded-full text-sm font-medium hover:bg-purple-200 flex items-center transition duration-200 ease-in-out transform hover:scale-105 download-btn">
