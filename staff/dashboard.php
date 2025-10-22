@@ -1401,6 +1401,30 @@ $nextAvailableDate = null;
 if (!empty($availableDates)) {
     $nextAvailableDate = $availableDates[0]['date'];
 }
+
+// === ADD THE UPDATED QUERY HERE ===
+// === UPDATED QUERY FOR UNAPPROVED USERS WITH ID IMAGE SUPPORT ===
+try {
+    $stmt = $pdo->query("
+        SELECT *, 
+               CASE 
+                   WHEN id_image_path IS NOT NULL AND id_image_path != '' THEN 
+                       CASE 
+                           WHEN id_image_path LIKE 'http%' THEN id_image_path
+                           WHEN id_image_path LIKE '/%' THEN id_image_path
+                           ELSE CONCAT('../', id_image_path)
+                       END
+                   ELSE NULL 
+               END as display_image_path
+        FROM sitio1_users 
+        WHERE approved = FALSE AND (status IS NULL OR status != 'declined') 
+        ORDER BY created_at DESC
+    ");
+    $unapprovedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $error = 'Error fetching unapproved users: ' . $e->getMessage();
+    $unapprovedUsers = [];
+}
 ?>
 
 <!DOCTYPE html>
@@ -2377,7 +2401,7 @@ if (!empty($availableDates)) {
                 </div>
             </div>
             
-            <!-- Account Management Section -->
+                        <!-- Account Management Section -->
             <div class="hidden p-4 bg-white rounded-lg border border-gray-200" id="account-management" role="tabpanel" aria-labelledby="account-tab">
                 <h2 class="text-xl font-semibold mb-4 text-blue-700">Patient Account Approvals</h2>
                 
@@ -2415,14 +2439,10 @@ if (!empty($availableDates)) {
                                         </td>
                                         <td class="py-2 px-4 border-b border-gray-200">
                                             <?php if ($user['status'] !== 'approved'): ?>
-                                                <form method="POST" action="" class="inline">
-                                                    <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
-                                                    <input type="hidden" name="action" value="approve">
-                                                    <button type="submit" name="approve_user" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 mr-2 action-button">Approve</button>
-                                                </form>
-                                                
-                                                <!-- Decline with reason modal trigger -->
-                                                <button onclick="openDeclineModal(<?= $user['id'] ?>)" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 action-button">Decline</button>
+                                                <button onclick="openUserDetailsModal(<?= htmlspecialchars(json_encode($user)) ?>)" 
+                                                        class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 action-button">
+                                                    <i class="fas fa-eye mr-1"></i> View Details
+                                                </button>
                                             <?php else: ?>
                                                 <span class="text-gray-400">No actions available</span>
                                             <?php endif; ?>
@@ -2434,8 +2454,517 @@ if (!empty($availableDates)) {
                     </div>
                 <?php endif; ?>
             </div>
+                            <!-- User Details Modal -->
+<div id="userDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-10 mx-auto p-4 border w-full max-w-5xl shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-semibold text-gray-900">Patient Registration Details</h3>
+            <button type="button" onclick="closeUserDetailsModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <div class="bg-gray-50 rounded-lg mb-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+                <!-- Personal Information -->
+                <div class="bg-white p-4 rounded-lg border border-gray-200">
+                    <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Personal Information</h4>
+                    <div class="space-y-3">
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Full Name:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userFullName">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Username:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userUsername">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Email:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userEmail">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Gender:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userGender">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Age:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userAge">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Contact:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userContact">N/A</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Address & Verification -->
+                <div class="bg-white p-4 rounded-lg border border-gray-200">
+                    <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Address Information</h4>
+                    <div class="space-y-3 mb-4">
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Full Address:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userAddress">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Sitio:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userSitio">N/A</p>
+                        </div>
+                    </div>
+
+                    <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Verification</h4>
+                    <div class="space-y-3">
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Method:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userVerificationMethod">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">ID Verified:</span>
+                            <p class="text-sm font-semibold mt-1" id="userIdVerified">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Consent Given:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userVerificationConsent">N/A</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ID Image Section -->
+                <div class="bg-white p-4 rounded-lg border border-gray-200">
+                    <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">ID Document</h4>
+                    <div id="idImageSection" class="hidden">
+                        <div class="flex flex-col items-center">
+                            <div class="w-full h-48 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center mb-3 overflow-hidden">
+                                <img id="userIdImage" src="" alt="Uploaded ID Image" 
+                                     class="w-full h-full object-contain">
+                            </div>
+                            <div class="text-center w-full">
+                                <p class="text-xs text-gray-500 mb-2 truncate" id="imagePathDisplay"></p>
+                                <div class="flex justify-center space-x-2">
+                                    <a id="userIdImageLink" href="#" target="_blank" 
+                                       class="inline-flex items-center bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition">
+                                        <i class="fas fa-external-link-alt mr-1"></i> Full Size
+                                    </a>
+                                    <button type="button" onclick="openImageModal()" 
+                                            class="inline-flex items-center bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 transition">
+                                        <i class="fas fa-expand mr-1"></i> Zoom
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="noIdImageSection" class="hidden">
+                        <div class="w-full h-48 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-lg flex flex-col items-center justify-center p-4">
+                            <i class="fas fa-id-card text-yellow-500 text-2xl mb-2"></i>
+                            <p class="text-yellow-700 text-sm font-medium text-center">No ID Image Uploaded</p>
+                            <p class="text-yellow-600 text-xs text-center mt-1">Manual verification required</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Row: Registration & Status -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 px-4 pb-4">
+                <div class="bg-white p-4 rounded-lg border border-gray-200">
+                    <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Registration Details</h4>
+                    <div class="grid grid-cols-1 gap-3">
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Date Registered:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userRegisteredDate">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Last Updated:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userUpdatedDate">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Verified At:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userVerifiedAt">N/A</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg border border-gray-200">
+                    <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Account Status</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Status:</span>
+                            <p class="text-sm font-semibold mt-1" id="userStatus">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Approved:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userApproved">N/A</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600">Role:</span>
+                            <p class="text-sm text-gray-900 mt-1" id="userRole">N/A</p>
+                        </div>
+                        <div id="uniqueNumberSection" class="hidden">
+                            <span class="text-sm font-medium text-gray-600">Unique No:</span>
+                            <p class="text-sm font-semibold text-blue-600 mt-1" id="userUniqueNumber">N/A</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verification Notes -->
+            <div id="verificationNotesSection" class="hidden px-4 pb-4">
+                <div class="bg-white p-4 rounded-lg border border-gray-200">
+                    <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Verification Notes</h4>
+                    <p class="text-sm text-gray-900" id="userVerificationNotes">N/A</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex justify-end space-x-3 mt-4">
+            <button type="button" onclick="closeUserDetailsModal()" class="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium">
+                <i class="fas fa-times mr-2"></i> Close
+            </button>
+            <button type="button" onclick="openApproveConfirmationModal()" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">
+                <i class="fas fa-check-circle mr-2"></i> Approve
+            </button>
+            <button type="button" onclick="openDeclineModalFromDetails()" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium">
+                <i class="fas fa-times-circle mr-2"></i> Decline
+            </button>
         </div>
     </div>
+</div>
+
+<!-- Approve Confirmation Modal -->
+<div id="approveConfirmationModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100">
+                <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">Confirm User Approval</h3>
+            <div class="mt-2 px-4 py-3">
+                <p class="text-sm text-gray-600">
+                    Are you sure you want to approve this user account? This action will generate a unique patient number and grant full system access.
+                </p>
+                <div class="mt-4 bg-blue-50 p-3 rounded-lg">
+                    <p class="text-sm text-blue-700 font-medium">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        An approval email with the unique patient number will be sent to the user.
+                    </p>
+                </div>
+            </div>
+            <div class="flex justify-center space-x-3 px-4 py-3 mt-4">
+                <button type="button" onclick="closeApproveConfirmationModal()" class="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium">
+                    Cancel
+                </button>
+                <form method="POST" action="" class="inline" id="finalApproveForm">
+                    <input type="hidden" name="user_id" id="finalApproveUserId">
+                    <input type="hidden" name="action" value="approve">
+                    <button type="submit" name="approve_user" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">
+                        <i class="fas fa-check mr-1"></i> Confirm Approval
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Decline Modal -->
+<div id="declineModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <div class="flex items-center mb-4">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                    <i class="fas fa-times-circle text-red-600 text-xl"></i>
+                </div>
+            </div>
+            <h3 class="text-xl leading-6 font-medium text-gray-900 text-center mb-2">Decline User Account</h3>
+            <p class="text-gray-600 text-center mb-6">Please provide a reason for declining this user registration.</p>
+            
+            <form id="declineForm" method="POST" action="">
+                <input type="hidden" name="user_id" id="declineUserId">
+                <input type="hidden" name="action" value="decline">
+                
+                <div class="mb-6">
+                    <label for="decline_reason" class="block text-gray-700 text-sm font-semibold mb-3">Reason for Declination *</label>
+                    <textarea id="decline_reason" name="decline_reason" rows="6" 
+                              class="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500" 
+                              placeholder="Please provide a detailed reason for declining this user account. This will be included in the notification email sent to the user..."
+                              required></textarea>
+                    <p class="text-xs text-gray-500 mt-2">This reason will be sent to the user via email.</p>
+                </div>
+                
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <i class="fas fa-exclamation-triangle text-red-500 mt-1 mr-3"></i>
+                        <div>
+                            <h4 class="text-sm font-semibold text-red-800">Important Notice</h4>
+                            <p class="text-sm text-red-700 mt-1">
+                                Declining this account will prevent the user from accessing the system. They will receive an email notification with the reason provided above.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeDeclineModal()" class="px-6 py-3 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium">
+                        <i class="fas fa-arrow-left mr-2"></i> Cancel
+                    </button>
+                    <button type="submit" name="approve_user" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium">
+                        <i class="fas fa-ban mr-2"></i> Confirm Decline
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Image Zoom Modal -->
+<div id="imageModal" class="fixed inset-0 bg-black bg-opacity-90 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-0 left-0 w-full h-full flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-full">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-lg font-semibold">ID Document Preview</h3>
+                <button type="button" onclick="closeImageModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4 overflow-auto max-h-96 flex justify-center">
+                <img id="zoomedUserIdImage" src="" alt="Zoomed ID Image" class="max-w-full h-auto rounded-lg">
+            </div>
+            <div class="p-4 border-t text-center">
+                <a id="zoomedUserIdImageLink" href="#" target="_blank" 
+                   class="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-external-link-alt mr-2"></i> Open in New Tab
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+        </div>
+    </div>
+
+    <script>
+        // Global variable to store current user ID
+let currentUserDetailsId = null;
+
+// User Details Modal functions
+function openUserDetailsModal(user) {
+    console.log('User data for modal:', user);
+    
+    // Set user data in the modal
+    document.getElementById('userFullName').textContent = user.full_name || 'N/A';
+    document.getElementById('userUsername').textContent = user.username || 'N/A';
+    document.getElementById('userEmail').textContent = user.email || 'N/A';
+    document.getElementById('userGender').textContent = user.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'N/A';
+    document.getElementById('userAge').textContent = user.age || 'N/A';
+    document.getElementById('userContact').textContent = user.contact || 'N/A';
+    
+    // Address information
+    document.getElementById('userAddress').textContent = user.address || 'N/A';
+    document.getElementById('userSitio').textContent = user.sitio || 'N/A';
+    
+    // Verification information
+    const verificationMethod = user.verification_method ? 
+        user.verification_method.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A';
+    document.getElementById('userVerificationMethod').textContent = verificationMethod;
+    
+    const idVerifiedElement = document.getElementById('userIdVerified');
+    if (user.id_verified === 1 || user.id_verified === true) {
+        idVerifiedElement.textContent = 'Yes';
+        idVerifiedElement.className = 'text-sm font-semibold text-green-600 mt-1';
+    } else {
+        idVerifiedElement.textContent = 'No';
+        idVerifiedElement.className = 'text-sm font-semibold text-red-600 mt-1';
+    }
+    
+    const consentElement = document.getElementById('userVerificationConsent');
+    if (user.verification_consent === 1 || user.verification_consent === true) {
+        consentElement.textContent = 'Yes';
+        consentElement.className = 'text-sm text-green-600 mt-1';
+    } else {
+        consentElement.textContent = 'No';
+        consentElement.className = 'text-sm text-red-600 mt-1';
+    }
+    
+    // Handle ID image - Use display_image_path from query or fallback to id_image_path
+    const idImageSection = document.getElementById('idImageSection');
+    const noIdImageSection = document.getElementById('noIdImageSection');
+    const idImage = document.getElementById('userIdImage');
+    const idImageLink = document.getElementById('userIdImageLink');
+    const imagePathDisplay = document.getElementById('imagePathDisplay');
+    const zoomedIdImage = document.getElementById('zoomedUserIdImage');
+    const zoomedIdImageLink = document.getElementById('zoomedUserIdImageLink');
+    
+    // Use display_image_path if available from query, otherwise use id_image_path
+    const imagePath = user.display_image_path || user.id_image_path;
+    
+    if (imagePath && imagePath.trim() !== '') {
+        console.log('Displaying ID image from path:', imagePath);
+        
+        // Create a new image to test loading
+        const testImage = new Image();
+        testImage.onload = function() {
+            // Image loads successfully
+            idImage.src = imagePath;
+            zoomedIdImage.src = imagePath;
+            idImageLink.href = imagePath;
+            zoomedIdImageLink.href = imagePath;
+            imagePathDisplay.textContent = imagePath;
+            
+            // Show image section, hide no-image section
+            idImageSection.classList.remove('hidden');
+            noIdImageSection.classList.add('hidden');
+        };
+        
+        testImage.onerror = function() {
+            // Image fails to load
+            console.error('Failed to load ID image:', imagePath);
+            idImageSection.classList.add('hidden');
+            noIdImageSection.classList.remove('hidden');
+        };
+        
+        testImage.src = imagePath;
+        
+    } else {
+        console.log('No ID image available');
+        idImageSection.classList.add('hidden');
+        noIdImageSection.classList.remove('hidden');
+    }
+    
+    // Handle verification notes
+    const verificationNotesSection = document.getElementById('verificationNotesSection');
+    const verificationNotes = document.getElementById('userVerificationNotes');
+    if (user.verification_notes) {
+        verificationNotesSection.classList.remove('hidden');
+        verificationNotes.textContent = user.verification_notes;
+    } else {
+        verificationNotesSection.classList.add('hidden');
+    }
+    
+    // Registration details
+    document.getElementById('userRegisteredDate').textContent = user.created_at ? 
+        new Date(user.created_at).toLocaleString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : 'N/A';
+    
+    document.getElementById('userUpdatedDate').textContent = user.updated_at ? 
+        new Date(user.updated_at).toLocaleString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : 'N/A';
+    
+    document.getElementById('userVerifiedAt').textContent = user.verified_at ? 
+        new Date(user.verified_at).toLocaleString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : 'Not verified';
+    
+    // Status information
+    const statusElement = document.getElementById('userStatus');
+    statusElement.textContent = user.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : 'Pending';
+    statusElement.className = 'text-sm font-semibold ' + 
+        (user.status === 'approved' ? 'text-green-600 mt-1' :
+         user.status === 'pending' ? 'text-yellow-600 mt-1' :
+         user.status === 'declined' ? 'text-red-600 mt-1' : 'text-yellow-600 mt-1');
+    
+    const approvedElement = document.getElementById('userApproved');
+    if (user.approved === 1 || user.approved === true) {
+        approvedElement.textContent = 'Yes';
+        approvedElement.className = 'text-sm text-green-600 mt-1';
+    } else {
+        approvedElement.textContent = 'No';
+        approvedElement.className = 'text-sm text-red-600 mt-1';
+    }
+    
+    document.getElementById('userRole').textContent = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Patient';
+    
+    // Handle unique number
+    const uniqueNumberSection = document.getElementById('uniqueNumberSection');
+    const uniqueNumberElement = document.getElementById('userUniqueNumber');
+    if (user.unique_number) {
+        uniqueNumberSection.classList.remove('hidden');
+        uniqueNumberElement.textContent = user.unique_number;
+    } else {
+        uniqueNumberSection.classList.add('hidden');
+    }
+    
+    // Store current user ID for approve/decline functionality
+    currentUserDetailsId = user.id;
+    
+    document.getElementById('userDetailsModal').classList.remove('hidden');
+}
+
+function closeUserDetailsModal() {
+    document.getElementById('userDetailsModal').classList.add('hidden');
+}
+
+// Approve Confirmation Modal functions
+function openApproveConfirmationModal() {
+    document.getElementById('finalApproveUserId').value = currentUserDetailsId;
+    document.getElementById('approveConfirmationModal').classList.remove('hidden');
+}
+
+function closeApproveConfirmationModal() {
+    document.getElementById('approveConfirmationModal').classList.add('hidden');
+}
+
+// Decline Modal functions
+function openDeclineModalFromDetails() {
+    closeUserDetailsModal();
+    setTimeout(() => {
+        openDeclineModal(currentUserDetailsId);
+    }, 100);
+}
+
+function openDeclineModal(userId) {
+    document.getElementById('declineUserId').value = userId;
+    document.getElementById('decline_reason').value = '';
+    document.getElementById('declineModal').classList.remove('hidden');
+}
+
+function closeDeclineModal() {
+    document.getElementById('declineModal').classList.add('hidden');
+}
+
+// Image Modal functions
+function openImageModal() {
+    document.getElementById('imageModal').classList.remove('hidden');
+}
+
+function closeImageModal() {
+    document.getElementById('imageModal').classList.add('hidden');
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    const userDetailsModal = document.getElementById('userDetailsModal');
+    if (event.target === userDetailsModal) {
+        closeUserDetailsModal();
+    }
+    
+    const approveConfirmationModal = document.getElementById('approveConfirmationModal');
+    if (event.target === approveConfirmationModal) {
+        closeApproveConfirmationModal();
+    }
+    
+    const declineModal = document.getElementById('declineModal');
+    if (event.target === declineModal) {
+        closeDeclineModal();
+    }
+    
+    const imageModal = document.getElementById('imageModal');
+    if (event.target === imageModal) {
+        closeImageModal();
+    }
+}
+    </script>
 
     <!-- Success Modal -->
     <div id="successModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
