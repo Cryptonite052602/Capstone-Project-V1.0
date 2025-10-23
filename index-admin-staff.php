@@ -372,7 +372,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="logo">
                     <i class="fas fa-hospital"></i>
                 </div>
-                <div class="logo-text">Barangay Pahina San Nicolas</div>
+                <div class="logo-text">Barangay Toong</div>
             </div>
 
             <div class="welcome-text">
