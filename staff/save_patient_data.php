@@ -1,7 +1,6 @@
 <?php
-// staff/save_patient_data.php
+// staff/save_patient_data.php (simplified version without logging)
 require_once __DIR__ . '/../includes/auth.php';
-
 redirectIfNotLoggedIn();
 
 if (!isStaff()) {
@@ -14,13 +13,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_health_info'])) 
     $response = ['success' => false, 'message' => ''];
     
     try {
-        // Start transaction
         $pdo->beginTransaction();
         
-        // Update patient basic info
-        $stmt = $pdo->prepare("UPDATE sitio1_patients SET last_checkup = ? WHERE id = ? AND added_by = ?");
+        // Update patient basic info with new fields
+        $stmt = $pdo->prepare("UPDATE sitio1_patients SET 
+            last_checkup = ?, civil_status = ?, occupation = ?, sitio = ? 
+            WHERE id = ? AND added_by = ?");
         $stmt->execute([
             !empty($_POST['last_checkup']) ? $_POST['last_checkup'] : null,
+            $_POST['civil_status'] ?? null,
+            $_POST['occupation'] ?? null,
+            $_POST['sitio'] ?? null,
             $patientId,
             $_SESSION['user']['id']
         ]);
@@ -31,7 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_health_info'])) 
         $patient = $stmt->fetch();
         
         if (empty($patient['user_id'])) {
-            $stmt = $pdo->prepare("UPDATE sitio1_patients SET full_name = ?, age = ?, gender = ?, address = ?, contact = ? WHERE id = ? AND added_by = ?");
+            $stmt = $pdo->prepare("UPDATE sitio1_patients SET 
+                full_name = ?, age = ?, gender = ?, address = ?, contact = ? 
+                WHERE id = ? AND added_by = ?");
             $stmt->execute([
                 $_POST['full_name'],
                 $_POST['age'],
@@ -43,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_health_info'])) 
             ]);
         }
         
-        // Save or update health information
+        // Save or update health information with new fields
         $stmt = $pdo->prepare("SELECT * FROM existing_info_patients WHERE patient_id = ?");
         $stmt->execute([$patientId]);
         $existingInfo = $stmt->fetch();
@@ -51,63 +56,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_health_info'])) 
         $gender = !empty($patient['user_id']) ? $_POST['gender'] : $_POST['gender'];
         
         if ($existingInfo) {
-            // Update existing record
             $stmt = $pdo->prepare("UPDATE existing_info_patients SET 
-                gender = ?, height = ?, weight = ?, blood_type = ?, allergies = ?, 
-                medical_history = ?, current_medications = ?, family_history = ?
+                gender = ?, height = ?, weight = ?, temperature = ?, blood_pressure = ?,
+                blood_type = ?, allergies = ?, medical_history = ?, 
+                current_medications = ?, family_history = ?, immunization_record = ?,
+                chronic_conditions = ?, updated_at = NOW()
                 WHERE patient_id = ?");
             $stmt->execute([
                 $gender,
                 $_POST['height'],
                 $_POST['weight'],
+                $_POST['temperature'] ?? null,
+                $_POST['blood_pressure'] ?? null,
                 $_POST['blood_type'],
                 $_POST['allergies'],
                 $_POST['medical_history'],
                 $_POST['current_medications'],
                 $_POST['family_history'],
+                $_POST['immunization_record'] ?? null,
+                $_POST['chronic_conditions'] ?? null,
                 $patientId
             ]);
         } else {
-            // Insert new record
             $stmt = $pdo->prepare("INSERT INTO existing_info_patients 
-                (patient_id, gender, height, weight, blood_type, allergies, 
-                 medical_history, current_medications, family_history) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                (patient_id, gender, height, weight, temperature, blood_pressure,
+                 blood_type, allergies, medical_history, current_medications, 
+                 family_history, immunization_record, chronic_conditions) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $patientId,
                 $gender,
                 $_POST['height'],
                 $_POST['weight'],
+                $_POST['temperature'] ?? null,
+                $_POST['blood_pressure'] ?? null,
                 $_POST['blood_type'],
                 $_POST['allergies'],
                 $_POST['medical_history'],
                 $_POST['current_medications'],
-                $_POST['family_history']
-            ]);
-        }
-        
-        // Save visit data if provided
-        if (!empty($_POST['visit_date']) && !empty($_POST['visit_type'])) {
-            $stmt = $pdo->prepare("INSERT INTO patient_visits 
-                (patient_id, staff_id, visit_date, visit_type, diagnosis, 
-                 treatment, prescription, notes, next_visit_date) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([
-                $patientId,
-                $_SESSION['user']['id'],
-                $_POST['visit_date'],
-                $_POST['visit_type'],
-                $_POST['diagnosis'] ?? '',
-                $_POST['treatment'] ?? '',
-                $_POST['prescription'] ?? '',
-                $_POST['notes'] ?? '',
-                !empty($_POST['next_visit_date']) ? $_POST['next_visit_date'] : null
+                $_POST['family_history'],
+                $_POST['immunization_record'] ?? null,
+                $_POST['chronic_conditions'] ?? null
             ]);
         }
         
         $pdo->commit();
         $response['success'] = true;
         $response['message'] = 'Patient information saved successfully!';
+        
+        // Fetch saved health info to return to client
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM existing_info_patients WHERE patient_id = ?");
+            $stmt->execute([$patientId]);
+            $saved = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // Fetch patient name
+            $stmt = $pdo->prepare("SELECT full_name FROM sitio1_patients WHERE id = ?");
+            $stmt->execute([$patientId]);
+            $p = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            $response['data'] = [
+                'patient_id' => $patientId,
+                'patient_name' => $p['full_name'] ?? null,
+                'gender' => $saved['gender'] ?? null,
+                'height' => $saved['height'] ?? null,
+                'weight' => $saved['weight'] ?? null,
+                'temperature' => $saved['temperature'] ?? null,
+                'blood_pressure' => $saved['blood_pressure'] ?? null,
+                'blood_type' => $saved['blood_type'] ?? null,
+                'allergies' => $saved['allergies'] ?? null,
+                'medical_history' => $saved['medical_history'] ?? null,
+                'current_medications' => $saved['current_medications'] ?? null,
+                'family_history' => $saved['family_history'] ?? null,
+                'chronic_conditions' => $saved['chronic_conditions'] ?? null,
+                'updated_at' => $saved['updated_at'] ?? null
+            ];
+        } catch (Exception $e) {
+            // ignore fetch errors
+            $response['data'] = null;
+        }
         
     } catch (PDOException $e) {
         $pdo->rollBack();
