@@ -17,6 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $gender = trim($_POST['gender'] ?? '');
     $address = trim($_POST['address'] ?? '');
     $sitio = trim($_POST['sitio'] ?? '');
+    $civilStatus = trim($_POST['civil_status'] ?? '');
+    $occupation = trim($_POST['occupation'] ?? '');
     $contact = trim($_POST['contact'] ?? '');
     
     // Identity verification fields
@@ -58,6 +60,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($sitio)) {
         showGlassModal('error', 'Sitio is required.');
         exit();
+    }
+
+    // Civil status may be required depending on local policy; accept empty but trim
+    if (empty($civilStatus)) {
+        // Not strictly required; set to NULL if empty
+        $civilStatus = null;
     }
     
     if ($password !== $confirmPassword) {
@@ -143,20 +151,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Insert user with verification data
         $stmt = $pdo->prepare("INSERT INTO sitio1_users 
-            (username, email, password, full_name, age, gender, address, sitio, contact, 
+            (username, email, password, full_name, age, gender, address, sitio, contact, civil_status, occupation,
              verification_method, id_image_path, verification_notes, verification_consent, approved) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
         
         $stmt->execute([
-            $username, 
-            $email, 
-            $hashedPassword, 
-            $fullName, 
-            $age, 
-            $gender, 
-            $address, 
+            $username,
+            $email,
+            $hashedPassword,
+            $fullName,
+            $age,
+            $gender,
+            $address,
             $sitio,
             $contact,
+            $civilStatus,
+            $occupation,
             $verificationMethod,
             $idImagePath,
             $verificationNotes,
