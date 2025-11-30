@@ -76,6 +76,7 @@ try {
                 <table class="min-w-full bg-white">
                     <thead>
                         <tr>
+                            <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Health Info</th>
                             <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
                             <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Age</th>
                             <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Disease</th>
@@ -85,12 +86,25 @@ try {
                     </thead>
                     <tbody>
                         <?php foreach ($patients as $patient): ?>
+                            <?php
+                            // Check if this patient has health info in existing_info_patients
+                            $stmt = $pdo->prepare("SELECT id FROM existing_info_patients WHERE patient_id = ?");
+                            $stmt->execute([$patient['id']]);
+                            $hasHealthInfo = $stmt->fetch() !== false;
+                            ?>
                             <tr>
                                 <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($patient['full_name']) ?></td>
                                 <td class="py-2 px-4 border-b border-gray-200"><?= $patient['age'] ?: 'N/A' ?></td>
                                 <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($patient['disease'] ?: 'N/A') ?></td>
                                 <td class="py-2 px-4 border-b border-gray-200"><?= $patient['last_checkup'] ? date('M d, Y', strtotime($patient['last_checkup'])) : 'N/A' ?></td>
                                 <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($patient['staff_name'] ?: 'System') ?></td>
+                                <td class="py-2 px-4 border-b border-gray-200">
+                                    <?php if (!$hasHealthInfo): ?>
+                                        <a href="/community-health-tracker/staff/get_patient_data.php?id=<?= $patient['id'] ?>" class="bg-primary text-white px-3 py-1 rounded hover:bg-blue-700 transition">Add Details</a>
+                                    <?php else: ?>
+                                        <span class="text-green-600 font-bold">✔</span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
