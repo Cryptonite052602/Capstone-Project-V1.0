@@ -124,9 +124,11 @@ try {
     <div class="container mx-auto px-4 py-8">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-gray-800">Deleted Patients Archive</h1>
-            <a href="existing_info_patients.php" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
-                <i class="fas fa-arrow-left mr-2"></i>Back to Patients
-            </a>
+            <a href="existing_info_patients.php" 
+   class="bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 transition">
+    <i class="fas fa-arrow-left mr-2"></i>Back to Patients
+</a>
+
         </div>
         
         <?php if ($message): ?>
