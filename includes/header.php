@@ -2,7 +2,7 @@
 ob_start(); // Start output buffering
 
 require_once __DIR__ . '/auth.php';
-require_once __DIR__ . '/header.php';
+
 
 // Set timezone to Philippine time
 date_default_timezone_set('Asia/Manila');
@@ -100,13 +100,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
         background: rgba(255, 255, 255, 0.1);
     }
 
-    /* CLEAN: Simple Logout Button */
+    /* CLEAN: Simple Logout Button - UPDATED FOR FULL ROUND */
     .logout-btn {
         background: #ef4444;
         padding: 0.75rem 1.5rem;
-        border-radius: 0.75rem;
+        border-radius: 9999px !important; /* Full round radius */
         font-weight: 600;
         transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        text-decoration: none;
     }
 
     .logout-btn:hover {
@@ -550,8 +554,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             </div>
                         </div>
                         
-                        <!-- Enhanced Logout Button -->
-                        <a href="../auth/logout.php" class="logout-btn flex items-center space-x-2">
+                        <!-- Enhanced Logout Button - UPDATED FOR FULL ROUND -->
+                        <a href="../auth/logout.php" class="logout-btn">
                             <i class="fas fa-sign-out-alt"></i>
                             <span>Logout</span>
                         </a>
@@ -640,13 +644,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                     <div class="flex items-center space-x-4">
                         <span class="font-medium">Welcome, <?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
-                        <!-- Enhanced Logout Button -->
+                        <!-- Enhanced Logout Button - UPDATED FOR FULL ROUND -->
                         <a href="/community-health-tracker/auth/logout.php"
-   class="flex items-center space-x-2 px-7 py-3 m-2 rounded-full bg-white text-[#3C96E1] hover:bg-[#2B7CC9] hover:text-white transition duration-300">
+   class="logout-btn bg-white text-[#3C96E1] hover:bg-[#2B7CC9] hover:text-white">
     <i class="fas fa-sign-out-alt"></i>
     <span>Logout</span>
 </a>
-
                     </div>
                 </div>
 
@@ -717,8 +720,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <i class="fas fa-user-circle text-xl"></i>
                             <span class="font-medium"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
                         </div>
-                        <!-- Enhanced Logout Button -->
-                        <a href="../auth/logout_user.php" class="flex items-center space-x-2 px-7 py-3 m-2 rounded-full bg-white text-[#3C96E1] hover:bg-[#2B7CC9] hover:text-white transition duration-300"">
+                        <!-- Enhanced Logout Button - UPDATED FOR FULL ROUND -->
+                        <a href="../auth/logout_user.php" class="logout-btn bg-white text-[#3C96E1] hover:bg-[#2B7CC9] hover:text-white">
                             <i class="fas fa-sign-out-alt"></i>
                             <span>Logout</span>
                         </a>
@@ -1174,6 +1177,28 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </select>
 </div>
 
+                    <!-- Civil Status and Occupation -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="civil_status" class="block text-sm font-medium text-gray-700 mb-2">Civil Status <span class="text-red-500">*</span></label>
+                            <select id="civil_status" name="civil_status" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input" required>
+                                <option value="" disabled selected>Select Civil Status</option>
+                                <option value="single">Single</option>
+                                <option value="married">Married</option>
+                                <option value="widowed">Widowed</option>
+                                <option value="separated">Separated</option>
+                                <option value="divorced">Divorced</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="occupation" class="block text-sm font-medium text-gray-700 mb-2">Occupation</label>
+                            <input type="text" id="occupation" name="occupation" placeholder="Occupation (optional)"
+                                value="<?php echo isset($_POST['occupation']) ? htmlspecialchars($_POST['occupation']) : ''; ?>"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input" />
+                        </div>
+                    </div>
+
                     <!-- Continue Button - consistent styling -->
                     <div class="mt-6">
                         <button type="button" id="openSecondRegister"
@@ -1242,6 +1267,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <input type="hidden" name="contact" id="hidden_contact" value="">
                     <input type="hidden" name="address" id="hidden_address" value="">
                     <input type="hidden" name="sitio" id="hidden_sitio" value="">
+                    <input type="hidden" name="civil_status" id="hidden_civil_status" value="">
+                    <input type="hidden" name="occupation" id="hidden_occupation" value="">
 
                     <div class="space-y-6">
                         <div>
@@ -1393,6 +1420,8 @@ document.getElementById('openSecondRegister').addEventListener('click', function
     const contact = document.getElementById('contact').value;
     const address = document.getElementById('address').value;
     const sitio = document.getElementById('sitio').value; // Get sitio value
+        const civilStatus = document.getElementById('civil_status') ? document.getElementById('civil_status').value : '';
+        const occupation = document.getElementById('occupation') ? document.getElementById('occupation').value : '';
     
     // Set values to hidden fields in second form
     document.getElementById('hidden_full_name').value = fullName;
@@ -1401,6 +1430,8 @@ document.getElementById('openSecondRegister').addEventListener('click', function
     document.getElementById('hidden_contact').value = contact;
     document.getElementById('hidden_address').value = address;
     document.getElementById('hidden_sitio').value = sitio; // Set sitio value
+    document.getElementById('hidden_civil_status').value = civilStatus;
+    document.getElementById('hidden_occupation').value = occupation;
     
     // Show second form and hide first form
     document.getElementById('registerFormModal').classList.add('hidden');
