@@ -33,13 +33,30 @@ try {
             id INT AUTO_INCREMENT PRIMARY KEY,
             username VARCHAR(50) NOT NULL UNIQUE,
             password VARCHAR(255) NOT NULL,
+            email VARCHAR(100) NOT NULL UNIQUE,
             full_name VARCHAR(100) NOT NULL,
-            age INT,
-            address TEXT,
-            contact VARCHAR(20),
+            gender ENUM('male','female','other') DEFAULT NULL,
+            age INT DEFAULT NULL,
+            address TEXT DEFAULT NULL,
+            sitio VARCHAR(100) DEFAULT NULL,
+            contact VARCHAR(20) DEFAULT NULL,
+            civil_status VARCHAR(50) DEFAULT NULL,
+            occupation VARCHAR(100) DEFAULT NULL,
             approved BOOLEAN DEFAULT FALSE,
-            approved_by INT,
+            approved_by INT DEFAULT NULL,
+            unique_number VARCHAR(50) DEFAULT NULL,
+            status ENUM('pending','approved','declined') DEFAULT 'pending',
+            role VARCHAR(20) DEFAULT 'patient',
+            specialization VARCHAR(255) DEFAULT NULL,
+            license_number VARCHAR(100) DEFAULT NULL,
+            verification_method ENUM('manual_verification','id_upload') DEFAULT 'manual_verification',
+            id_image_path VARCHAR(255) DEFAULT NULL,
+            verification_notes TEXT DEFAULT NULL,
+            verification_consent TINYINT(1) DEFAULT 0,
+            id_verified TINYINT(1) DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            verified_at TIMESTAMP NULL DEFAULT NULL,
             FOREIGN KEY (approved_by) REFERENCES sitio1_staff(id)
         )",
         
@@ -103,6 +120,26 @@ try {
             post_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (staff_id) REFERENCES sitio1_staff(id)
         )",
+        // patient_visits table for storing visit records
+        "CREATE TABLE IF NOT EXISTS patient_visits (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            patient_id INT NOT NULL,
+            staff_id INT NOT NULL,
+            visit_date DATETIME NOT NULL,
+            visit_type VARCHAR(100) NOT NULL,
+            symptoms TEXT NULL,
+            vital_signs TEXT NULL,
+            diagnosis TEXT NULL,
+            treatment TEXT NULL,
+            prescription TEXT NULL,
+            referral_info TEXT NULL,
+            notes TEXT NULL,
+            next_visit_date DATE NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (patient_id) REFERENCES sitio1_patients(id),
+            FOREIGN KEY (staff_id) REFERENCES sitio1_staff(id)
+        )",
         
         "CREATE TABLE IF NOT EXISTS user_announcements (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -118,6 +155,23 @@ try {
     
     foreach ($tables as $table) {
         $pdo->exec($table);
+    }
+    
+    // Add missing columns to existing tables if they don't exist
+    try {
+        // Check and add civil_status column if it doesn't exist
+        $stmt = $pdo->query("SHOW COLUMNS FROM sitio1_users LIKE 'civil_status'");
+        if ($stmt->rowCount() == 0) {
+            $pdo->exec("ALTER TABLE sitio1_users ADD COLUMN civil_status VARCHAR(50) DEFAULT NULL AFTER contact");
+        }
+        
+        // Check and add occupation column if it doesn't exist
+        $stmt = $pdo->query("SHOW COLUMNS FROM sitio1_users LIKE 'occupation'");
+        if ($stmt->rowCount() == 0) {
+            $pdo->exec("ALTER TABLE sitio1_users ADD COLUMN occupation VARCHAR(100) DEFAULT NULL AFTER civil_status");
+        }
+    } catch (PDOException $e) {
+        // Columns might already exist, continue
     }
     
     // Insert default admin if not exists
