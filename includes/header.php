@@ -525,7 +525,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <!-- Barangay Toong Logo -->
-                        <img src="/community-health-tracker/asssets/images/toong-logo.png" alt="Barangay Toong Logo"
+                        <img src="../asssets/images/toong-logo.png" alt="Barangay Toong Logo"
                             class="logo-image">
                         <!-- Updated Header Title with Barangay Toong text -->
                         <div class="header-title-container">
@@ -633,12 +633,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <!-- Barangay Toong Logo -->
-                        <img src="/community-health-tracker/asssets/images/toong-logo.png" alt="Barangay Toong Logo"
+                        <img src="../asssets/images/toong-logo.png" alt="Barangay Toong Logo"
                             class="logo-image">
                         <!-- Updated Header Title with Barangay Toong text -->
                         <div class="header-title-container">
                             <div class="barangay-text">Barangay Toong</div>
-                            <a href="/community-health-tracker/" class="main-title">Health Center Admin Panel</a>
+                            <a href="/community-health-tracker/" class="main-title">Health Center Staff Panel</a>
                         </div>
                     </div>
 
@@ -657,19 +657,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="container mx-auto px-4 flex items-center justify-between staff-nav-container">
                         <div class="nav-tab-container">
                             <div class="nav-connection">
-                                <a href="/community-health-tracker/staff/dashboard.php"
+                                <a href="/CAPSTONE-PROJECT-V1.0/staff/dashboard.php"
                                     class="nav-tab <?= ($current_page == 'dashboard.php') ? 'active' : '' ?>">
                                     Dashboard
                                 </a>
                             </div>
                             <div class="nav-connection">
-                                <a href="/community-health-tracker/staff/existing_info_patients.php"
+                                <a href="/CAPSTONE-PROJECT-V1.0/staff/existing_info_patients.php"
                                     class="nav-tab <?= ($current_page == 'existing_info_patients.php') ? 'active' : '' ?>">
                                     Medical Records
                                 </a>
                             </div>
                             <div class="nav-connection">
-                                <a href="/community-health-tracker/staff/announcements.php"
+                                <a href="/CAPSTONE-PROJECT-V1.0/staff/announcements.php"
                                     class="nav-tab <?= ($current_page == 'announcements.php') ? 'active' : '' ?>">
                                     Announcements
                                 </a>

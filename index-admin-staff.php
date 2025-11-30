@@ -459,6 +459,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <span>Digital Health Records</span>
                     </div>
                 </div>
+                <div class="logo-text">Barangay Pahina San Nicolas</div>
             </div>
         </div>
 
