@@ -11,10 +11,16 @@ $publicAnnouncements = [];
 try {
     $stmt = $pdo->prepare("SELECT title, message, priority, post_date 
                           FROM sitio1_announcements 
-                          WHERE status = 'active' AND audience_type = 'public' 
+                          WHERE status = 'active' AND audience_type IN ('public', 'landing_page') 
                           AND (expiry_date IS NULL OR expiry_date >= CURDATE())
-                          ORDER BY post_date DESC 
-                          LIMIT 10");
+                          ORDER BY 
+                            CASE priority 
+                                WHEN 'high' THEN 1
+                                WHEN 'medium' THEN 2
+                                WHEN 'normal' THEN 3
+                            END,
+                            post_date DESC 
+                          LIMIT 6");
     $stmt->execute();
     $publicAnnouncements = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -49,7 +55,7 @@ try {
 
                     <!-- TEXT CONTENT -->
                     <div class="relative z-10 space-y-2 sm:space-y-3">
-                        <h1 class="font-bold text-3xl sm:text-4xl md:text-5xl text-[#0D1B2A]">Barangay Toong</h1>
+                        <h1 class="font-bold text-3xl sm:text-4xl md:text-5xl text-[#0D1B2A]">Barangay Luz</h1>
                         <h2 class="font-semibold text-xl sm:text-2xl md:text-3xl text-[#1B263B]">Health Monitoring and Tracking</h2>
                         <p class="text-[#415A77] text-base sm:text-lg md:text-xl">Matinud-anong pagbantay sa panglawas sa barangay | V1.0</p>
                         <div class="text-white bg-[#4A90E2] w-[18rem] text-center py-4 rounded-full hover:bg-[#6BA8EB] transition-colors cursor-pointer">
@@ -62,7 +68,7 @@ try {
 
                     <!-- RIGHT -->
                     <div class="bg-white w-full md:w-1/2 h-[22rem] md:h-auto">
-                        <img src="asssets/images/right-image.png" alt="Right section image"
+                        <img src="asssets/images/Dev.jpg" alt="Right section image"
                             class="w-full h-full object-cover object-center" />
                     </div>
                 </div>
@@ -129,6 +135,181 @@ try {
                     </div>
                 </div>
             </div>
+
+            <!-- Community Announcements Section -->
+<div class="py-12 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+            <h2 class="text-base text-[#4A90E2] font-semibold tracking-wide uppercase">Community Announcements</h2>
+            <p class="mt-2 text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+                Latest Updates from Barangay Luz
+            </p>
+        </div>
+
+        <?php if (!empty($publicAnnouncements)): ?>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <?php foreach ($publicAnnouncements as $announcement): ?>
+                    <?php 
+                    // Determine priority color
+                    $priorityColors = [
+                        'high' => 'border-red-500 bg-red-50',
+                        'medium' => 'border-yellow-500 bg-yellow-50',
+                        'normal' => 'border-blue-500 bg-blue-50'
+                    ];
+                    $priorityClass = $priorityColors[$announcement['priority']] ?? 'border-blue-500 bg-blue-50';
+                    ?>
+                    
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
+                        <!-- Header with priority indicator -->
+                        <div class="px-4 py-3 <?= $priorityClass ?>">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center">
+                                    <span class="inline-block w-3 h-3 rounded-full mr-2
+                                        <?= $announcement['priority'] === 'high' ? 'bg-red-500' : 
+                                           ($announcement['priority'] === 'medium' ? 'bg-yellow-500' : 'bg-blue-500') ?>">
+                                    </span>
+                                    <span class="text-sm font-semibold uppercase tracking-wide 
+                                        <?= $announcement['priority'] === 'high' ? 'text-red-700' : 
+                                           ($announcement['priority'] === 'medium' ? 'text-yellow-700' : 'text-blue-700') ?>">
+                                        <?= ucfirst($announcement['priority']) ?> Priority
+                                    </span>
+                                </div>
+                                <span class="text-xs text-gray-600">
+                                    <?= date('M d, Y', strtotime($announcement['post_date'])) ?>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Content -->
+                        <div class="p-5">
+                            <h3 class="text-lg font-bold text-gray-900 mb-3 line-clamp-2">
+                                <?= htmlspecialchars($announcement['title']) ?>
+                            </h3>
+                            
+                            <p class="text-gray-600 mb-4 line-clamp-3">
+                                <?= htmlspecialchars($announcement['message']) ?>
+                            </p>
+                            
+                            <!-- Expand button for longer messages -->
+                            <?php if (strlen($announcement['message']) > 150): ?>
+                                <button onclick="expandAnnouncement(this)" 
+                                        class="text-[#4A90E2] hover:text-[#1B4F8C] text-sm font-medium inline-flex items-center">
+                                    Read more
+                                    <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <!-- Full message (hidden by default) -->
+                        <?php if (strlen($announcement['message']) > 150): ?>
+                            <div class="hidden px-5 pb-5">
+                                <p class="text-gray-600 whitespace-pre-line">
+                                    <?= htmlspecialchars($announcement['message']) ?>
+                                </p>
+                                <button onclick="collapseAnnouncement(this)" 
+                                        class="mt-3 text-[#4A90E2] hover:text-[#1B4F8C] text-sm font-medium inline-flex items-center">
+                                    Show less
+                                    <svg class="w-4 h-4 ml-1 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <!-- Footer -->
+                        <div class="px-5 py-3 bg-gray-50 border-t border-gray-200">
+                            <div class="flex items-center text-sm text-gray-500">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Posted: <?= date('F j, Y', strtotime($announcement['post_date'])) ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            
+            <!-- View All Button -->
+            <?php if (isLoggedIn()): ?>
+                <div class="text-center mt-8">
+                    <a href="/community-health-tracker/user/announcements.php" 
+                       class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-full text-white bg-[#4A90E2] hover:bg-[#1B4F8C] transition-colors duration-300">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        View All Announcements
+                    </a>
+                </div>
+            <?php else: ?>
+                
+            <?php endif; ?>
+        <?php else: ?>
+            <div class="text-center py-12">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">No Announcements Yet</h3>
+                <p class="text-gray-500 max-w-md mx-auto">
+                    Check back soon for updates from our community health team.
+                </p>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<style>
+    .line-clamp-2 {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+    
+    .line-clamp-3 {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+    }
+    
+    .whitespace-pre-line {
+        white-space: pre-line;
+    }
+</style>
+
+<script>
+    function expandAnnouncement(button) {
+        const card = button.closest('.bg-white.rounded-xl');
+        const hiddenContent = card.querySelector('.hidden');
+        const expandedContent = card.querySelector('.line-clamp-3');
+        
+        if (hiddenContent) {
+            hiddenContent.classList.remove('hidden');
+            expandedContent.classList.add('hidden');
+            button.classList.add('hidden');
+        }
+    }
+    
+    function collapseAnnouncement(button) {
+        const card = button.closest('.bg-white.rounded-xl');
+        const hiddenContent = button.closest('.px-5.pb-5');
+        const expandedContent = card.querySelector('.line-clamp-3');
+        const expandButton = card.querySelector('button[onclick^="expandAnnouncement"]');
+        
+        if (hiddenContent && expandedContent && expandButton) {
+            hiddenContent.classList.add('hidden');
+            expandedContent.classList.remove('hidden');
+            expandButton.classList.remove('hidden');
+        }
+    }
+</script>
 
             <!-- Testimonials Section -->
             <div class="py-12 bg-gray-50">
