@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Barangay Pahina San Nicolas Healthcare</title>
+    <title>Login | Barangay Luz Healthcare</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -435,10 +435,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="left-content">
                 <!-- Circular Logo -->
                 <div class="logo-container">
-                    <img src="asssets/images/toong-logo.png" alt="Barangay Toong Logo">
+                    <img src="asssets/images/Luz.jpg" alt="Barangay Luz Logo">
                 </div>
                 
-                <h1 class="left-title">Barangay Toong</h1>
+                <h1 class="left-title">Barangay Luz</h1>
                 <p class="left-subtitle">Healthcare Management System</p>
                 
                 <div class="features">
