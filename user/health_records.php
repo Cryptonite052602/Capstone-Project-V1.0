@@ -11,9 +11,22 @@ if (!isUser()) {
 global $pdo;
 
 $userId = $_SESSION['user']['id'];
-$userEmail = $_SESSION['user']['email'] ?? 'Not provided';
-$userFullName = $_SESSION['user']['full_name'] ?? 'Not provided';
-$userCreatedAt = $_SESSION['user']['created_at'] ?? date('Y-m-d');
+
+// Get user information including email and date of birth from the database
+$userInfo = [];
+try {
+    $stmt = $pdo->prepare("SELECT email, full_name, date_of_birth, created_at FROM sitio1_users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $userInfo = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+} catch (PDOException $e) {
+    $error = 'Error fetching user information: ' . $e->getMessage();
+}
+
+// Use database values as primary source, fallback to session
+$userEmail = $userInfo['email'] ?? $_SESSION['user']['email'] ?? 'Not provided';
+$userFullName = $userInfo['full_name'] ?? $_SESSION['user']['full_name'] ?? 'Not provided';
+$userDateOfBirth = $userInfo['date_of_birth'] ?? $_SESSION['user']['date_of_birth'] ?? null;
+$userCreatedAt = $userInfo['created_at'] ?? $_SESSION['user']['created_at'] ?? date('Y-m-d');
 $error = '';
 $success = '';
 
@@ -66,89 +79,148 @@ try {
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Formal, unique visual theme for My Health Profile */
-        :root{
-            --bg: #f7fafc;
-            --card-bg: #ffffff;
-            --muted: #6b7280;
-            --accent: #0f172a; /* dark navy */
-            --accent-soft: #e6eef8;
-            --border: #e6e9ee;
-            --success: #0f766e;
+        /* Consistent warm blue color scheme */
+        :root {
+            --warm-blue: #3b82f6;
+            --warm-blue-light: #dbeafe;
+            --warm-blue-dark: #1e40af;
+            --text-dark: #1f2937;
+            --text-light: #6b7280;
+            --bg-light: #f9fafb;
+            --border-light: #e5e7eb;
         }
 
-        html,body{height:100%;}
-        body{
-            background: linear-gradient(180deg, #f8fafc 0%, #f3f4f6 100%);
-            color: #111827;
-            font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-            -webkit-font-smoothing:antialiased;
-            -moz-osx-font-smoothing:grayscale;
+        body {
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
         }
 
-        /* Header & Profile summary */
-        .profile-header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
-        .profile-card{background:var(--card-bg);border:1px solid var(--border);padding:1rem 1.25rem;border-radius:20px;display:flex;align-items:center;gap:1rem}
-        .avatar{width:64px;height:64px;border-radius:16px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:1.25rem;color:var(--accent)}
-        .profile-meta .name{font-weight:700;font-size:1.05rem;color:var(--accent)}
-        .profile-meta .sub{color:var(--muted);font-size:0.9rem}
-
-        /* Tabs */
-        .nav-pill{background:transparent;border:1px solid transparent;padding:0.75rem 1.25rem;border-radius:50px;color:var(--muted);display:inline-flex;align-items:center;gap:0.5rem;font-weight:600;transition:all 0.3s ease}
-        .nav-pill.active{background:linear-gradient(90deg,var(--accent-soft),#f1f6fb);border-color:var(--border);color:var(--accent)}
-
-        .tab-content{display:none}
-        .tab-content.active{display:block}
-
-        /* Info cards */
-        .info-card{background:var(--card-bg);border:1px solid var(--border);padding:1.5rem;border-radius:20px;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
-        .info-label{color:var(--muted);font-size:0.78rem;font-weight:700;letter-spacing:0.6px;margin-bottom:0.35rem}
-        .info-value{color:var(--accent);font-weight:600}
-        .empty-value{color:#9ca3af;font-style:italic}
-
-        /* Timeline-style health records for a formal look */
-        .health-record-item{display:flex;gap:1rem;background:var(--card-bg);border:1px solid var(--border);border-left:6px solid #cfe3ff;padding:0;margin-bottom:1.5rem;border-radius:20px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
-        .record-side{width:120px;background:#fbfdff;padding:1rem 0.75rem;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid var(--border);border-radius:20px 0 0 20px}
-        .record-side .date{font-weight:700;color:var(--accent);font-size:0.95rem;text-align:center}
-        .record-body{padding:1.5rem 1.5rem;flex:1}
-
-        .record-section{background:transparent;border-radius:16px;padding:1rem;border:1px dashed transparent}
-        .record-section h4{font-weight:700;color:var(--accent);margin-bottom:0.35rem;font-size:0.95rem}
-        .record-section p{color:#374151;white-space:pre-wrap}
-
-        .action-btn{padding:0.75rem 1.25rem;border-radius:50px;font-weight:600;font-size:0.9rem;transition:all 0.3s ease}
-        .action-btn i{margin-right:0.45rem}
-
-        /* Summary cards */
-        .summary-tile{padding:1.5rem;border-radius:20px;background:linear-gradient(180deg,#fafbff,#f6f8fb);border:1px solid var(--border)}
-
-        /* Print/Download/Share consistent colors */
-        .btn-print{background:#e6f0ff;color:#0b4da0}
-        .btn-download{background:#e9f7f2;color:#0a6b48}
-        .btn-share{background:#f5edff;color:#6b21a8}
-
-        /* Status badges */
-        .status-badge{padding:0.5rem 1rem;border-radius:50px;font-size:0.8rem;font-weight:600}
-
-        /* Section titles */
-        .section-title{position:relative;padding-left:1rem}
-        .section-title:before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:20px;background:#3b82f6;border-radius:4px}
-
-        /* Small responsive tweaks */
-        @media (max-width: 768px){
-            .record-side{display:none}
-            .health-record-item{border-left-width:4px;border-radius:16px}
+        .btn-primary {
+            background-color: white;
+            border: 2px solid var(--warm-blue);
+            color: var(--warm-blue);
+            transition: all 0.3s ease;
         }
 
-        /* Hover effects */
-        .nav-pill:hover{background:var(--accent-soft);color:var(--accent)}
-        .action-btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
-        .info-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.08)}
-        .health-record-item:hover{box-shadow:0 4px 12px rgba(0,0,0,0.08)}
+        .btn-primary:hover {
+            background-color: var(--warm-blue-light);
+            transform: translateY(-2px);
+        }
+
+        .nav-pill {
+            background-color: white;
+            border: 2px solid var(--warm-blue);
+            color: var(--warm-blue);
+            transition: all 0.3s ease;
+        }
+
+        .nav-pill.active {
+            background-color: var(--warm-blue);
+            color: white;
+        }
+
+        .nav-pill:hover:not(.active) {
+            background-color: var(--warm-blue-light);
+        }
+
+        .info-card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-light);
+        }
+
+        .health-record-item {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-light);
+            border-left: 4px solid var(--warm-blue);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 2rem;
+            position: relative;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-light);
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .close-modal:hover {
+            color: var(--text-dark);
+        }
+
+        .section-title {
+            position: relative;
+            padding-left: 1rem;
+        }
+
+        .section-title:before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 20px;
+            background: var(--warm-blue);
+            border-radius: 4px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <div class="container mx-auto px-6 py-8 max-w-7xl">
+<body class="min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
         <!-- Header -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
             <div class="mb-6 md:mb-0">
@@ -161,7 +233,10 @@ try {
                 </div>
                 <div>
                     <p class="font-semibold text-gray-800 text-lg"><?= htmlspecialchars($userFullName) ?></p>
-                    <p class="text-sm text-gray-500">Patient ID: <?= !empty($patientInfo['id']) ? htmlspecialchars($patientInfo['id']) : 'N/A' ?></p>
+                    <p class="text-sm text-gray-500">Email: <?= htmlspecialchars($userEmail) ?></p>
+                    <?php if ($userDateOfBirth): ?>
+                        <p class="text-sm text-gray-500">Date of Birth: <?= date('M d, Y', strtotime($userDateOfBirth)) ?></p>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -182,16 +257,16 @@ try {
 
         <!-- Tabs Navigation -->
         <div class="bg-white rounded-2xl shadow-sm p-4 mb-8 flex flex-wrap border border-gray-200">
-            <button class="nav-pill active flex items-center mr-3 mb-2" data-tab="records">
+            <button class="nav-pill active flex items-center mr-3 mb-2 px-4 py-2 rounded-full" data-tab="records">
                 <i class="fas fa-file-medical mr-2"></i> Health Records
                 <span class="bg-blue-100 text-blue-800 text-xs font-medium ml-2 px-3 py-1 rounded-full">
                     <?= count($healthRecords) ?>
                 </span>
             </button>
-            <button class="nav-pill flex items-center mr-3 mb-2" data-tab="profile">
+            <button class="nav-pill flex items-center mr-3 mb-2 px-4 py-2 rounded-full" data-tab="profile">
                 <i class="fas fa-user-circle mr-2"></i> Personal Info
             </button>
-            <button class="nav-pill flex items-center mr-3 mb-2" data-tab="medical">
+            <button class="nav-pill flex items-center mr-3 mb-2 px-4 py-2 rounded-full" data-tab="medical">
                 <i class="fas fa-heartbeat mr-2"></i> Medical Info
             </button>
         </div>
@@ -207,92 +282,37 @@ try {
             <?php else: ?>
                 <div class="space-y-6">
                     <?php foreach ($healthRecords as $index => $record): ?>
-                        <div class="health-record-item bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-300">
-                            <div class="record-side">
-                                <div class="date"><?= date('M d', strtotime($record['visit_date'] ?? 'now')) ?></div>
-                                <div class="text-xs mt-2" style="color:var(--muted)"><?= date('Y', strtotime($record['visit_date'] ?? 'now')) ?></div>
-                                <div class="text-xs mt-3 px-3 py-1 bg-green-100 text-green-800 rounded-full" style="font-weight:700">Completed</div>
-                            </div>
-
-                            <!-- Record Content -->
-                            <div class="record-body px-6 py-6 space-y-6">
-                                <!-- Doctor Information -->
-                                <div class="flex items-start gap-4 pb-4 border-b border-gray-100">
-                                    <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-                                        <i class="fas fa-user-md text-blue-600"></i>
+                        <div class="health-record-item p-6">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between mb-4">
+                                <div class="flex items-center mb-4 md:mb-0">
+                                    <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center mr-4">
+                                        <i class="fas fa-calendar-check text-blue-500"></i>
                                     </div>
                                     <div>
-                                        <p class="info-label">Attending Healthcare Provider</p>
-                                        <p class="info-value">Dr. <?= htmlspecialchars($record['doctor_name'] ?? 'Unknown') ?></p>
+                                        <h3 class="font-semibold text-lg">Visit on <?= date('M d, Y', strtotime($record['visit_date'] ?? 'now')) ?></h3>
+                                        <p class="text-gray-500">With Dr. <?= htmlspecialchars($record['doctor_name'] ?? 'Unknown') ?></p>
                                     </div>
                                 </div>
-
-                                <!-- Diagnosis -->
-                                <div class="bg-red-50 border border-red-100 rounded-2xl p-5">
-                                    <h4 class="font-semibold text-red-800 mb-3 flex items-center">
-                                        <i class="fas fa-stethoscope text-red-600 mr-3"></i> Diagnosis
-                                    </h4>
-                                    <p class="text-gray-700 whitespace-pre-wrap">
-                                        <?= htmlspecialchars($record['diagnosis'] ?? 'No diagnosis recorded') ?>
-                                    </p>
-                                </div>
-
-                                <!-- Treatment -->
-                                <div class="bg-green-50 border border-green-100 rounded-2xl p-5">
-                                    <h4 class="font-semibold text-green-800 mb-3 flex items-center">
-                                        <i class="fas fa-bandage text-green-600 mr-3"></i> Treatment
-                                    </h4>
-                                    <p class="text-gray-700 whitespace-pre-wrap">
-                                        <?= htmlspecialchars($record['treatment'] ?? 'No treatment recorded') ?>
-                                    </p>
-                                </div>
-
-                                <!-- Prescription -->
-                                <div class="bg-yellow-50 border border-yellow-100 rounded-2xl p-5">
-                                    <h4 class="font-semibold text-yellow-800 mb-3 flex items-center">
-                                        <i class="fas fa-pills text-yellow-600 mr-3"></i> Prescription
-                                    </h4>
-                                    <p class="text-gray-700 whitespace-pre-wrap">
-                                        <?= htmlspecialchars($record['prescription'] ?? 'No prescription') ?>
-                                    </p>
-                                </div>
-
-                                <!-- Notes -->
-                                <div class="bg-blue-50 border border-blue-100 rounded-2xl p-5">
-                                    <h4 class="font-semibold text-blue-800 mb-3 flex items-center">
-                                        <i class="fas fa-clipboard text-blue-600 mr-3"></i> Notes
-                                    </h4>
-                                    <p class="text-gray-700 whitespace-pre-wrap">
-                                        <?= htmlspecialchars($record['notes'] ?? 'No additional notes') ?>
-                                    </p>
-                                </div>
-
-                                <!-- Next Appointment -->
-                                <?php if (!empty($record['next_visit_date'])): ?>
-                                    <div class="bg-purple-50 border border-purple-100 rounded-2xl p-5">
-                                        <h4 class="font-semibold text-purple-800 mb-3 flex items-center">
-                                            <i class="fas fa-calendar-check text-purple-600 mr-3"></i> Next Appointment
-                                        </h4>
-                                        <p class="text-gray-700 font-medium">
-                                            <?= date('l, F d, Y', strtotime($record['next_visit_date'])) ?>
-                                        </p>
-                                    </div>
-                                <?php endif; ?>
-
-                                <!-- Action Buttons -->
-                                <div class="pt-4 flex gap-3 flex-wrap">
+                                <div class="flex space-x-2">
+                                    <button onclick="viewRecord(<?= htmlspecialchars(json_encode($record)) ?>)" 
+                                            class="btn-primary flex items-center px-4 py-2 rounded-full">
+                                        <i class="fas fa-eye mr-2"></i> View
+                                    </button>
                                     <button onclick="printRecord(<?= htmlspecialchars(json_encode($record)) ?>)" 
-                                            class="action-btn btn-print flex items-center gap-2">
-                                        <i class="fas fa-print"></i> Print
+                                            class="btn-primary flex items-center px-4 py-2 rounded-full">
+                                        <i class="fas fa-print mr-2"></i> Print
                                     </button>
-                                    <button onclick="downloadRecord(<?= $record['id'] ?>)" 
-                                            class="action-btn btn-download flex items-center gap-2">
-                                        <i class="fas fa-download"></i> Download PDF
-                                    </button>
-                                    <button onclick="shareRecord(<?= $record['id'] ?>)" 
-                                            class="action-btn btn-share flex items-center gap-2">
-                                        <i class="fas fa-share-alt"></i> Share
-                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="bg-blue-50 p-4 rounded-lg">
+                                    <h4 class="font-semibold text-blue-800 mb-2">Diagnosis</h4>
+                                    <p class="text-gray-700"><?= htmlspecialchars($record['diagnosis'] ?? 'No diagnosis recorded') ?></p>
+                                </div>
+                                <div class="bg-green-50 p-4 rounded-lg">
+                                    <h4 class="font-semibold text-green-800 mb-2">Treatment</h4>
+                                    <p class="text-gray-700"><?= htmlspecialchars($record['treatment'] ?? 'No treatment recorded') ?></p>
                                 </div>
                             </div>
                         </div>
@@ -329,91 +349,121 @@ try {
         <div id="profile" class="tab-content">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Personal Information -->
-                <div class="info-card">
+                <div class="info-card p-6">
                     <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
                         <i class="fas fa-user text-blue-500 mr-3"></i> Personal Information
                     </h3>
                     
                     <div class="space-y-6">
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <p class="info-label">Full Name</p>
-                                <p class="info-value"><?= htmlspecialchars($userFullName) ?></p>
+                                <p class="text-gray-500 text-sm font-medium mb-1">Full Name</p>
+                                <p class="text-gray-800 font-medium"><?= htmlspecialchars($userFullName) ?></p>
                             </div>
                             <div>
-                                <p class="info-label">Email</p>
-                                <p class="info-value"><?= htmlspecialchars($userEmail) ?></p>
+                                <p class="text-gray-500 text-sm font-medium mb-1">Email</p>
+                                <p class="text-gray-800 font-medium"><?= htmlspecialchars($userEmail) ?></p>
                             </div>
                         </div>
                         
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <p class="info-label">Age</p>
-                                <p class="info-value"><?= !empty($patientInfo['age']) ? htmlspecialchars($patientInfo['age']) : '<span class="empty-value">Not provided</span>' ?></p>
+                                <p class="text-gray-500 text-sm font-medium mb-1">Date of Birth</p>
+                                <p class="text-gray-800 font-medium">
+                                    <?php if ($userDateOfBirth): ?>
+                                        <?= date('M d, Y', strtotime($userDateOfBirth)) ?>
+                                    <?php else: ?>
+                                        <span class="text-gray-400">Not provided</span>
+                                    <?php endif; ?>
+                                </p>
                             </div>
                             <div>
-                                <p class="info-label">Gender</p>
-                                <p class="info-value"><?= !empty($patientInfo['gender']) ? htmlspecialchars($patientInfo['gender']) : '<span class="empty-value">Not provided</span>' ?></p>
+                                <p class="text-gray-500 text-sm font-medium mb-1">Age</p>
+                                <p class="text-gray-800 font-medium">
+                                    <?php if (!empty($patientInfo['age'])): ?>
+                                        <?= htmlspecialchars($patientInfo['age']) ?> years
+                                    <?php elseif ($userDateOfBirth): ?>
+                                        <?php 
+                                            $birthDate = new DateTime($userDateOfBirth);
+                                            $today = new DateTime();
+                                            $age = $birthDate->diff($today)->y;
+                                            echo $age . ' years';
+                                        ?>
+                                    <?php else: ?>
+                                        <span class="text-gray-400">Not provided</span>
+                                    <?php endif; ?>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-gray-500 text-sm font-medium mb-1">Gender</p>
+                                <p class="text-gray-800 font-medium"><?= !empty($patientInfo['gender']) ? htmlspecialchars($patientInfo['gender']) : '<span class="text-gray-400">Not provided</span>' ?></p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 text-sm font-medium mb-1">Civil Status</p>
+                                <p class="text-gray-800 font-medium"><?= !empty($patientInfo['civil_status']) ? htmlspecialchars($patientInfo['civil_status']) : '<span class="text-gray-400">Not provided</span>' ?></p>
                             </div>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Contact Information -->
-                <div class="info-card">
+                <div class="info-card p-6">
                     <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
                         <i class="fas fa-address-card text-blue-500 mr-3"></i> Contact Information
                     </h3>
                     
                     <div class="space-y-6">
                         <div>
-                            <p class="info-label">Address</p>
-                            <p class="info-value"><?= !empty($patientInfo['address']) ? htmlspecialchars($patientInfo['address']) : '<span class="empty-value">Not provided</span>' ?></p>
+                            <p class="text-gray-500 text-sm font-medium mb-1">Address</p>
+                            <p class="text-gray-800 font-medium"><?= !empty($patientInfo['address']) ? htmlspecialchars($patientInfo['address']) : '<span class="text-gray-400">Not provided</span>' ?></p>
                         </div>
                         
                         <div>
-                            <p class="info-label">Contact Number</p>
-                            <p class="info-value"><?= !empty($patientInfo['contact']) ? htmlspecialchars($patientInfo['contact']) : '<span class="empty-value">Not provided</span>' ?></p>
+                            <p class="text-gray-500 text-sm font-medium mb-1">Contact Number</p>
+                            <p class="text-gray-800 font-medium"><?= !empty($patientInfo['contact']) ? htmlspecialchars($patientInfo['contact']) : '<span class="text-gray-400">Not provided</span>' ?></p>
+                        </div>
+                        
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium mb-1">Sitio/Barangay</p>
+                            <p class="text-gray-800 font-medium"><?= !empty($patientInfo['sitio']) ? htmlspecialchars($patientInfo['sitio']) : '<span class="text-gray-400">Not provided</span>' ?></p>
                         </div>
                         
                         <?php if (!empty($patientInfo['last_checkup'])): ?>
                         <div>
-                            <p class="info-label">Last Check-up</p>
-                            <p class="info-value"><?= date('M d, Y', strtotime($patientInfo['last_checkup'])) ?></p>
+                            <p class="text-gray-500 text-sm font-medium mb-1">Last Check-up</p>
+                            <p class="text-gray-800 font-medium"><?= date('M d, Y', strtotime($patientInfo['last_checkup'])) ?></p>
                         </div>
                         <?php endif; ?>
                     </div>
                 </div>
                 
                 <!-- Account Information -->
-                <div class="info-card lg:col-span-2">
+                <div class="info-card p-6 lg:col-span-2">
                     <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
                         <i class="fas fa-info-circle text-blue-500 mr-3"></i> Account Information
                     </h3>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div>
-                            <p class="info-label">User ID</p>
-                            <p class="info-value font-mono"><?= htmlspecialchars($userId) ?></p>
-                        </div>
-                        
-                        <div>
-                            <p class="info-label">Patient ID</p>
-                            <p class="info-value"><?= !empty($patientInfo['id']) ? htmlspecialchars($patientInfo['id']) : '<span class="empty-value">Not assigned</span>' ?></p>
-                        </div>
-                        
-                        <div>
-                            <p class="info-label">Account Status</p>
-                            <p class="info-value">
-                                <span class="status-badge bg-green-100 text-green-800">
+                            <p class="text-gray-500 text-sm font-medium mb-1">Account Status</p>
+                            <p class="text-gray-800 font-medium">
+                                <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                                     Active
                                 </span>
                             </p>
                         </div>
                         
                         <div>
-                            <p class="info-label">Member Since</p>
-                            <p class="info-value"><?= date('M d, Y', strtotime($userCreatedAt)) ?></p>
+                            <p class="text-gray-500 text-sm font-medium mb-1">Member Since</p>
+                            <p class="text-gray-800 font-medium"><?= date('M d, Y', strtotime($userCreatedAt)) ?></p>
+                        </div>
+                        
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium mb-1">Total Health Visits</p>
+                            <p class="text-gray-800 font-medium"><?= count($healthRecords) ?></p>
                         </div>
                     </div>
                 </div>
@@ -424,32 +474,32 @@ try {
         <div id="medical" class="tab-content">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Vital Statistics -->
-                <div class="info-card">
+                <div class="info-card p-6">
                     <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
                         <i class="fas fa-chart-line text-blue-500 mr-3"></i> Vital Statistics
                     </h3>
                     
                     <div class="space-y-6">
                         <div>
-                            <p class="info-label">Blood Type</p>
-                            <p class="info-value"><?= !empty($medicalInfo['blood_type']) ? htmlspecialchars($medicalInfo['blood_type']) : '<span class="empty-value">Not recorded</span>' ?></p>
+                            <p class="text-gray-500 text-sm font-medium mb-1">Blood Type</p>
+                            <p class="text-gray-800 font-medium"><?= !empty($medicalInfo['blood_type']) ? htmlspecialchars($medicalInfo['blood_type']) : '<span class="text-gray-400">Not recorded</span>' ?></p>
                         </div>
                         
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <p class="info-label">Height</p>
-                                <p class="info-value"><?= !empty($medicalInfo['height']) ? htmlspecialchars($medicalInfo['height']) . ' cm' : '<span class="empty-value">--</span>' ?></p>
+                                <p class="text-gray-500 text-sm font-medium mb-1">Height</p>
+                                <p class="text-gray-800 font-medium"><?= !empty($medicalInfo['height']) ? htmlspecialchars($medicalInfo['height']) . ' cm' : '<span class="text-gray-400">--</span>' ?></p>
                             </div>
                             <div>
-                                <p class="info-label">Weight</p>
-                                <p class="info-value"><?= !empty($medicalInfo['weight']) ? htmlspecialchars($medicalInfo['weight']) . ' kg' : '<span class="empty-value">--</span>' ?></p>
+                                <p class="text-gray-500 text-sm font-medium mb-1">Weight</p>
+                                <p class="text-gray-800 font-medium"><?= !empty($medicalInfo['weight']) ? htmlspecialchars($medicalInfo['weight']) . ' kg' : '<span class="text-gray-400">--</span>' ?></p>
                             </div>
                         </div>
                         
                         <?php if (!empty($medicalInfo['height']) && !empty($medicalInfo['weight'])): ?>
                         <div>
-                            <p class="info-label">BMI</p>
-                            <p class="info-value">
+                            <p class="text-gray-500 text-sm font-medium mb-1">BMI</p>
+                            <p class="text-gray-800 font-medium">
                                 <?php 
                                     $height = $medicalInfo['height'] / 100;
                                     $weight = $medicalInfo['weight'];
@@ -466,52 +516,68 @@ try {
                 </div>
                 
                 <!-- Medical Details -->
-                <div class="info-card">
+                <div class="info-card p-6">
                     <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
                         <i class="fas fa-stethoscope text-blue-500 mr-3"></i> Medical Details
                     </h3>
                     
                     <div class="space-y-6">
                         <div>
-                            <p class="info-label">Allergies</p>
-                            <p class="info-value"><?= !empty($medicalInfo['allergies']) ? nl2br(htmlspecialchars($medicalInfo['allergies'])) : '<span class="empty-value">No allergies recorded</span>' ?></p>
+                            <p class="text-gray-500 text-sm font-medium mb-1">Allergies</p>
+                            <p class="text-gray-800 font-medium"><?= !empty($medicalInfo['allergies']) ? nl2br(htmlspecialchars($medicalInfo['allergies'])) : '<span class="text-gray-400">No allergies recorded</span>' ?></p>
                         </div>
                         
                         <div>
-                            <p class="info-label">Current Medications</p>
-                            <p class="info-value"><?= !empty($medicalInfo['current_medications']) ? nl2br(htmlspecialchars($medicalInfo['current_medications'])) : '<span class="empty-value">No medications recorded</span>' ?></p>
+                            <p class="text-gray-500 text-sm font-medium mb-1">Current Medications</p>
+                            <p class="text-gray-800 font-medium"><?= !empty($medicalInfo['current_medications']) ? nl2br(htmlspecialchars($medicalInfo['current_medications'])) : '<span class="text-gray-400">No medications recorded</span>' ?></p>
                         </div>
                         
                         <div>
-                            <p class="info-label">Chronic Conditions</p>
-                            <p class="info-value"><?= !empty($patientInfo['disease']) ? htmlspecialchars($patientInfo['disease']) : '<span class="empty-value">No chronic conditions recorded</span>' ?></p>
+                            <p class="text-gray-500 text-sm font-medium mb-1">Chronic Conditions</p>
+                            <p class="text-gray-800 font-medium"><?= !empty($patientInfo['disease']) ? htmlspecialchars($patientInfo['disease']) : '<span class="text-gray-400">No chronic conditions recorded</span>' ?></p>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Medical History -->
-                <div class="info-card lg:col-span-2">
+                <div class="info-card p-6 lg:col-span-2">
                     <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
                         <i class="fas fa-history text-blue-500 mr-3"></i> Medical History
                     </h3>
                     
                     <div>
-                        <p class="info-label">Medical History</p>
-                        <p class="info-value"><?= !empty($medicalInfo['medical_history']) ? nl2br(htmlspecialchars($medicalInfo['medical_history'])) : '<span class="empty-value">No medical history recorded</span>' ?></p>
+                        <p class="text-gray-500 text-sm font-medium mb-1">Medical History</p>
+                        <p class="text-gray-800 font-medium"><?= !empty($medicalInfo['medical_history']) ? nl2br(htmlspecialchars($medicalInfo['medical_history'])) : '<span class="text-gray-400">No medical history recorded</span>' ?></p>
                     </div>
                 </div>
                 
                 <!-- Family History -->
-                <div class="info-card lg:col-span-2">
+                <div class="info-card p-6 lg:col-span-2">
                     <h3 class="text-xl font-semibold text-gray-800 mb-6 section-title flex items-center">
                         <i class="fas fa-users text-blue-500 mr-3"></i> Family Medical History
                     </h3>
                     
                     <div>
-                        <p class="info-label">Family History</p>
-                        <p class="info-value"><?= !empty($medicalInfo['family_history']) ? nl2br(htmlspecialchars($medicalInfo['family_history'])) : '<span class="empty-value">No family medical history recorded</span>' ?></p>
+                        <p class="text-gray-500 text-sm font-medium mb-1">Family History</p>
+                        <p class="text-gray-800 font-medium"><?= !empty($medicalInfo['family_history']) ? nl2br(htmlspecialchars($medicalInfo['family_history'])) : '<span class="text-gray-400">No family medical history recorded</span>' ?></p>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for viewing records - Initially hidden -->
+    <div id="recordModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal()">&times;</button>
+            <div id="modalContent"></div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="printCurrentRecord()" class="btn-primary flex items-center px-4 py-2 rounded-full">
+                    <i class="fas fa-print mr-2"></i> Print
+                </button>
+                <button onclick="closeModal()" class="bg-gray-200 text-gray-700 flex items-center px-4 py-2 rounded-full hover:bg-gray-300">
+                    <i class="fas fa-times mr-2"></i> Close
+                </button>
             </div>
         </div>
     </div>
@@ -534,6 +600,84 @@ try {
                 document.getElementById(tabId).classList.add('active');
             });
         });
+
+        let currentRecord = null;
+
+        // View Record Function
+        function viewRecord(record) {
+            currentRecord = record;
+            const modal = document.getElementById('recordModal');
+            const modalContent = document.getElementById('modalContent');
+            
+            const visitDate = new Date(record.visit_date).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric'
+            });
+            
+            const content = `
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Health Record</h2>
+                <p class="text-gray-600 mb-6">Visit on ${visitDate}</p>
+                
+                <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                    <h3 class="font-semibold text-blue-800 mb-2">Healthcare Provider</h3>
+                    <p class="text-gray-700">Dr. ${record.doctor_name || 'Unknown'}</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div class="bg-red-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-red-800 mb-2">Diagnosis</h3>
+                        <p class="text-gray-700 whitespace-pre-wrap">${record.diagnosis || 'No diagnosis recorded'}</p>
+                    </div>
+                    
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-green-800 mb-2">Treatment</h3>
+                        <p class="text-gray-700 whitespace-pre-wrap">${record.treatment || 'No treatment recorded'}</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div class="bg-yellow-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-yellow-800 mb-2">Prescription</h3>
+                        <p class="text-gray-700 whitespace-pre-wrap">${record.prescription || 'No prescription'}</p>
+                    </div>
+                    
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-purple-800 mb-2">Notes</h3>
+                        <p class="text-gray-700 whitespace-pre-wrap">${record.notes || 'No additional notes'}</p>
+                    </div>
+                </div>
+                
+                ${record.next_visit_date ? `
+                <div class="bg-indigo-50 p-4 rounded-lg mb-4">
+                    <h3 class="font-semibold text-indigo-800 mb-2">Next Appointment</h3>
+                    <p class="text-gray-700">${new Date(record.next_visit_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                </div>
+                ` : ''}
+            `;
+            
+            modalContent.innerHTML = content;
+            modal.classList.add('active');
+            
+            // Prevent body scrolling when modal is open
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Close Modal Function
+        function closeModal() {
+            const modal = document.getElementById('recordModal');
+            modal.classList.remove('active');
+            
+            // Restore body scrolling
+            document.body.style.overflow = 'auto';
+        }
+
+        // Print Current Record from Modal
+        function printCurrentRecord() {
+            if (currentRecord) {
+                printRecord(currentRecord);
+            }
+        }
 
         // Print Record Function
         function printRecord(record) {
@@ -623,58 +767,19 @@ try {
             }, 250);
         }
 
-        // Download PDF Function
-        function downloadRecord(recordId) {
-            // This would integrate with a backend API to generate PDF
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', `/community-health-tracker/api/export_patient.php?record_id=${recordId}`, true);
-            xhr.responseType = 'blob';
-            xhr.onload = function() {
-                const blob = new Blob([xhr.response], { type: 'application/pdf' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `health-record-${recordId}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            };
-            xhr.send();
-        }
-
-        // Share Record Function
-        function shareRecord(recordId) {
-            if (navigator.share) {
-                navigator.share({
-                    title: 'My Health Record',
-                    text: 'I would like to share my health record with you.',
-                    url: window.location.href
-                }).catch(err => {
-                    showShareModal(recordId);
-                });
-            } else {
-                showShareModal(recordId);
+        // Close modal when clicking outside
+        document.getElementById('recordModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
             }
-        }
+        });
 
-        function showShareModal(recordId) {
-            const email = prompt('Enter email address to share this record with:');
-            if (email) {
-                // This would integrate with a backend API to send record via email
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', '/community-health-tracker/api/share_record.php', true);
-                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                xhr.onload = function() {
-                    if (xhr.status === 200) {
-                        alert('Record shared successfully!');
-                    } else {
-                        alert('Error sharing record. Please try again.');
-                    }
-                };
-                xhr.send('record_id=' + recordId + '&email=' + encodeURIComponent(email));
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
             }
-        }
+        });
     </script>
 </body>
 </html>

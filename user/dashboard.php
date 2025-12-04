@@ -1,4 +1,5 @@
 <?php
+// user/dashboard.php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/header.php';
 
@@ -45,9 +46,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile_image'
         
         // Validate file type
         if (!in_array($fileExtension, $allowedExtensions)) {
-            $error = 'Only JPG, JPEG, PNG, and GIF files are allowed.';
+            $_SESSION['notification'] = [
+                'type' => 'error',
+                'message' => 'Only JPG, JPEG, PNG, and GIF files are allowed.'
+            ];
+            header('Location: ' . $_SERVER['REQUEST_URI']);
+            exit();
         } elseif ($file['size'] > 5 * 1024 * 1024) { // 5MB limit
-            $error = 'File size must be less than 5MB.';
+            $_SESSION['notification'] = [
+                'type' => 'error',
+                'message' => 'File size must be less than 5MB.'
+            ];
+            header('Location: ' . $_SERVER['REQUEST_URI']);
+            exit();
         } else {
             // Generate unique filename
             $newFilename = 'user_' . $userId . '_' . time() . '.' . $fileExtension;
@@ -73,17 +84,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile_image'
                 
                 $_SESSION['notification'] = [
                     'type' => 'success',
-                    'message' => 'Profile image updated successfully!'
+                    'title' => 'Profile Updated',
+                    'message' => 'Profile image updated successfully!',
+                    'icon' => 'fas fa-user-circle'
                 ];
                 
                 header('Location: ' . $_SERVER['REQUEST_URI']);
                 exit();
             } else {
-                $error = 'Failed to upload image. Please try again.';
+                $_SESSION['notification'] = [
+                    'type' => 'error',
+                    'title' => 'Upload Failed',
+                    'message' => 'Failed to upload image. Please try again.',
+                    'icon' => 'fas fa-exclamation-triangle'
+                ];
+                header('Location: ' . $_SERVER['REQUEST_URI']);
+                exit();
             }
         }
     } else {
-        $error = 'Please select a valid image file.';
+        $_SESSION['notification'] = [
+            'type' => 'error',
+            'title' => 'Invalid File',
+            'message' => 'Please select a valid image file.',
+            'icon' => 'fas fa-exclamation-circle'
+        ];
+        header('Location: ' . $_SERVER['REQUEST_URI']);
+        exit();
     }
 }
 
@@ -107,7 +134,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_profile_image'
         
         $_SESSION['notification'] = [
             'type' => 'success',
-            'message' => 'Profile image removed successfully!'
+            'title' => 'Profile Updated',
+            'message' => 'Profile image removed successfully!',
+            'icon' => 'fas fa-user-circle'
         ];
         
         header('Location: ' . $_SERVER['REQUEST_URI']);
@@ -140,11 +169,30 @@ if ($userData) {
         $stmt->execute([$userId]);
         $stats['upcoming_appointments'] = $stmt->fetchColumn();
 
-        // Unread announcements
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM sitio1_announcements a 
-                              LEFT JOIN user_announcements ua ON a.id = ua.announcement_id AND ua.user_id = ? 
-                              WHERE ua.id IS NULL");
-        $stmt->execute([$userId]);
+        // UPDATED: Count only unread announcements that are ACTUALLY TARGETED to this user
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM sitio1_announcements a 
+            WHERE a.status = 'active'
+            AND (expiry_date IS NULL OR expiry_date >= CURDATE())
+            AND (
+                -- Public announcements (excluding landing_page)
+                (a.audience_type = 'public')
+                OR 
+                -- Specific announcements targeted to this user
+                (a.audience_type = 'specific' AND a.id IN (
+                    SELECT announcement_id 
+                    FROM announcement_targets 
+                    WHERE user_id = ?
+                ))
+            )
+            AND a.id NOT IN (
+                SELECT announcement_id 
+                FROM user_announcements 
+                WHERE user_id = ?
+            )
+        ");
+        $stmt->execute([$userId, $userId]);
         $stats['unread_announcements'] = $stmt->fetchColumn();
         
         // Get recent activities (appointments and consultations from the last 30 days)
@@ -192,7 +240,14 @@ $appointmentTab = $_GET['appointment_tab'] ?? 'upcoming';
 // Handle appointment booking
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) {
     if (!isset($_POST['appointment_id'], $_POST['selected_date'], $_POST['consent'])) {
-        $error = 'Missing required booking information.';
+        $_SESSION['notification'] = [
+            'type' => 'error',
+            'title' => 'Booking Error',
+            'message' => 'Missing required booking information.',
+            'icon' => 'fas fa-exclamation-circle'
+        ];
+        header('Location: ' . $_SERVER['HTTP_REFERER']);
+        exit();
     } else {
         $appointmentId = intval($_POST['appointment_id']);
         $selectedDate  = $_POST['selected_date'];
@@ -210,7 +265,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
         if (count($healthConcerns) === 0) {
             $_SESSION['notification'] = [
                 'type' => 'error',
-                'message' => 'Please select at least one health concern.'
+                'title' => 'Health Concerns Required',
+                'message' => 'Please select at least one health concern.',
+                'icon' => 'fas fa-heartbeat'
             ];
             header('Location: ' . $_SERVER['HTTP_REFERER']);
             exit();
@@ -228,7 +285,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
         if ($sameDayAppointment > 0) {
             $_SESSION['notification'] = [
                 'type' => 'error',
-                'message' => 'You already have an appointment scheduled for ' . date('M d, Y', strtotime($selectedDate)) . '. Please choose a different date.'
+                'title' => 'Already Booked',
+                'message' => 'You already have an appointment scheduled for ' . date('M d, Y', strtotime($selectedDate)) . '. Please choose a different date.',
+                'icon' => 'fas fa-calendar-times'
             ];
             header('Location: ' . $_SERVER['HTTP_REFERER']);
             exit();
@@ -254,11 +313,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
             ':consent'         => $consentGiven
         ]);
 
-        $_SESSION['booking_success'] = true;
         $_SESSION['notification'] = [
             'type' => 'success',
-            'message' => 'Appointment booked successfully! Your health visit has been scheduled.'
+            'title' => 'Appointment Booked!',
+            'message' => 'Your health visit has been scheduled successfully. You will receive a confirmation shortly.',
+            'icon' => 'fas fa-calendar-check',
+            'details' => [
+                'Date' => date('F j, Y', strtotime($selectedDate)),
+                'Status' => 'Pending Approval',
+                'Health Concerns' => $healthConcernsStr
+            ]
         ];
+        
         header('Location: ' . $_SERVER['HTTP_REFERER']);
         exit();
     }
@@ -274,7 +340,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
     if (empty($cancelReason)) {
         $_SESSION['notification'] = [
             'type' => 'error',
-            'message' => 'Please provide a reason for cancellation'
+            'title' => 'Cancellation Error',
+            'message' => 'Please provide a reason for cancellation.',
+            'icon' => 'fas fa-exclamation-circle'
         ];
         header('Location: ' . $_SERVER['HTTP_REFERER']);
         exit();
@@ -283,7 +351,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
     if (strlen($cancelReason) < 10) {
         $_SESSION['notification'] = [
             'type' => 'error',
-            'message' => 'Please provide a detailed reason for cancellation (at least 10 characters)'
+            'title' => 'Cancellation Error',
+            'message' => 'Please provide a detailed reason for cancellation (at least 10 characters).',
+            'icon' => 'fas fa-exclamation-circle'
         ];
         header('Location: ' . $_SERVER['HTTP_REFERER']);
         exit();
@@ -315,14 +385,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
             $appointmentInfo = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$appointmentInfo) {
-                throw new Exception('Appointment not found or you do not have permission to cancel it.');
+                $errorMessage = 'Appointment not found or you do not have permission to cancel it.';
             } elseif ($appointmentInfo['status'] !== 'pending') {
-                throw new Exception('Only pending appointments can be cancelled. For approved appointments, please contact support.');
+                $errorMessage = 'Only pending appointments can be cancelled. For approved appointments, please contact support.';
             } elseif ($appointmentInfo['is_past']) {
-                throw new Exception('Past appointments cannot be cancelled.');
+                $errorMessage = 'Past appointments cannot be cancelled.';
             } else {
-                throw new Exception('Appointment cannot be cancelled at this time.');
+                $errorMessage = 'Appointment cannot be cancelled at this time.';
             }
+            
+            $_SESSION['notification'] = [
+                'type' => 'error',
+                'title' => 'Cancellation Failed',
+                'message' => $errorMessage,
+                'icon' => 'fas fa-times-circle'
+            ];
+            header('Location: ' . $_SERVER['HTTP_REFERER']);
+            exit();
         }
         
         // UPDATE the appointment status to cancelled
@@ -333,30 +412,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_appointment'])
         ");
         $stmt->execute([$cancelReason, $userAppointmentId, $userId]);
         
-        // In the cancellation handler section, update the success part:
-if ($stmt->rowCount() > 0) {
-    $_SESSION['cancellation_success'] = true;
-    $_SESSION['notification'] = [
-        'type' => 'success',
-        'message' => 'Appointment cancelled successfully. The slot is now available for others.'
-    ];
-    
-    // Redirect to show feedback modal
-    header('Location: ?tab=appointments&appointment_tab=upcoming&cancellation_success=1');
-    exit();
-    
-} else {
-    throw new Exception('Failed to cancel appointment.');
-}
-        
-        // Redirect to prevent form resubmission and refresh the slots display
-        header('Location: ?tab=appointments&appointment_tab=upcoming&refresh=' . time());
-        exit();
+        if ($stmt->rowCount() > 0) {
+            $_SESSION['notification'] = [
+                'type' => 'success',
+                'title' => 'Appointment Cancelled',
+                'message' => 'Your appointment has been cancelled successfully. The slot is now available for others.',
+                'icon' => 'fas fa-calendar-times',
+                'details' => [
+                    'Cancelled On' => date('F j, Y g:i A'),
+                    'Reason' => $cancelReason
+                ]
+            ];
+            
+            // Redirect to show success modal
+            header('Location: ?tab=appointments&appointment_tab=upcoming');
+            exit();
+            
+        } else {
+            throw new Exception('Failed to cancel appointment.');
+        }
         
     } catch (Exception $e) {
         $_SESSION['notification'] = [
             'type' => 'error',
-            'message' => 'Error cancelling appointment: ' . $e->getMessage()
+            'title' => 'Cancellation Error',
+            'message' => 'Error cancelling appointment: ' . $e->getMessage(),
+            'icon' => 'fas fa-exclamation-triangle'
         ];
 
         // Log failed cancellation attempt with reason
@@ -925,14 +1006,15 @@ try {
         }
 
         .profile-action-btn {
-            border-radius: 8px;
-            padding: 12px 20px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
+            border-radius: 9999px !important;
+            padding: 12px 24px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+            width: 100% !important;
         }
 
         .profile-action-btn i {
@@ -940,23 +1022,23 @@ try {
         }
 
         .upload-btn {
-            background: #3b82f6;
-            color: white;
+            background: #3b82f6 !important;
+            color: white !important;
         }
 
         .upload-btn:hover {
-            background: #2563eb;
-            transform: translateY(-2px);
+            background: #2563eb !important;
+            transform: translateY(-2px) !important;
         }
 
         .remove-btn {
-            background: #ef4444;
-            color: white;
+            background: #ef4444 !important;
+            color: white !important;
         }
 
         .remove-btn:hover {
-            background: #dc2626;
-            transform: translateY(-2px);
+            background: #dc2626 !important;
+            transform: translateY(-2px) !important;
         }
 
         .profile-info-card {
@@ -998,18 +1080,23 @@ try {
 
         .file-input-label {
             display: block;
-            padding: 12px 20px;
-            background: #3b82f6;
-            color: white;
-            border-radius: 8px;
+            padding: 12px 24px !important;
+            background: #3b82f6 !important;
+            color: white !important;
+            border-radius: 9999px !important;
             cursor: pointer;
             text-align: center;
-            transition: all 0.3s ease;
-            font-weight: 600;
+            transition: all 0.3s ease !important;
+            font-weight: 600 !important;
+            text-align: center !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px;
         }
 
         .file-input-label:hover {
-            background: #2563eb;
+            background: #2563eb !important;
         }
 
         /* Image preview in modal */
@@ -1140,9 +1227,377 @@ try {
         .slot-unavailable {
             border-left: 4px solid #ef4444;
         }
+        
+        /* Realistic profile UI */
+        .profile-image-wrapper {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            border: 4px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            margin: 0 auto;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .profile-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+        
+        .profile-upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: #f8fafc;
+        }
+        
+        .profile-upload-area:hover {
+            border-color: #3b82f6;
+            background: #f0f9ff;
+        }
+        
+        .profile-upload-area.dragover {
+            border-color: #3b82f6;
+            background: #e0f2fe;
+        }
+        
+        /* Modern input styling */
+        .modern-input {
+            border-radius: 12px !important;
+            border: 2px solid #e5e7eb !important;
+            padding: 14px 16px !important;
+            font-size: 16px !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .modern-input:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+            outline: none !important;
+        }
+        
+        /* Info card styling */
+        .info-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 16px;
+            padding: 20px;
+        }
+        
+        .info-card h3 {
+            color: white;
+            margin-bottom: 15px;
+        }
+        
+        .info-card p {
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        /* Responsive profile layout */
+        @media (max-width: 768px) {
+            .profile-image-wrapper {
+                width: 150px;
+                height: 150px;
+            }
+            
+            .profile-upload-area {
+                padding: 20px;
+            }
+        }
+        
+        /* UPDATED: Consolidated Notification Modal Styles - Updated with Warm Blue Theme */
+.notification-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.notification-modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.notification-modal {
+    background: white;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 500px;
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all 0.4s ease;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.notification-modal.active {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.notification-modal-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 300px;
+}
+
+/* Header styles */
+.notification-modal-header {
+    padding: 40px 30px 30px;
+    text-align: center;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* UPDATED: Warm Blue Icon */
+.notification-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 25px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+}
+
+.notification-icon.success {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.notification-icon.error {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.notification-icon.info {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.notification-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 12px;
+    line-height: 1.2;
+}
+
+.notification-message {
+    font-size: 18px;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+/* Body styles */
+.notification-modal-body {
+    padding: 30px;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-details {
+    text-align: center;
+    width: 100%;
+}
+
+.notification-details-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.notification-detail-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.notification-detail-item:last-child {
+    border-bottom: none;
+}
+
+.notification-detail-label {
+    font-size: 15px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.notification-detail-value {
+    font-size: 15px;
+    color: #1e293b;
+    font-weight: 600;
+    text-align: right;
+    max-width: 60%;
+}
+
+/* Footer styles */
+.notification-modal-footer {
+    padding: 25px 30px 35px;
+    border-top: 1px solid #f1f5f9;
+    text-align: center;
+}
+
+.notification-close-btn {
+    min-width: 200px;
+    padding: 16px 32px;
+    border: none;
+    border-radius: 50px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* UPDATED: Warm Blue Button - Used for both Continue and Okay buttons */
+.continue-btn {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.continue-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+}
+
+.ok-btn {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.ok-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+}
+
+/* UPDATED: Remove green specific styles and use warm blue for all success modals */
+.booking-success .notification-title {
+    color: #1e293b; /* Dark gray instead of green */
+}
+
+.cancellation-success .notification-title {
+    color: #1e293b; /* Dark gray instead of green */
+}
+
+.cancellation-success .notification-message {
+    font-size: 16px;
+    color: #475569;
+}
+
+/* Animation for auto-hide */
+@keyframes slideUp {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+}
+
+.notification-modal.hiding {
+    animation: slideUp 0.3s ease forwards;
+}
+
+/* Responsive styles */
+@media (max-width: 640px) {
+    .notification-modal {
+        width: 95%;
+        max-width: 400px;
+    }
+    
+    .notification-modal-header {
+        padding: 30px 20px 20px;
+    }
+    
+    .notification-icon {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 20px;
+    }
+    
+    .notification-title {
+        font-size: 24px;
+    }
+    
+    .notification-message {
+        font-size: 16px;
+    }
+    
+    .notification-modal-body {
+        padding: 20px;
+    }
+    
+    .notification-modal-footer {
+        padding: 20px;
+    }
+    
+    .notification-close-btn {
+        min-width: 160px;
+        padding: 14px 28px;
+        font-size: 16px;
+    }
+}
     </style>
 </head>
 <body class="bg-gray-100">
+    <!-- Consolidated Notification Modal -->
+    <div id="notification-modal-overlay" class="notification-modal-overlay">
+        <div id="notification-modal" class="notification-modal">
+            <div class="notification-modal-header">
+                <div id="notification-icon" class="notification-icon">
+                    <i class="fas fa-check"></i>
+                </div>
+                <h3 id="notification-title">Success!</h3>
+                <p id="notification-message">Your action was completed successfully.</p>
+            </div>
+            
+            <div class="notification-modal-body">
+                <div id="notification-details" class="notification-details" style="display: none;">
+                    <h4><i class="fas fa-info-circle"></i> Details</h4>
+                    <div id="notification-details-content" class="notification-details-grid">
+                        <!-- Details will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="notification-modal-footer">
+                <button id="notification-close-btn" class="notification-close-btn">
+                    <i class="fas fa-check"></i>
+                    Continue
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="container mx-auto px-4 py-6">
         <!-- Cancellation Modal -->
         <div id="cancel-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
@@ -1181,25 +1636,102 @@ try {
             </div>
         </div>
 
-        <!-- Cancellation Feedback Modal -->
-        <div id="cancellation-feedback-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="cancellation-feedback-backdrop"></div>
-            <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full opacity-0 scale-95" id="cancellation-feedback-content">
-                <div class="p-6 text-center">
-                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100" id="cancellation-icon">
-                        <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <!-- Appointment Booking Modal -->
+        <div id="booking-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300"></div>
+            <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4 flex items-center text-green-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                         </svg>
+                        Confirm Health Visit
+                    </h3>
+                    
+                    <div id="booking-details" class="space-y-4 mb-6">
+                        <!-- Details will be populated by JavaScript -->
                     </div>
-                    <h3 class="mt-3 text-lg font-medium text-gray-900" id="cancellation-title">Appointment Cancelled</h3>
-                    <div class="mt-2 px-4 py-3">
-                        <p class="text-sm text-gray-500" id="cancellation-message">Your appointment has been cancelled successfully.</p>
-                    </div>
-                    <div class="mt-4">
-                        <button type="button" onclick="hideCancellationFeedback()" class="px-6 py-3 bg-green-600 text-white rounded-full hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 modal-button">
-                            Continue
-                        </button>
-                    </div>
+                    
+                    <form method="POST" action="" class="space-y-6" id="booking-form" onsubmit="return validateHealthConcerns()">
+                        <input type="hidden" name="appointment_id" id="modal-appointment-id-input">
+                        <input type="hidden" name="selected_date" id="modal-selected-date-input">
+                        <input type="hidden" name="service_id" id="modal-service-id-input">
+                        <input type="hidden" name="service_type" value="General Checkup">
+
+                        <!-- Health Concerns Section -->
+                        <div>
+                            <h4 class="font-medium text-gray-700 mb-3 text-lg">Select Health Concerns <span class="text-red-500">*</span></h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <?php 
+                                $healthConcerns = [
+                                    'Asthma', 'Tuberculosis', 'Malnutrition', 'Obesity',
+                                    'Pneumonia', 'Dengue', 'Anemia', 'Arthritis',
+                                    'Stroke', 'Cancer', 'Depression'
+                                ];
+                                
+                                foreach ($healthConcerns as $concern): ?>
+                                    <div class="flex items-center">
+                                        <input type="checkbox" 
+                                               id="modal-concern_<?= strtolower(str_replace(' ', '_', $concern)) ?>" 
+                                               name="health_concerns[]" 
+                                               value="<?= $concern ?>"
+                                               class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="modal-concern_<?= strtolower(str_replace(' ', '_', $concern)) ?>" 
+                                               class="ml-3 text-gray-700 text-base"><?= $concern ?></label>
+                                    </div>
+                                <?php endforeach; ?>
+                                
+                                <!-- Other Concern Option -->
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="modal-other_concern" name="health_concerns[]" value="Other"
+                                           class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="modal-other_concern" class="ml-3 text-gray-700 text-base">Other</label>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4" id="modal-other_concern_container" style="display: none;">
+                                <label for="modal-other_concern_specify" class="block text-gray-700 mb-2 text-base">Please specify:</label>
+                                <input type="text" id="modal-other_concern_specify" name="other_concern_specify" 
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 modern-input">
+                            </div>
+                            
+                            <div id="health-concerns-error" class="mt-3 text-sm text-red-600 hidden">
+                                Please select at least one health concern.
+                            </div>
+                        </div>
+                        
+                        <!-- Additional Notes -->
+                        <div>
+                            <label for="modal-appointment_notes" class="block text-gray-700 mb-2 text-base font-medium">Health Concerns Details</label>
+                            <textarea id="modal-appointment_notes" name="notes" rows="4" 
+                                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 modern-input" 
+                                      placeholder="Describe your symptoms, concerns, or any other relevant information"></textarea>
+                        </div>
+                        
+                        <!-- Consent Checkbox -->
+                        <div class="flex items-center">
+                            <input type="checkbox" id="modal-consent" name="consent" required
+                                   class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="modal-consent" class="ml-3 text-gray-700 text-base">
+                                I consent to sharing my health information for this appointment
+                            </label>
+                        </div>
+                        
+                        <!-- Submit Button -->
+                        <div class="flex justify-end space-x-3 pt-4">
+                            <button type="button" onclick="closeBookingModal()"
+                                    class="px-6 py-3 border border-gray-300 rounded-full text-base font-medium text-gray-700 hover:bg-gray-50 transition duration-200 modal-button">
+                                Cancel
+                            </button>
+                            <button type="submit" name="book_appointment" 
+                                    class="px-6 py-3 bg-green-600 text-white rounded-full text-base font-medium hover:bg-green-700 transition flex items-center justify-center modal-button">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Book Appointment
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -1375,52 +1907,6 @@ try {
             </div>
         </div>
 
-        <!-- Success Modal for Appointment Booking -->
-        <div id="success-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="success-modal-backdrop"></div>
-            <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full opacity-0 scale-95" id="success-modal-content">
-                <div class="p-6 text-center">
-                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-                        <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                    <h3 class="mt-3 text-lg font-medium text-gray-900">Appointment Booked Successfully!</h3>
-                    <div class="mt-2 px-4 py-3">
-                        <p class="text-sm text-gray-500">Your health visit has been scheduled. You will receive a confirmation shortly.</p>
-                    </div>
-                    <div class="mt-4">
-                        <button type="button" onclick="hideModal('success')" class="px-6 py-3 bg-green-600 text-white rounded-full hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 modal-button">
-                            Continue
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Error Modal -->
-        <div id="error-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="error-modal-backdrop"></div>
-            <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full opacity-0 scale-95" id="error-modal-content">
-                <div class="p-6 text-center">
-                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                        <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </div>
-                    <h3 class="mt-3 text-lg font-medium text-gray-900">Booking Error</h3>
-                    <div class="mt-2 px-4 py-3">
-                        <p class="text-sm text-gray-500" id="error-message"></p>
-                    </div>
-                    <div class="mt-4">
-                        <button type="button" onclick="hideModal('error')" class="px-6 py-3 bg-red-600 text-white rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 modal-button">
-                            Try Again
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Profile Image Upload Modal -->
         <div id="profile-image-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
             <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300"></div>
@@ -1449,11 +1935,11 @@ try {
                         
                         <div class="flex justify-end space-x-3 pt-4">
                             <button type="button" onclick="closeProfileImageModal()"
-                                class="px-6 py-3 border border-gray-300 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-50 transition duration-200">
+                                class="px-6 py-3 border border-gray-300 rounded-full text-base font-medium text-gray-700 hover:bg-gray-50 transition duration-200 modal-button">
                                 Cancel
                             </button>
                             <button type="submit" name="update_profile_image" id="upload-submit-btn"
-                                class="px-6 py-3 bg-blue-600 text-white rounded-lg text-base font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200"
+                                class="px-6 py-3 bg-blue-600 text-white rounded-full text-base font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200 modal-button"
                                 disabled>
                                 <i class="fas fa-upload mr-2"></i> Upload Photo
                             </button>
@@ -1462,53 +1948,6 @@ try {
                 </div>
             </div>
         </div>
-
-        <!-- Session Notification Modal -->
-        <?php if (isset($_SESSION['notification'])): ?>
-            <div id="session-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 opacity-0" id="session-modal-backdrop"></div>
-                <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full opacity-0 scale-95" id="session-modal-content">
-                    <div class="p-6 text-center">
-                        <?php if ($_SESSION['notification']['type'] === 'success'): ?>
-                            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-                                <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                </svg>
-                            </div>
-                            <h3 class="mt-3 text-lg font-medium text-gray-900">Success!</h3>
-                        <?php else: ?>
-                            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </div>
-                            <h3 class="mt-3 text-lg font-medium text-gray-900">Error!</h3>
-                        <?php endif; ?>
-                        <div class="mt-2 px-4 py-3">
-                            <p class="text-sm text-gray-500"><?= htmlspecialchars($_SESSION['notification']['message']) ?></p>
-                        </div>
-                        <div class="mt-4">
-                            <button type="button" onclick="hideModal('session')" class="px-6 py-3 <?= $_SESSION['notification']['type'] === 'success' ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' : 'bg-red-600 hover:bg-red-700 focus:ring-red-500' ?> text-white rounded-full focus:outline-none focus:ring-2 modal-button">
-                                OK
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <?php unset($_SESSION['notification']); ?>
-        <?php endif; ?>
-
-        <!-- Auto-show success modal after booking -->
-        <?php if (isset($_SESSION['booking_success']) && $_SESSION['booking_success']): ?>
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    setTimeout(function() {
-                        showSuccessModal();
-                    }, 500);
-                });
-            </script>
-            <?php unset($_SESSION['booking_success']); ?>
-        <?php endif; ?>
 
         <!-- Dashboard Header -->
         <div class="flex justify-between items-center mb-6">
@@ -1519,7 +1958,7 @@ try {
                 User Dashboard
             </h1>
             <!-- Help Button -->
-            <button onclick="openHelpModal()" class="help-icon bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300 transition">
+            <button onclick="openHelpModal()" class="help-icon bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300 transition action-button">
                 <i class="fas fa-question-circle text-xl"></i>
             </button>
         </div>
@@ -1636,13 +2075,13 @@ try {
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                Appointments
+                Appointments Management
             </a>
             <a href="?tab=dashboard" class="<?= $activeTab === 'dashboard' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700' ?> px-4 py-2 font-medium flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
-                Dashboard
+                Personal Information
             </a>
         </div>
 
@@ -1734,7 +2173,7 @@ try {
                     <div class="grid grid-cols-1 gap-4">
                         <div>
                             <label for="appointment_date" class="block text-gray-700 mb-2 font-medium">Or select specific date:</label>
-                            <select id="appointment_date" name="date" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <select id="appointment_date" name="date" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 modern-input">
                                 <option value="">-- Select date --</option>
                                 <?php foreach ($availableDates as $dateInfo): 
                                     $date = $dateInfo['date'];
@@ -1810,7 +2249,8 @@ try {
                                                 }
                                             }
                                         ?>
-                                            <div class="border rounded-lg p-3 <?= $statusClass ?> <?= $isAvailable && $slotStatus !== 'unavailable' ? 'border-gray-200 hover:bg-blue-50' : 'slot-disabled border-gray-200 bg-gray-100 text-gray-500' ?>">
+                                            <div class="border rounded-lg p-3 <?= $statusClass ?> <?= $isAvailable && $slotStatus !== 'unavailable' ? 'border-gray-200 hover:bg-blue-50 cursor-pointer' : 'slot-disabled border-gray-200 bg-gray-100 text-gray-500' ?>"
+                                                 onclick="<?= $isAvailable && $slotStatus !== 'unavailable' ? 'selectSlot(' . $slot['slot_id'] . ')' : '' ?>">
                                                 <div class="flex items-center">
                                                     <input 
                                                         type="radio" 
@@ -1821,7 +2261,7 @@ try {
                                                         <?= !$isAvailable || $slotStatus === 'unavailable' ? 'disabled' : '' ?>
                                                         required
                                                     >
-                                                    <label for="slot_<?= $slot['slot_id'] ?>" class="ml-3 block">
+                                                    <label for="slot_<?= $slot['slot_id'] ?>" class="ml-3 block cursor-pointer">
                                                         <div class="font-medium">
                                                             <?= date('h:i A', strtotime($slot['start_time'])) ?> - <?= date('h:i A', strtotime($slot['end_time'])) ?>
                                                             <?php if ($slotStatus === 'closing-soon'): ?>
@@ -1923,7 +2363,7 @@ try {
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                 </svg>
-                                Confirm Health Visit
+                                Slot Selected
                             </h3>
                             <div class="space-y-3">
                                 <div class="flex items-start">
@@ -1963,76 +2403,24 @@ try {
                             </div>
                             
                             <?php if ($bookingAllowed): ?>
-                                <form method="POST" action="" class="mt-6" onsubmit="return validateHealthConcerns()">
-                                    <input type="hidden" name="appointment_id" value="<?= $selectedSlot['slot_id'] ?>">
-                                    <input type="hidden" name="selected_date" value="<?= $selectedDate ?>">
-                                    <input type="hidden" name="service_id" value="<?= $serviceId ?>">
-                                    <input type="hidden" name="service_type" value="General Checkup">
-
-                                    <!-- Health Concerns Section -->
-                                    <div class="mb-6">
-                                        <h4 class="font-medium text-gray-700 mb-3">Select Health Concerns</h4>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            <?php 
-                                            $healthConcerns = [
-                                                'Asthma', 'Tuberculosis', 'Malnutrition', 'Obesity',
-                                                'Pneumonia', 'Dengue', 'Anemia', 'Arthritis',
-                                                'Stroke', 'Cancer', 'Depression'
-                                            ];
-                                            
-                                            foreach ($healthConcerns as $concern): ?>
-                                                <div class="flex items-center">
-                                                    <input type="checkbox" 
-                                                           id="concern_<?= strtolower(str_replace(' ', '_', $concern)) ?>" 
-                                                           name="health_concerns[]" 
-                                                           value="<?= $concern ?>"
-                                                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                                    <label for="concern_<?= strtolower(str_replace(' ', '_', $concern)) ?>" 
-                                                           class="ml-2 text-gray-700"><?= $concern ?></label>
-                                                </div>
-                                            <?php endforeach; ?>
-                                            
-                                            <!-- Other Concern Option -->
-                                            <div class="flex items-center">
-                                                <input type="checkbox" id="other_concern" name="health_concerns[]" value="Other"
-                                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                                <label for="other_concern" class="ml-2 text-gray-700">Other</label>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="mt-3" id="other_concern_container" style="display: none;">
-                                            <label for="other_concern_specify" class="block text-gray-700 mb-1 text-sm">Please specify:</label>
-                                            <input type="text" id="other_concern_specify" name="other_concern_specify" 
-                                                   class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Additional Notes -->
-                                    <div class="mb-4">
-                                        <label for="appointment_notes" class="block text-gray-700 mb-2 font-medium">Health Concerns Details</label>
-                                        <textarea id="appointment_notes" name="notes" rows="3" 
-                                                  class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                                  placeholder="Describe your symptoms, concerns, or any other relevant information"></textarea>
-                                    </div>
-                                    
-                                    <!-- Consent Checkbox -->
-                                    <div class="flex items-center mb-4">
-                                        <input type="checkbox" id="consent" name="consent" required
-                                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                        <label for="consent" class="ml-2 text-gray-700">
-                                            I consent to sharing my health information for this appointment
-                                        </label>
-                                    </div>
-                                    
-                                    <!-- Submit Button -->
-                                    <button type="submit" name="book_appointment" 
+                                <div class="mt-6">
+                                    <button onclick="openBookingModal(
+                                        <?= $selectedSlot['slot_id'] ?>, 
+                                        '<?= $selectedDate ?>', 
+                                        '<?= htmlspecialchars($selectedSlot['staff_name']) ?>', 
+                                        '<?= !empty($selectedSlot['specialization']) ? htmlspecialchars($selectedSlot['specialization']) : '' ?>', 
+                                        '<?= date('M d, Y', strtotime($selectedDate)) ?>', 
+                                        '<?= date('h:i A', strtotime($selectedSlot['start_time'])) ?>', 
+                                        '<?= date('h:i A', strtotime($selectedSlot['end_time'])) ?>', 
+                                        <?= $selectedSlot['available_slots'] ?>, 
+                                        <?= $selectedSlot['max_slots'] ?>)"
                                             class="w-full bg-green-600 text-white py-3 px-4 rounded-full hover:bg-green-700 transition flex items-center justify-center action-button">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                         </svg>
-                                        Book Appointment
+                                        Book This Appointment
                                     </button>
-                                </form>
+                                </div>
                             <?php else: ?>
                                 <div class="mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
                                     <div class="flex items-center">
@@ -2318,15 +2706,16 @@ try {
                 <div class="flex flex-col md:flex-row items-center gap-8">
                     <!-- Profile Image Display -->
                     <div class="flex flex-col items-center">
-                        <div class="profile-image-container">
+                        <div class="profile-image-wrapper">
                             <?php if (!empty($userData['profile_image'])): ?>
                                 <img src="<?= htmlspecialchars($userData['profile_image']) ?>" 
                                      alt="Profile Image" 
-                                     class="profile-image-preview"
-                                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNzUiIGN5PSI3NSIgcj0iNzUiIGZpbGw9IiNlNWU3ZWIiLz48cGF0aCBkPSJNNzUgODVBNzUgNzUgMCAwMTc1IDE1IDc1IDc1IDAgMDE3NSA4NXpNNzUgNzVBNjUgNjUgMCAwMTc1IDEwIDY1IDY1IDAgMDE3NSA3NXoiIGZpbGw9IiM5Y2EzYWYiLz48L3N2Zz4='">
+                                     class="profile-image"
+                                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMTAwIiBjeT0iMTAwIiByPSIxMDAiIGZpbGw9IiNlNWU3ZWIiLz48cGF0aCBkPSJNMTAwIDExMEE3NSA3NSAwIDAxMTAwIDM1IDc1IDc1IDAgMDExMDAgMTEwek0xMDAgMTAwQTY1IDY1IDAgMDExMDAgMzUgNjUgNjUgMCAwMTEwMCAxMDB6IiBmaWxsPSIjOWNhM2FmIi8+PC9zdmc+'">
                             <?php else: ?>
-                                <div class="profile-image-preview bg-gray-200 flex items-center justify-center">
-                                    <i class="fas fa-user text-4xl text-gray-400"></i>
+                                <div class="flex flex-col items-center justify-center w-full h-full">
+                                    <i class="fas fa-user text-6xl text-gray-400 mb-3"></i>
+                                    <span class="text-gray-500 text-sm">No profile photo</span>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -2337,13 +2726,33 @@ try {
                     
                     <!-- Profile Image Actions -->
                     <div class="flex-1">
-                        <div class="space-y-4">
+                        <div class="space-y-6">
                             <div>
-                                <h4 class="font-medium text-gray-700 mb-2">Profile Photo Settings</h4>
-                                <p class="text-sm text-gray-600">
+                                <h4 class="font-medium text-gray-700 mb-3 text-lg">Profile Photo Settings</h4>
+                                <p class="text-gray-600 mb-4">
                                     Upload a clear photo of yourself to help our health staff recognize you during appointments. 
                                     This improves your experience at the health center.
                                 </p>
+                                
+                                <!-- Upload Area -->
+                                <div class="profile-upload-area" id="upload-area" ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
+                                    <div class="mb-4">
+                                        <i class="fas fa-cloud-upload-alt text-4xl text-blue-500 mb-3"></i>
+                                        <p class="text-gray-700 font-medium mb-2">Drag & drop your photo here</p>
+                                        <p class="text-gray-500 text-sm">or click to browse files</p>
+                                    </div>
+                                    
+                                    <div class="file-input-wrapper">
+                                        <input type="file" id="profile_image" name="profile_image" 
+                                               accept="image/jpeg,image/png,image/gif" 
+                                               class="file-input"
+                                               onchange="previewImage(this)">
+                                        <label for="profile_image" class="file-input-label">
+                                            <i class="fas fa-folder-open"></i> Browse Files
+                                        </label>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-3">Supported formats: JPG, PNG, GIF. Max size: 5MB</p>
+                                </div>
                             </div>
                             
                             <div class="profile-image-actions">
@@ -2382,33 +2791,111 @@ try {
                 </h2>
                 
                 <?php if ($userData): ?>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-3">
-                            <div>
-                                <span class="font-semibold text-gray-700">Full Name:</span>
-                                <p class="text-gray-600"><?= htmlspecialchars($userData['full_name']) ?></p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-6">
+                            <!-- Personal Info Card -->
+                            <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                                <h3 class="font-semibold text-gray-800 mb-4 text-lg flex items-center">
+                                    <i class="fas fa-id-card text-blue-500 mr-2"></i>
+                                    Personal Information
+                                </h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-start">
+                                        <div class="bg-blue-50 p-2 rounded-lg mr-3">
+                                            <i class="fas fa-user text-blue-500"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm text-gray-500">Full Name</p>
+                                            <p class="font-medium text-gray-800"><?= htmlspecialchars($userData['full_name']) ?></p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-start">
+                                        <div class="bg-blue-50 p-2 rounded-lg mr-3">
+                                            <i class="fas fa-birthday-cake text-blue-500"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm text-gray-500">Age</p>
+                                            <p class="font-medium text-gray-800"><?= $userData['age'] ? htmlspecialchars($userData['age']) : 'N/A' ?></p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-start">
+                                        <div class="bg-blue-50 p-2 rounded-lg mr-3">
+                                            <i class="fas fa-phone text-blue-500"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm text-gray-500">Contact Number</p>
+                                            <p class="font-medium text-gray-800"><?= $userData['contact'] ? htmlspecialchars($userData['contact']) : 'N/A' ?></p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <span class="font-semibold text-gray-700">Age:</span>
-                                <p class="text-gray-600"><?= $userData['age'] ? htmlspecialchars($userData['age']) : 'N/A' ?></p>
-                            </div>
-                            <div>
-                                <span class="font-semibold text-gray-700">Contact:</span>
-                                <p class="text-gray-600"><?= $userData['contact'] ? htmlspecialchars($userData['contact']) : 'N/A' ?></p>
+                            
+                            <!-- Account Status Card -->
+                            <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                                <h3 class="font-semibold text-gray-800 mb-4 text-lg flex items-center">
+                                    <i class="fas fa-shield-alt text-green-500 mr-2"></i>
+                                    Account Status
+                                </h3>
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-gray-500">Verification Status</p>
+                                        <p class="font-medium <?= $userData['approved'] ? 'text-green-600' : 'text-yellow-600' ?>">
+                                            <?= $userData['approved'] ? 'Verified Account' : 'Pending Verification' ?>
+                                        </p>
+                                    </div>
+                                    <div class="bg-<?= $userData['approved'] ? 'green' : 'yellow' ?>-100 text-<?= $userData['approved'] ? 'green' : 'yellow' ?>-800 px-3 py-1 rounded-full text-sm font-medium">
+                                        <?= $userData['approved'] ? 'Active' : 'Pending' ?>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="space-y-3">
-                            <div>
-                                <span class="font-semibold text-gray-700">Address:</span>
-                                <p class="text-gray-600"><?= $userData['address'] ? htmlspecialchars($userData['address']) : 'N/A' ?></p>
+                        
+                        <div class="space-y-6">
+                            <!-- Address Card -->
+                            <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm h-full">
+                                <h3 class="font-semibold text-gray-800 mb-4 text-lg flex items-center">
+                                    <i class="fas fa-home text-purple-500 mr-2"></i>
+                                    Address Information
+                                </h3>
+                                <div class="flex items-start">
+                                    <div class="bg-purple-50 p-2 rounded-lg mr-3">
+                                        <i class="fas fa-map-marker-alt text-purple-500"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-500 mb-1">Complete Address</p>
+                                        <p class="font-medium text-gray-800"><?= $userData['address'] ? htmlspecialchars($userData['address']) : 'N/A' ?></p>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <span class="font-semibold text-gray-700">Account Status:</span>
-                                <p class="text-gray-600">
-                                    <?= $userData['approved'] ? 
-                                        '<span class="text-green-600 font-medium">Approved</span>' : 
-                                        '<span class="text-yellow-600 font-medium">Pending Approval</span>' ?>
-                                </p>
+                            
+                            <!-- Quick Actions Card -->
+                            <div class="info-card">
+                                <h3 class="text-white mb-4 text-lg font-semibold flex items-center">
+                                    <i class="fas fa-bolt mr-2"></i>
+                                    Quick Actions
+                                </h3>
+                                <div class="space-y-3">
+                                    <p class="text-white text-sm">
+                                        <i class="fas fa-calendar-check mr-2"></i>
+                                        Book a new appointment
+                                    </p>
+                                    <p class="text-white text-sm">
+                                        <i class="fas fa-bell mr-2"></i>
+                                        View notifications
+                                    </p>
+                                    <p class="text-white text-sm">
+                                        <i class="fas fa-question-circle mr-2"></i>
+                                        Get help & support
+                                    </p>
+                                </div>
+                                <div class="mt-6">
+                                    <a href="?tab=appointments" class="bg-white text-blue-600 px-6 py-3 rounded-full font-semibold hover:bg-gray-100 transition duration-200 inline-flex items-center action-button">
+                                        <i class="fas fa-plus mr-2"></i>
+                                        Schedule Appointment
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2528,6 +3015,92 @@ try {
     </div>
 
     <script>
+    // Consolidated Notification Modal Functions
+    function showNotification(notification) {
+        const overlay = document.getElementById('notification-modal-overlay');
+        const modal = document.getElementById('notification-modal');
+        const icon = document.getElementById('notification-icon');
+        const title = document.getElementById('notification-title');
+        const message = document.getElementById('notification-message');
+        const detailsContainer = document.getElementById('notification-details');
+        const detailsContent = document.getElementById('notification-details-content');
+        const closeBtn = document.getElementById('notification-close-btn');
+        
+        // Set modal content based on notification type
+        title.textContent = notification.title || 'Notification';
+        message.textContent = notification.message || '';
+        
+        // Set icon and color based on type
+        icon.className = 'notification-icon ' + notification.type;
+        icon.innerHTML = `<i class="${notification.icon || 'fas fa-info-circle'}"></i>`;
+        
+        // Set button text based on type
+        if (notification.type === 'success') {
+            closeBtn.innerHTML = '<i class="fas fa-check"></i> Continue';
+            closeBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        } else if (notification.type === 'error') {
+            closeBtn.innerHTML = '<i class="fas fa-times"></i> Try Again';
+            closeBtn.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+        } else {
+            closeBtn.innerHTML = '<i class="fas fa-check"></i> OK';
+            closeBtn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+        }
+        
+        // Show details if available
+        if (notification.details && Object.keys(notification.details).length > 0) {
+            detailsContainer.style.display = 'block';
+            detailsContent.innerHTML = '';
+            
+            for (const [key, value] of Object.entries(notification.details)) {
+                const detailItem = document.createElement('div');
+                detailItem.className = 'notification-detail-item';
+                detailItem.innerHTML = `
+                    <span class="notification-detail-label">${key}</span>
+                    <span class="notification-detail-value">${value}</span>
+                `;
+                detailsContent.appendChild(detailItem);
+            }
+        } else {
+            detailsContainer.style.display = 'none';
+        }
+        
+        // Show modal with animation
+        overlay.classList.add('active');
+        setTimeout(() => {
+            modal.classList.add('active');
+        }, 10);
+        
+        // Auto-hide after 5 seconds for success messages
+        if (notification.type === 'success') {
+            setTimeout(() => {
+                hideNotification();
+            }, 5000);
+        }
+    }
+    
+    function hideNotification() {
+        const overlay = document.getElementById('notification-modal-overlay');
+        const modal = document.getElementById('notification-modal');
+        
+        modal.classList.remove('active');
+        modal.classList.add('hiding');
+        
+        setTimeout(() => {
+            overlay.classList.remove('active');
+            modal.classList.remove('hiding');
+        }, 300);
+    }
+    
+    // Close notification when clicking outside
+    document.getElementById('notification-modal-overlay').addEventListener('click', function(e) {
+        if (e.target === this) {
+            hideNotification();
+        }
+    });
+    
+    // Close notification with button
+    document.getElementById('notification-close-btn').addEventListener('click', hideNotification);
+    
     // JavaScript function to handle downloads
     function downloadInvoice(appointmentId) {
         window.location.href = '<?= $_SERVER['PHP_SELF'] ?>?tab=appointments&download_invoice=' + appointmentId;
@@ -2555,43 +3128,128 @@ try {
         window.open('ticket_preview.php?appointment_id=' + appointmentId, '_blank', 'width=600,height=800');
     }
 
+    // Function to select slot and scroll to booking button
+    function selectSlot(slotId) {
+        const radio = document.getElementById('slot_' + slotId);
+        if (radio && !radio.disabled) {
+            radio.checked = true;
+            // Find the booking button and scroll to it
+            const bookingButton = document.querySelector('[onclick*="openBookingModal"]');
+            if (bookingButton) {
+                bookingButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }
+
+    // Booking Modal Functions
+    function openBookingModal(appointmentId, selectedDate, staffName, specialization, dateStr, startTime, endTime, availableSlots, maxSlots) {
+        // Set form inputs
+        document.getElementById('modal-appointment-id-input').value = appointmentId;
+        document.getElementById('modal-selected-date-input').value = selectedDate;
+        document.getElementById('modal-service-id-input').value = appointmentId;
+        
+        // Populate booking details
+        const bookingDetails = document.getElementById('booking-details');
+        bookingDetails.innerHTML = `
+            <div class="space-y-4">
+                <div class="flex items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <div>
+                        <p class="font-medium text-gray-700">Health Worker</p>
+                        <p class="text-gray-600">${staffName}${specialization ? ' (' + specialization + ')' : ''}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <div>
+                        <p class="font-medium text-gray-700">Date & Time</p>
+                        <p class="text-gray-600">${dateStr} at ${startTime} - ${endTime}</p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <div>
+                        <p class="font-medium text-gray-700">Availability</p>
+                        <p class="text-gray-600">${availableSlots} slot${availableSlots > 1 ? 's' : ''} remaining (out of ${maxSlots})</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Reset form
+        document.getElementById('booking-form').reset();
+        document.getElementById('modal-other_concern_container').style.display = 'none';
+        document.getElementById('health-concerns-error').classList.add('hidden');
+        
+        // Show modal
+        document.getElementById('booking-modal').classList.remove('hidden');
+    }
+
+    function closeBookingModal() {
+        document.getElementById('booking-modal').classList.add('hidden');
+    }
+
     function validateHealthConcerns() {
-        const checkboxes = document.querySelectorAll('input[name="health_concerns[]"]:checked');
+        const checkboxes = document.querySelectorAll('#booking-form input[name="health_concerns[]"]:checked');
+        const errorElement = document.getElementById('health-concerns-error');
+        
         if (checkboxes.length === 0) {
-            alert("Please select at least one health concern.");
+            errorElement.classList.remove('hidden');
             return false;
         }
 
-        const otherChecked = document.getElementById("other_concern").checked;
-        const otherInput = document.getElementById("other_concern_specify").value.trim();
+        const otherChecked = document.getElementById("modal-other_concern").checked;
+        const otherInput = document.getElementById("modal-other_concern_specify").value.trim();
 
         if (otherChecked && otherInput === "") {
-            alert("Please specify your other health concern.");
+            showNotification({
+                type: 'error',
+                title: 'Health Concern Required',
+                message: 'Please specify your other health concern.',
+                icon: 'fas fa-heartbeat'
+            });
             return false;
         }
 
+        errorElement.classList.add('hidden');
         return true;
     }
 
-    // Toggle Other field visibility
-    document.getElementById("other_concern").addEventListener("change", function () {
-        document.getElementById("other_concern_container").style.display = this.checked ? "block" : "none";
+    // Toggle Other field visibility in modal
+    document.getElementById("modal-other_concern").addEventListener("change", function () {
+        document.getElementById("modal-other_concern_container").style.display = this.checked ? "block" : "none";
     });
 
-        // Enhanced cancellation functions - ONLY FOR PENDING APPOINTMENTS
+    // Enhanced cancellation functions - ONLY FOR PENDING APPOINTMENTS
     function openCancelModal(appointmentId, status, date, startTime) {
         const currentDateTime = new Date();
         const appointmentDateTime = new Date(date + ' ' + startTime);
         
         // Check if appointment slot is in the past based on real-time
         if (appointmentDateTime < currentDateTime) {
-            showErrorModal('Past appointments cannot be cancelled.');
+            showNotification({
+                type: 'error',
+                title: 'Cannot Cancel',
+                message: 'Past appointments cannot be cancelled.',
+                icon: 'fas fa-calendar-times'
+            });
             return;
         }
         
         // Only allow cancellation for pending appointments
         if (status !== 'pending') {
-            showErrorModal('Only pending appointments can be cancelled. Approved appointments require staff assistance.');
+            showNotification({
+                type: 'error',
+                title: 'Cannot Cancel',
+                message: 'Only pending appointments can be cancelled. Approved appointments require staff assistance.',
+                icon: 'fas fa-exclamation-triangle'
+            });
             return;
         }
         
@@ -2650,54 +3308,42 @@ try {
         }
     }
 
-    // Success Modal Functions
-    function showSuccessModal() {
-        const modal = document.getElementById('success-modal');
-        const backdrop = document.getElementById('success-modal-backdrop');
-        const content = document.getElementById('success-modal-content');
-        
-        modal.classList.remove('hidden');
-        
-        setTimeout(() => {
-            backdrop.classList.add('opacity-100');
-            content.classList.add('opacity-100', 'scale-100');
-        }, 10);
+    // Drag and drop functions for profile upload
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('upload-area').classList.add('dragover');
     }
 
-    function hideModal(type) {
-        const modal = document.getElementById(`${type}-modal`);
-        const backdrop = document.getElementById(`${type}-modal-backdrop`);
-        const content = document.getElementById(`${type}-modal-content`);
+    function handleDragLeave(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('upload-area').classList.remove('dragover');
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('upload-area').classList.remove('dragover');
         
-        if (backdrop && content) {
-            backdrop.classList.remove('opacity-100');
-            content.classList.remove('opacity-100', 'scale-100');
-            
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            const file = files[0];
+            if (file.type.startsWith('image/')) {
+                const input = document.getElementById('profile_image');
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                input.files = dataTransfer.files;
+                previewImage(input);
+            } else {
+                showNotification({
+                    type: 'error',
+                    title: 'Invalid File',
+                    message: 'Please drop an image file (JPG, PNG, GIF)',
+                    icon: 'fas fa-file-image'
+                });
+            }
         }
-    }
-
-    function showErrorModal(message) {
-        document.getElementById('error-message').textContent = message;
-        showModal('error');
-    }
-
-    function showModal(type, message) {
-        const modal = document.getElementById(`${type}-modal`);
-        const messageElement = document.getElementById(`${type}-message`);
-        
-        if (messageElement && message) {
-            messageElement.textContent = message;
-        }
-        
-        modal.classList.remove('hidden');
-        
-        setTimeout(() => {
-            document.getElementById(`${type}-modal-backdrop`).classList.add('opacity-100');
-            document.getElementById(`${type}-modal-content`).classList.add('opacity-100', 'scale-100');
-        }, 10);
     }
 
     // Help modal functions
@@ -2730,29 +3376,18 @@ try {
             });
         }
 
-        // Handle session notification modal
-        const sessionModal = document.getElementById('session-modal');
-        if (sessionModal) {
-            const backdrop = document.getElementById('session-modal-backdrop');
-            const content = document.getElementById('session-modal-content');
-            
-            // Show modal with animation
-            setTimeout(() => {
-                backdrop.classList.add('opacity-100');
-                content.classList.add('opacity-100', 'scale-100');
-            }, 10);
-            
-            // Auto-hide after 3 seconds
-            setTimeout(() => {
-                hideModal('session');
-            }, 3000);
+        // Initialize drag and drop for profile upload
+        const uploadArea = document.getElementById('upload-area');
+        if (uploadArea) {
+            uploadArea.addEventListener('click', function() {
+                document.getElementById('profile_image').click();
+            });
         }
-
-        // Auto-show success modal if booking was successful
-        <?php if (isset($_SESSION['booking_success']) && $_SESSION['booking_success']): ?>
-            setTimeout(() => {
-                showSuccessModal();
-            }, 500);
+        
+        // Check for session notification on page load
+        <?php if (isset($_SESSION['notification'])): ?>
+            showNotification(<?= json_encode($_SESSION['notification']) ?>);
+            <?php unset($_SESSION['notification']); ?>
         <?php endif; ?>
     });
 
@@ -2761,6 +3396,11 @@ try {
         const cancelModal = document.getElementById('cancel-modal');
         if (event.target === cancelModal) {
             closeCancelModal();
+        }
+        
+        const bookingModal = document.getElementById('booking-modal');
+        if (event.target === bookingModal) {
+            closeBookingModal();
         }
         
         const contactModal = document.getElementById('contact-info-modal');
@@ -2773,116 +3413,24 @@ try {
             closeProfileImageModal();
         }
         
-        const successModal = document.getElementById('success-modal');
-        if (event.target === successModal) {
-            hideModal('success');
-        }
-        
-        const errorModal = document.getElementById('error-modal');
-        if (event.target === errorModal) {
-            hideModal('error');
-        }
-        
         const helpModal = document.getElementById('helpModal');
         if (event.target === helpModal) {
             closeHelpModal();
         }
     }
 
-    // Cancellation feedback functions
-    function showCancellationFeedback(success, message) {
-        const modal = document.getElementById('cancellation-feedback-modal');
-        const backdrop = document.getElementById('cancellation-feedback-backdrop');
-        const content = document.getElementById('cancellation-feedback-content');
-        const icon = document.getElementById('cancellation-icon');
-        const title = document.getElementById('cancellation-title');
-        const messageEl = document.getElementById('cancellation-message');
-        
-        if (success) {
-            icon.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100';
-            icon.innerHTML = '<svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>';
-            title.textContent = 'Appointment Cancelled';
-            title.className = 'mt-3 text-lg font-medium text-gray-900';
-        } else {
-            icon.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100';
-            icon.innerHTML = '<svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>';
-            title.textContent = 'Cancellation Failed';
-            title.className = 'mt-3 text-lg font-medium text-gray-900';
-        }
-        
-        messageEl.textContent = message;
-        
-        modal.classList.remove('hidden');
-        
-        setTimeout(() => {
-            backdrop.classList.add('opacity-100');
-            content.classList.add('opacity-100', 'scale-100');
-        }, 10);
-        
-        // Auto close after 5 seconds
-        setTimeout(() => {
-            hideCancellationFeedback();
-        }, 5000);
-    }
-
-    function hideCancellationFeedback() {
-        const modal = document.getElementById('cancellation-feedback-modal');
-        const backdrop = document.getElementById('cancellation-feedback-backdrop');
-        const content = document.getElementById('cancellation-feedback-content');
-        
-        backdrop.classList.remove('opacity-100');
-        content.classList.remove('opacity-100', 'scale-100');
-        
-        setTimeout(() => {
-            modal.classList.add('hidden');
-            // Refresh the page to update the appointments list
-            window.location.reload();
-        }, 300);
-    }
-
-    // Add to window.onclick function
-    window.onclick = function(event) {
-        // ... existing code ...
-        
-        const cancellationFeedbackModal = document.getElementById('cancellation-feedback-modal');
-        if (event.target === cancellationFeedbackModal) {
-            hideCancellationFeedback();
-        }
-    }
-
     // Add this function to handle copying contact info
     function copyToClipboard(text) {
         navigator.clipboard.writeText(text).then(function() {
-            // Show temporary success message
-            const originalEvent = event;
-            const button = originalEvent.target.closest('button');
-            const originalText = button.innerHTML;
-            
-            button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Copied!';
-            button.classList.remove('text-blue-600', 'text-green-600');
-            button.classList.add('text-gray-600');
-            
-            setTimeout(() => {
-                button.innerHTML = originalText;
-                button.classList.remove('text-gray-600');
-                if (text.includes('@')) {
-                    button.classList.add('text-green-600');
-                } else {
-                    button.classList.add('text-blue-600');
-                }
-            }, 2000);
+            showNotification({
+                type: 'success',
+                title: 'Copied!',
+                message: 'Text copied to clipboard',
+                icon: 'fas fa-copy'
+            });
         }).catch(function(err) {
             console.error('Failed to copy text: ', err);
         });
-    }
-
-    // Update the existing showContactModal function if needed
-    function showContactModal() {
-        document.getElementById('contact-info-modal').classList.remove('hidden');
-    }
-
-    function closeContactModal() {
-        document.getElementById('contact-info-modal').classList.add('hidden');
     }
     </script>
 </body>
