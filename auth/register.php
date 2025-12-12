@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 if (isLoggedIn()) {
     redirectBasedOnRole();
@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = trim($_POST['password'] ?? '');
     $confirmPassword = trim($_POST['confirm_password'] ?? '');
     $fullName = trim($_POST['full_name'] ?? '');
+    $dateOfBirth = trim($_POST['date_of_birth'] ?? '');
     $age = intval($_POST['age'] ?? 0);
     $gender = trim($_POST['gender'] ?? '');
     $address = trim($_POST['address'] ?? '');
@@ -49,6 +50,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if (empty($fullName)) {
         showGlassModal('error', 'Full name is required.');
+        exit();
+    }
+    
+    // DATE OF BIRTH VALIDATION - ADDED FIELD
+    if (empty($dateOfBirth)) {
+        showGlassModal('error', 'Date of birth is required.');
+        exit();
+    }
+    
+    // Validate date format and ensure it's not in the future
+    $dobTimestamp = strtotime($dateOfBirth);
+    if (!$dobTimestamp || $dobTimestamp > time()) {
+        showGlassModal('error', 'Please enter a valid date of birth.');
         exit();
     }
     
@@ -149,17 +163,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
         
-        // Insert user with verification data
+        // Insert user with verification data INCLUDING DATE OF BIRTH
         $stmt = $pdo->prepare("INSERT INTO sitio1_users 
-            (username, email, password, full_name, age, gender, address, sitio, contact, civil_status, occupation,
+            (username, email, password, full_name, date_of_birth, age, gender, address, sitio, contact, civil_status, occupation,
              verification_method, id_image_path, verification_notes, verification_consent, approved) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
         
         $stmt->execute([
             $username,
             $email,
             $hashedPassword,
             $fullName,
+            $dateOfBirth, // ADDED DATE OF BIRTH
             $age,
             $gender,
             $address,

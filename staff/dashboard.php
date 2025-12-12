@@ -335,45 +335,36 @@ function sendAccountStatusEmail($email, $status, $message = '', $uniqueNumber = 
     }
 }
 
-// Function to generate sequential priority number
-function generatePriorityNumber($pdo, $appointmentId, $staffId, $date) {
-    // Get the count of approved appointments for this staff on this date
+// Function to generate sequential priority number per time slot (01-05 only)
+function generatePriorityNumber($pdo, $appointmentId, $staffId, $date, $timeSlotId) {
+    // Get the count of approved appointments for this specific time slot on this date
     $stmt = $pdo->prepare("
         SELECT COUNT(*) as appointment_count 
         FROM user_appointments ua
         JOIN sitio1_appointments a ON ua.appointment_id = a.id
-        WHERE a.staff_id = ? AND a.date = ? AND ua.status = 'approved'
-        AND ua.id <= ?
+        WHERE a.staff_id = ? 
+        AND a.date = ? 
+        AND a.id = ?
+        AND ua.status = 'approved'
+        AND ua.id < ?
     ");
-    $stmt->execute([$staffId, $date, $appointmentId]);
+    $stmt->execute([$staffId, $date, $timeSlotId, $appointmentId]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    $sequenceNumber = $result['appointment_count'] ?? 1;
+    // Add 1 to get the next number in sequence for this time slot
+    $sequenceNumber = ($result['appointment_count'] ?? 0) + 1;
     
-    // Get staff initials
-    $stmt = $pdo->prepare("SELECT full_name FROM sitio1_users WHERE id = ?");
-    $stmt->execute([$staffId]);
-    $staff = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    $initials = 'HW';
-    if ($staff && !empty($staff['full_name'])) {
-        $nameParts = explode(' ', $staff['full_name']);
-        $initials = '';
-        foreach ($nameParts as $part) {
-            if (!empty(trim($part))) {
-                $initials .= strtoupper(substr($part, 0, 1));
-            }
-        }
-        if (empty($initials)) $initials = 'HW';
+    // If sequence number exceeds 5, keep it at 5 (maximum)
+    if ($sequenceNumber > 5) {
+        $sequenceNumber = 5;
     }
     
-    // Format: HW_INITIALS-01, HW_INITIALS-02, etc.
-    return $initials . '-' . str_pad($sequenceNumber, 2, '0', STR_PAD_LEFT);
+    // Format as two-digit number (01, 02, 03, 04, 05)
+    return str_pad($sequenceNumber, 2, '0', STR_PAD_LEFT);
 }
 
-// Function to generate appointment ticket
+// Function to generate appointment ticket with time slot info
 function generateAppointmentTicket($appointmentData, $priorityNumber) {
-    // Create HTML content for the ticket
     $html = '
     <!DOCTYPE html>
     <html>
@@ -523,6 +514,17 @@ function generateAppointmentTicket($appointmentData, $priorityNumber) {
                     border: 2px solid #000;
                 }
             }
+            .time-slot-info {
+                font-size: 14px;
+                color: #6b7280;
+                margin-top: 8px;
+            }
+            .priority-explanation {
+                font-size: 12px;
+                color: #4b5563;
+                margin-top: 5px;
+                font-style: italic;
+            }
         </style>
         <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
     </head>
@@ -535,10 +537,34 @@ function generateAppointmentTicket($appointmentData, $priorityNumber) {
                     <h1>Community Health Tracker</h1>
                     <p>Appointment Confirmation Ticket</p>
                     <div class="priority-number">' . $priorityNumber . '</div>
+                    <div class="time-slot-info">
+                        Time Slot: ' . date('g:i A', strtotime($appointmentData['start_time'])) . ' - ' . date('g:i A', strtotime($appointmentData['end_time'])) . '
+                    </div>
+                    <div class="priority-explanation">
+                        Priority number is specific to this time slot (01-05 only)
+                    </div>
                 </div>
                 
                 <div class="section">
-                    <h2>📅 Appointment Details</h2>
+                    <h2><i class="fas fa-user"></i> Patient Information</h2>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="label">Full Name:</span>
+                            <span class="value">' . htmlspecialchars($appointmentData['full_name']) . '</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Patient ID:</span>
+                            <span class="value">' . htmlspecialchars($appointmentData['unique_number']) . '</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Contact:</span>
+                            <span class="value">' . htmlspecialchars($appointmentData['contact']) . '</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2><i class="fas fa-calendar-alt"></i> Appointment Details</h2>
                     <div class="info-grid">
                         <div class="info-item">
                             <span class="label">Date:</span>
@@ -549,7 +575,7 @@ function generateAppointmentTicket($appointmentData, $priorityNumber) {
                             <span class="value">' . date('g:i A', strtotime($appointmentData['start_time'])) . ' - ' . date('g:i A', strtotime($appointmentData['end_time'])) . '</span>
                         </div>
                         <div class="info-item">
-                            <span class="label">Health Worker:</span>
+                            <span class="label">Healthcare Provider:</span>
                             <span class="value">' . htmlspecialchars($appointmentData['staff_name']) . '</span>
                         </div>
                         <div class="info-item">
@@ -560,38 +586,27 @@ function generateAppointmentTicket($appointmentData, $priorityNumber) {
                 </div>
                 
                 <div class="section">
-                    <h2>👤 Patient Information</h2>
+                    <h2><i class="fas fa-file-invoice"></i> Invoice Details</h2>
                     <div class="info-grid">
                         <div class="info-item">
-                            <span class="label">Name:</span>
-                            <span class="value">' . htmlspecialchars($appointmentData['full_name']) . '</span>
+                            <span class="label">Invoice Number:</span>
+                            <span class="value">' . htmlspecialchars($appointmentData['invoice_number']) . '</span>
                         </div>
                         <div class="info-item">
-                            <span class="label">Contact:</span>
-                            <span class="value">' . htmlspecialchars($appointmentData['contact']) . '</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="label">Patient ID:</span>
-                            <span class="value">' . htmlspecialchars($appointmentData['unique_number']) . '</span>
+                            <span class="label">Generated:</span>
+                            <span class="value">' . date('F j, Y g:i A', strtotime($appointmentData['invoice_generated_at'] ?? 'now')) . '</span>
                         </div>
                     </div>
                 </div>
                 
-                <div class="section">
-                    <h2>🏥 Health Concerns</h2>
-                    <div style="padding: 10px 0;">
-                        ' . (!empty($appointmentData['health_concerns']) ? nl2br(htmlspecialchars($appointmentData['health_concerns'])) : 'General Checkup') . '
-                    </div>
-                </div>
-
                 <div class="barcode">
-                    *' . $priorityNumber . '*
+                    ' . strtoupper($appointmentData['invoice_number']) . '
                 </div>
                 
                 <div class="footer">
-                    <p>🚨 Please bring this ticket to your appointment</p>
-                    <p>⏰ Arrive 15 minutes before your scheduled time</p>
-                    <p>📅 Generated on: ' . date('F j, Y \a\t g:i A') . '</p>
+                    <p>Please present this ticket at the clinic reception</p>
+                    <p>Valid only for the scheduled appointment date and time</p>
+                    <p>© ' . date('Y') . ' Community Health Tracker. All rights reserved.</p>
                 </div>
             </div>
         </div>
@@ -756,6 +771,65 @@ function sendAppointmentApprovalEmail($appointment, $priorityNumber, $invoiceNum
         error_log("Email could not be sent. Mailer Error: {$mail->ErrorInfo}");
         return false;
     }
+}
+
+// Function to automatically check ID type
+function checkIdType($imagePath) {
+    // Common keywords for different ID types (lowercase for matching)
+    $idKeywords = [
+        'senior' => ['senior', 'sc', 'senior citizen', 'senior-citizen', 'osc', 'office of senior citizen', 'senior card', 's.c.', 'sc id', 'senior citizen id'],
+        'national' => ['national', 'phil', 'philippine', 'phil id', 'phil-id', 'philid', 'national id', 'philippine id', 'phil sys', 'philsys', 'phil. id', 'philippine national id', 'pnid'],
+        'driver' => ['driver', 'license', 'dl', 'lto', 'land transportation', 'driver\'s license', 'driving license', 'driver license'],
+        'voter' => ['voter', 'comelec', 'voter id', 'voter-id', 'voter\'s id', 'voters id', 'voter certification'],
+        'passport' => ['passport', 'dfa', 'department of foreign affairs', 'philippine passport', 'passport id'],
+        'umid' => ['umid', 'unified', 'multi-purpose', 'unified multi-purpose', 'unified id', 'multi-purpose id'],
+        'sss' => ['sss', 'social security', 'social security system', 'sss id', 'sss card', 'sss number'],
+        'gsis' => ['gsis', 'government service insurance system', 'gsis id', 'gsis card'],
+        'tin' => ['tin', 'tax', 'taxpayer', 'taxpayer identification', 'tin id', 'tin card', 'tax identification'],
+        'postal' => ['postal', 'post office', 'philpost', 'postal id', 'post office id'],
+        'prc' => ['prc', 'professional', 'professional regulation', 'prc id', 'prc license', 'professional id'],
+        'nbi' => ['nbi', 'national bureau', 'national bureau of investigation', 'nbi clearance', 'nbi id'],
+        'birth' => ['birth', 'certificate', 'birth certificate', 'psa', 'civil registry', 'certificate of live birth'],
+        'company' => ['company', 'employee', 'employee id', 'company id', 'office', 'work', 'office id', 'work id', 'employment id'],
+        'student' => ['student', 'school', 'university', 'college', 'school id', 'student id', 'student card', 'university id']
+    ];
+    
+    // Extract filename without extension and path
+    $filename = strtolower(pathinfo($imagePath, PATHINFO_FILENAME));
+    
+    // Check if image path contains any ID keywords
+    $lowerPath = strtolower($imagePath);
+    
+    foreach ($idKeywords as $type => $keywords) {
+        foreach ($keywords as $keyword) {
+            if (strpos($filename, $keyword) !== false || strpos($lowerPath, $keyword) !== false) {
+                return ucfirst($type) . ' ID';
+            }
+        }
+    }
+    
+    // If no specific type found, check for general ID indicators
+    $generalIdIndicators = ['id', 'identification', 'card', 'certificate', 'license'];
+    foreach ($generalIdIndicators as $indicator) {
+        if (strpos($filename, $indicator) !== false || strpos($lowerPath, $indicator) !== false) {
+            return 'Valid ID';
+        }
+    }
+    
+    return 'Unknown ID Type';
+}
+
+// Function to check if ID is valid for verification (Senior Citizen or National ID)
+function isIdValidForVerification($idType) {
+    $validTypes = ['Senior ID', 'National ID'];
+    
+    foreach ($validTypes as $validType) {
+        if (stripos($idType, $validType) !== false) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 // Export functionality
@@ -946,7 +1020,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $pdo->prepare("INSERT INTO sitio1_appointments (staff_id, date, start_time, end_time, max_slots) VALUES (?, ?, ?, ?, ?)");
                     $stmt->execute([$staffId, $date, $startTime, $endTime, $maxSlots]);
                     
-                    $success = 'Appointment slot added successfully!';
+                    // Store success message in session for modal display
+                    $_SESSION['success_message'] = 'Appointment Slot Added Successfully!<br>' . 
+                                                   date('F j, Y', strtotime($date)) . ' ' . 
+                                                   date('g:i A', strtotime($startTime)) . ' - ' . 
+                                                   date('g:i A', strtotime($endTime));
+                    
+                    header("Location: " . $_SERVER['PHP_SELF'] . "?tab=appointment-management&appointment_tab=available-slots");
+                    exit();
                 }
             } catch (PDOException $e) {
                 $error = 'Error adding appointment slot: ' . $e->getMessage();
@@ -970,7 +1051,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$date, $startTime, $endTime, $maxSlots, $slotId, $staffId]);
                 
                 if ($stmt->rowCount() > 0) {
-                    $success = 'Appointment slot updated successfully!';
+                    $_SESSION['success_message'] = 'Appointment Slot Updated Successfully!<br>' . 
+                                                   date('F j, Y', strtotime($date)) . ' ' . 
+                                                   date('g:i A', strtotime($startTime)) . ' - ' . 
+                                                   date('g:i A', strtotime($endTime));
+                    
+                    header("Location: " . $_SERVER['PHP_SELF'] . "?tab=appointment-management&appointment_tab=available-slots");
+                    exit();
                 } else {
                     $error = 'No changes made or slot not found.';
                 }
@@ -996,7 +1083,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$slotId, $staffId]);
                 
                 if ($stmt->rowCount() > 0) {
-                    $success = 'Appointment slot deleted successfully!';
+                    $_SESSION['success_message'] = 'Appointment Slot Deleted Successfully!';
+                    header("Location: " . $_SERVER['PHP_SELF'] . "?tab=appointment-management&appointment_tab=available-slots");
+                    exit();
                 } else {
                     $error = 'Slot not found or already deleted.';
                 }
@@ -1011,10 +1100,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (in_array($action, ['approve', 'reject', 'complete'])) {
             try {
+                // In the appointment approval section, update to use the new function
                 if ($action === 'approve') {
                     // Get appointment details for priority number generation
                     $stmt = $pdo->prepare("
-                        SELECT a.staff_id, a.date 
+                        SELECT a.staff_id, a.date, a.id as slot_id
                         FROM user_appointments ua
                         JOIN sitio1_appointments a ON ua.appointment_id = a.id
                         WHERE ua.id = ?
@@ -1026,9 +1116,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         throw new Exception('Appointment not found');
                     }
                     
-                    // Generate invoice and priority number
+                    // Generate invoice and priority number using the new function
                     $invoiceNumber = 'INV-' . date('Ymd') . '-' . str_pad($appointmentId, 4, '0', STR_PAD_LEFT);
-                    $priorityNumber = generatePriorityNumber($pdo, $appointmentId, $appointmentDetails['staff_id'], $appointmentDetails['date']);
+                    $priorityNumber = generatePriorityNumber($pdo, $appointmentId, $appointmentDetails['staff_id'], 
+                                                            $appointmentDetails['date'], $appointmentDetails['slot_id']);
                     
                     // Update appointment with approved status and generated numbers
                     $stmt = $pdo->prepare("
@@ -1075,7 +1166,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                         }
                         
-                        $success = 'Appointment approved successfully! Priority Number: <strong>' . $priorityNumber . '</strong> | Invoice: <strong>' . $invoiceNumber . '</strong>';
+                        $_SESSION['success_message'] = 'Appointment Approved Successfully!<br>Priority Number: <strong>' . $priorityNumber . '</strong><br>Invoice: <strong>' . $invoiceNumber . '</strong>';
+                        
+                        header("Location: " . $_SERVER['PHP_SELF'] . "?tab=appointment-management&appointment_tab=pending");
+                        exit();
                     } else {
                         $error = 'Failed to update appointment status. Please try again.';
                     }
@@ -1088,17 +1182,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute([$rejectionReason, $appointmentId]);
                         
                         if ($stmt->rowCount() > 0) {
-                            $success = 'Appointment rejected successfully!';
+                            $_SESSION['success_message'] = 'Appointment Declined Successfully!';
+                            header("Location: " . $_SERVER['PHP_SELF'] . "?tab=appointment-management&appointment_tab=pending");
+                            exit();
                         } else {
                             $error = 'Failed to reject appointment. Please try again.';
                         }
                     }
                 } elseif ($action === 'complete') {
-                    $stmt = $pdo->prepare("UPDATE user_appointments SET status = 'completed', completed_at = NOW() WHERE id = ?");
+                    $stmt = $pdo->prepare("
+                        UPDATE user_appointments 
+                        SET status = 'completed', 
+                            completed_at = NOW() 
+                        WHERE id = ?
+                    ");
                     $stmt->execute([$appointmentId]);
                     
                     if ($stmt->rowCount() > 0) {
-                        $success = 'Appointment marked as completed successfully!';
+                        // Get appointment details for success message
+                        $stmt = $pdo->prepare("
+                            SELECT u.full_name, a.date, a.start_time, a.end_time, ua.priority_number
+                            FROM user_appointments ua
+                            JOIN sitio1_users u ON ua.user_id = u.id
+                            JOIN sitio1_appointments a ON ua.appointment_id = a.id
+                            WHERE ua.id = ?
+                        ");
+                        $stmt->execute([$appointmentId]);
+                        $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        $_SESSION['success_message'] = 'Appointment Completed Successfully!<br>Patient: <strong>' . htmlspecialchars($appointment['full_name']) . '</strong><br>Priority Number: <strong>' . $appointment['priority_number'] . '</strong>';
+                        
+                        header("Location: " . $_SERVER['PHP_SELF'] . "?tab=appointment-management&appointment_tab=upcoming");
+                        exit();
                     } else {
                         $error = 'Failed to mark appointment as completed. Please try again.';
                     }
@@ -1135,10 +1250,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         sendAccountStatusEmail($user['email'], 'approved', '', $uniqueNumber);
                     }
                     
-                    $success = 'User approved successfully! Unique number: ' . $uniqueNumber;
+                    $_SESSION['success_message'] = 'Resident Account Approved Successfully!<br>Patient ID: <strong>' . $uniqueNumber . '</strong>';
                     
-                    // Redirect to account management tab with success message
-                    header("Location: " . $_SERVER['PHP_SELF'] . "?tab=account-management&success=" . urlencode('User approved successfully! Unique number: ' . $uniqueNumber));
+                    header("Location: " . $_SERVER['PHP_SELF'] . "?tab=account-management&success=true");
                     exit();
                 } else {
                     $declineReason = isset($_POST['decline_reason']) ? trim($_POST['decline_reason']) : 'No reason provided';
@@ -1151,10 +1265,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         sendAccountStatusEmail($user['email'], 'declined', $declineReason);
                     }
                     
-                    $success = 'User declined successfully!';
+                    $_SESSION['success_message'] = 'Account Declined Successfully!';
                     
-                    // Redirect to account management tab with success message
-                    header("Location: " . $_SERVER['PHP_SELF'] . "?tab=account-management&success=" . urlencode('User declined successfully!'));
+                    header("Location: " . $_SERVER['PHP_SELF'] . "?tab=account-management&success=true");
                     exit();
                 }
             }
@@ -1194,27 +1307,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_cancelled_appo
         $stmt = $pdo->prepare("DELETE FROM user_appointments WHERE id = ?");
         $stmt->execute([$cancelledAppointmentId]);
         
-        $_SESSION['notification'] = [
-            'type' => 'success',
-            'message' => 'Cancelled appointment deleted successfully.'
-        ];
+        $_SESSION['success_message'] = 'Cancelled appointment deleted successfully.';
         
         header('Location: ' . $_SERVER['PHP_SELF'] . '?tab=appointments&appointment_tab=cancelled');
         exit();
         
     } catch (Exception $e) {
-        $_SESSION['notification'] = [
-            'type' => 'error',
-            'message' => 'Error deleting cancelled appointment: ' . $e->getMessage()
-        ];
-        header('Location: ' . $_SERVER['HTTP_REFERER']);
-        exit();
+        $error = 'Error deleting cancelled appointment: ' . $e->getMessage();
     }
 }
 
-// Check for success message from URL parameter (after redirect)
-if (isset($_GET['success'])) {
-    $success = urldecode($_GET['success']);
+// Check for success message from session (after redirect)
+if (isset($_SESSION['success_message'])) {
+    $success = $_SESSION['success_message'];
+    unset($_SESSION['success_message']);
 }
 
 // Get filter parameters
@@ -1360,35 +1466,37 @@ try {
     
     // Get all appointments with filters - UPDATED: Include approved, completed, cancelled, rejected
     $query = "
-        SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time,
-               s.full_name as staff_name, s.specialization
-        FROM user_appointments ua 
-        JOIN sitio1_users u ON ua.user_id = u.id 
-        JOIN sitio1_appointments a ON ua.appointment_id = a.id 
-        JOIN sitio1_users s ON a.staff_id = s.id 
-        WHERE a.staff_id = ? 
-        AND ua.status IN ('approved', 'completed', 'cancelled', 'rejected')
-    ";
-    
-    $params = [$staffId];
-    
-    if ($filterStatus !== 'all') {
-        $query .= " AND ua.status = ?";
-        $params[] = $filterStatus;
-    }
-    
-    if (!empty($filterDate)) {
-        $query .= " AND a.date = ?";
-        $params[] = $filterDate;
-    }
-    
-    $query .= " ORDER BY a.date DESC, a.start_time DESC";
+    SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time,
+           s.full_name as staff_name, s.specialization,
+           ua.created_at as appointment_created_at
+    FROM user_appointments ua 
+    JOIN sitio1_users u ON ua.user_id = u.id 
+    JOIN sitio1_appointments a ON ua.appointment_id = a.id 
+    JOIN sitio1_users s ON a.staff_id = s.id 
+    WHERE a.staff_id = ? 
+    AND ua.status IN ('approved', 'completed', 'cancelled', 'rejected')
+";
+
+$params = [$staffId];
+
+if ($filterStatus !== 'all') {
+    $query .= " AND ua.status = ?";
+    $params[] = $filterStatus;
+}
+
+if (!empty($filterDate)) {
+    $query .= " AND a.date = ?";
+    $params[] = $filterDate;
+}
+
+// Sort by date, time, and creation timestamp
+$query .= " ORDER BY a.date DESC, a.start_time DESC, ua.created_at DESC";
     
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
     $allAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get unapproved users with pagination
+    // Get unapproved users with pagination and automatically check ID type
     $usersPerPage = 5;
     $currentPage = isset($_GET['user_page']) ? max(1, intval($_GET['user_page'])) : 1;
     $offset = ($currentPage - 1) * $usersPerPage;
@@ -1419,6 +1527,18 @@ try {
     $stmt->bindValue(2, $offset, PDO::PARAM_INT);
     $stmt->execute();
     $unapprovedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Automatically check ID type for each user
+    foreach ($unapprovedUsers as &$user) {
+        if (!empty($user['id_image_path'])) {
+            $user['id_type'] = checkIdType($user['id_image_path']);
+            $user['is_valid_id'] = isIdValidForVerification($user['id_type']);
+        } else {
+            $user['id_type'] = 'No ID Uploaded';
+            $user['is_valid_id'] = false;
+        }
+    }
+    unset($user); // Break the reference
     
 } catch (PDOException $e) {
     $error = 'Error fetching data: ' . $e->getMessage();
@@ -1496,6 +1616,29 @@ $nextAvailableDate = null;
 if (!empty($availableDates)) {
     $nextAvailableDate = $availableDates[0]['date'];
 }
+
+// Get all occupied time slots for the current staff
+$stmt = $pdo->prepare("
+    SELECT 
+        a.date,
+        a.start_time,
+        a.end_time
+    FROM sitio1_appointments a
+    WHERE a.staff_id = ? AND a.date >= CURDATE()
+    ORDER BY a.date, a.start_time
+");
+$stmt->execute([$staffId]);
+$occupiedSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Create an array of occupied time slots by date
+$occupiedSlotsByDate = [];
+foreach ($occupiedSlots as $slot) {
+    $date = $slot['date'];
+    if (!isset($occupiedSlotsByDate[$date])) {
+        $occupiedSlotsByDate[$date] = [];
+    }
+    $occupiedSlotsByDate[$date][] = $slot['start_time'] . ' - ' . $slot['end_time'];
+}
 ?>
 
 <!DOCTYPE html>
@@ -1508,6 +1651,110 @@ if (!empty($availableDates)) {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* Enhanced Modal Styles - Centered and Consistent */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            position: relative;
+            margin: auto;
+        }
+        
+        .modal-overlay.active .modal-container {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .modal-header {
+            padding: 24px 24px 0 24px;
+        }
+        
+        .modal-body {
+            padding: 24px;
+        }
+        
+        .modal-footer {
+            padding: 0 24px 24px 24px;
+        }
+        
+        /* Action Modal - Centered Success/Error Messages */
+        .action-modal {
+            max-width: 400px;
+        }
+        
+        .action-modal .modal-body {
+            text-align: center;
+            padding: 40px 24px;
+        }
+        
+        .action-modal-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 32px;
+        }
+        
+        .action-modal-success .action-modal-icon {
+            background: #d1fae5;
+            color: #059669;
+        }
+        
+        .action-modal-error .action-modal-icon {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        
+        .action-modal-info .action-modal-icon {
+            background: #dbeafe;
+            color: #3b82f6;
+        }
+        
+        .action-modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+        
+        .action-modal-message {
+            font-size: 15px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+        
+        /* Other styles remain the same as before */
         .fixed {
             position: fixed;
         }
@@ -1526,15 +1773,6 @@ if (!empty($availableDates)) {
         .tab-active {
             border-bottom: 2px solid #3C96E1;
             color: #3C96E1;
-        }
-        .modal {
-            opacity: 0;
-            transform: translate(-50%, -50%) scale(0.9);
-            transition: all 0.3s ease-out;
-        }
-        .modal.active {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
         }
         .count-badge {
             display: inline-flex;
@@ -1693,6 +1931,56 @@ if (!empty($availableDates)) {
             font-weight: bold;
         }
         
+        /* Calendar date status indicator */
+        .calendar-day.occupied {
+            background: #fff3cd !important;
+            border-color: #ffc107 !important;
+            color: #856404 !important;
+        }
+        
+        .calendar-day.occupied .date-status {
+            font-size: 10px;
+            font-weight: bold;
+            color: #856404;
+            background: rgba(255, 193, 7, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-top: 4px;
+        }
+        
+        /* Time slot status */
+        .time-slot.occupied {
+            background: #fff3cd !important;
+            border-color: #ffc107 !important;
+            color: #856404 !important;
+            cursor: not-allowed !important;
+        }
+        
+        .time-slot.occupied .slot-status {
+            font-size: 12px;
+            font-weight: bold;
+            color: #856404;
+            margin-top: 4px;
+        }
+        
+        /* Selected date status display */
+        .date-status-display {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(59, 130, 246, 0.1);
+            color: #1e40af;
+        }
+        
+        .date-status-display.occupied {
+            background: rgba(255, 193, 7, 0.2);
+            color: #856404;
+        }
+        
         /* Modal buttons */
         .modal-button {
             border-radius: 9999px !important;
@@ -1703,12 +1991,12 @@ if (!empty($availableDates)) {
         }
 
         /* Simple hover effect for available dates */
-        .calendar-day:not(.disabled):not(.selected):hover {
+        .calendar-day:not(.disabled):not(.selected):not(.occupied):hover {
             border-color: #3C96E1;
             background: #eff6ff;
         }
 
-        .time-slot:not(.disabled):not(.selected):hover {
+        .time-slot:not(.disabled):not(.selected):not(.occupied):hover {
             border-color: #3C96E1;
             background: #eff6ff;
         }
@@ -1724,7 +2012,7 @@ if (!empty($availableDates)) {
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
         }
 
-        /* NEW: Updated button styles for Edit and Delete */
+        /* Updated button styles for Edit and Delete */
         .btn-edit {
             background-color: #3C96E1 !important;
             color: white !important;
@@ -1761,12 +2049,12 @@ if (!empty($availableDates)) {
             box-shadow: 0 4px 8px rgba(239, 68, 68, 0.4) !important;
         }
 
-        /* NEW: Updated button style for View Details */
+        /* Updated button style for View Details */
         .btn-view-details {
             background-color: #3C96E1 !important;
             color: white !important;
             border-radius: 9999px !important;
-            padding: 10px 20px !important;
+            padding: 8px 16px !important;
             font-weight: 600 !important;
             font-size: 14px !important;
             transition: all 0.3s ease !important;
@@ -1847,7 +2135,7 @@ if (!empty($availableDates)) {
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
         }
 
-        /* NEW: Enhanced Tab Button Styles with Blue Theme */
+        /* Enhanced Tab Button Styles with Blue Theme */
         .nav-tab-button {
             display: inline-flex;
             align-items: center;
@@ -1951,7 +2239,7 @@ if (!empty($availableDates)) {
             box-shadow: 0 4px 12px rgba(60, 150, 225, 0.4);
         }
 
-        /* NEW: Blue Theme for Appointment Management Tabs */
+        /* Blue Theme for Appointment Management Tabs */
         .appointment-tab-button {
             display: inline-flex;
             align-items: center;
@@ -2084,52 +2372,52 @@ if (!empty($availableDates)) {
         }
 
         /* Enhanced Chart Container Styles */
-.chart-container {
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e5e7eb;
-    height: 400px; /* Fixed height */
-    position: relative;
-    overflow: hidden;
-}
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
+            height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
 
-.chart-wrapper {
-    width: 100%;
-    height: 100%;
-    position: relative;
-}
+        .chart-wrapper {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
 
-.chart-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-}
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+        }
 
-.chart-title i {
-    margin-right: 8px;
-    color: #3C96E1;
-}
+        .chart-title i {
+            margin-right: 8px;
+            color: #3C96E1;
+        }
 
-/* Analytics grid layout improvements */
-.analytics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-    margin-bottom: 20px;
-}
+        /* Analytics grid layout improvements */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
 
-/* Chart canvas responsive sizing */
-.chart-container canvas {
-    max-width: 100% !important;
-    max-height: 100% !important;
-    width: auto !important;
-    height: auto !important;
-}
+        /* Chart canvas responsive sizing */
+        .chart-container canvas {
+            max-width: 100% !important;
+            max-height: 100% !important;
+            width: auto !important;
+            height: auto !important;
+        }
 
         /* Analytics grid layout */
         .analytics-grid {
@@ -2181,1270 +2469,1405 @@ if (!empty($availableDates)) {
             background: #f3f4f6;
             color: #6b7280;
         }
+        
+        /* Improved user details modal layout */
+        .info-label {
+            font-weight: 700 !important;
+            color: #374151 !important;
+            font-size: 14px !important;
+        }
+        
+        .info-value {
+            font-weight: 500 !important;
+            color: #4b5563 !important;
+            font-size: 14px !important;
+        }
+        
+        .id-validation-status {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            text-align: center;
+            display: inline-block;
+        }
+        
+        .id-valid {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        
+        .id-invalid {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        
+        .id-unknown {
+            background-color: #f3f4f6;
+            color: #6b7280;
+            border: 1px solid #e5e7eb;
+        }
+        
+        /* AJAX Loader */
+        .ajax-loader {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3C96E1;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* User details modal specific styles */
+        .user-details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .detail-section {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .detail-section h4 {
+            color: #2d3748;
+            font-weight: 600;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+        
+        .detail-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .detail-label {
+            font-weight: 600;
+            color: #4a5568;
+            flex: 1;
+        }
+        
+        .detail-value {
+            color: #2d3748;
+            flex: 2;
+            text-align: right;
+        }
+        
+        .id-preview-container {
+            max-height: 200px;
+            overflow: hidden;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        
+        .id-preview-container img {
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
-    <div class="container mx-auto px-4 py-6">
-        <!-- Dashboard Header -->
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                </svg>
-                Admin Dashboard
-            </h1>
-            <!-- Help Button -->
-            <button onclick="openHelpModal()" class="help-icon bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300 transition">
-                <i class="fas fa-question-circle text-xl"></i>
+
+<!-- AJAX Loader -->
+<div id="ajaxLoader" class="ajax-loader">
+    <div class="spinner"></div>
+    <p>Loading analytics...</p>
+</div>
+
+<div class="container mx-auto px-4 py-6">
+    <!-- Dashboard Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+            Admin Dashboard
+        </h1>
+        <!-- Help Button -->
+        <button onclick="openHelpModal()" class="help-icon bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300 transition">
+            <i class="fas fa-question-circle text-xl"></i>
+        </button>
+    </div>
+
+    <!-- Help/Guide Modal -->
+    <div id="helpModal" class="modal-overlay hidden">
+        <div class="modal-container max-w-4xl">
+            <div class="modal-header">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-2xl font-semibold text-gray-900">Staff Dashboard Guide</h3>
+                    <button onclick="closeHelpModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="modal-body">
+                <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                    <p class="text-blue-800"><strong>Welcome to the Community Health Tracker Staff Dashboard!</strong> This guide will help you understand how to use all the features available to you as a staff member.</p>
+                </div>
+                
+                <!-- Guide content -->
+                <div class="space-y-4">
+                    <div class="border-l-4 border-blue-500 pl-4">
+                        <h4 class="font-semibold text-lg text-gray-800">Appointment Management</h4>
+                        <p class="text-gray-600">Manage your available time slots, view pending appointments, and handle appointment approvals.</p>
+                    </div>
+                    
+                    <div class="border-l-4 border-green-500 pl-4">
+                        <h4 class="font-semibold text-lg text-gray-800">Account Approvals</h4>
+                        <p class="text-gray-600">Review and approve new patient registrations for system access.</p>
+                    </div>
+
+                    <div class="border-l-4 border-purple-500 pl-4">
+                        <h4 class="font-semibold text-lg text-gray-800">Analytics Dashboard</h4>
+                        <p class="text-gray-600">View comprehensive analytics and insights about patients, appointments, and system usage.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <div class="flex justify-end">
+                    <button type="button" onclick="closeHelpModal()" class="px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition font-medium">
+                        Got it, thanks!
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="flex items-center">
+                <i class="fas fa-user-injured text-2xl text-blue-600 mr-3"></i>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700">Your Patients</h3>
+                    <p class="text-3xl font-bold text-blue-600"><?= $stats['total_patients'] ?></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="flex items-center">
+                <i class="fas fa-file-medical text-2xl text-yellow-600 mr-3"></i>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700">Pending Consultations</h3>
+                    <p class="text-3xl font-bold text-yellow-600"><?= $stats['pending_consultations'] ?></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="flex items-center">
+                <i class="fas fa-calendar-check text-2xl text-purple-600 mr-3"></i>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700">Pending Appointments</h3>
+                    <p class="text-3xl font-bold text-purple-600"><?= $stats['pending_appointments'] ?></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="flex items-center">
+                <i class="fas fa-user-clock text-2xl text-red-600 mr-3"></i>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700">Unapproved Users</h3>
+                    <p class="text-3xl font-bold text-red-600"><?= $stats['unapproved_users'] ?></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="mb-6">
+        <div class="flex flex-wrap items-center" id="dashboardTabs" role="tablist">
+            <button class="nav-tab-button tab-analytics <?= $activeTab === 'analytics' ? 'active' : '' ?>" 
+                    id="analytics-tab" data-tabs-target="#analytics" type="button" role="tab" aria-controls="analytics" aria-selected="<?= $activeTab === 'analytics' ? 'true' : 'false' ?>">
+                <i class="fas fa-chart-bar"></i>
+                Analytics Dashboard
+            </button>
+            <button class="nav-tab-button tab-appointment-management <?= $activeTab === 'appointment-management' ? 'active' : '' ?>" 
+                    id="appointment-tab" data-tabs-target="#appointment-management" type="button" role="tab" aria-controls="appointment-management" aria-selected="<?= $activeTab === 'appointment-management' ? 'true' : 'false' ?>">
+                <i class="fas fa-calendar-alt"></i>
+                Appointment Management
+                <span class="count-badge"><?= $stats['pending_appointments'] ?></span>
+            </button>
+            
+            <button class="nav-tab-button tab-account-management <?= $activeTab === 'account-management' ? 'active' : '' ?>" 
+                    id="account-tab" data-tabs-target="#account-management" type="button" role="tab" aria-controls="account-management" aria-selected="<?= $activeTab === 'account-management' ? 'true' : 'false' ?>">
+                <i class="fas fa-user-check"></i>
+                Account Approvals
+                <span class="count-badge"><?= $stats['unapproved_users'] ?></span>
             </button>
         </div>
-
-        <!-- Help/Guide Modal -->
-        <div id="helpModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-            <div class="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
-                <div class="mt-3">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-2xl leading-6 font-medium text-gray-900">Staff Dashboard Guide</h3>
-                        <button onclick="closeHelpModal()" class="text-gray-500 hover:text-gray-700">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                    </div>
+    </div>
+    
+    <!-- Tab Contents -->
+    <div class="tab-content">
+        <!-- Appointment Management Section -->
+        <div class="<?= $activeTab === 'appointment-management' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="appointment-management" role="tabpanel" aria-labelledby="appointment-tab">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold text-blue-700">Appointment Management</h2>
+            </div>
+            
+            <!-- Navigation Tabs -->
+            <div class="mb-6 border-b border-gray-200">
+                <div class="flex flex-wrap -mb-px" id="appointmentTabs" role="tablist">
+                    <button class="appointment-tab-button <?= $activeAppointmentTab === 'add-slot' ? 'active' : '' ?>" 
+                            id="add-slot-tab" data-tabs-target="#add-slot" type="button" role="tab" aria-controls="add-slot" aria-selected="<?= $activeAppointmentTab === 'add-slot' ? 'true' : 'false' ?>">
+                        <i class="fas fa-plus-circle"></i>
+                        Add Slot
+                    </button>
                     
-                    <div class="bg-blue-50 p-4 rounded-lg mb-6">
-                        <p class="text-blue-800"><strong>Welcome to the Community Health Tracker Staff Dashboard!</strong> This guide will help you understand how to use all the features available to you as a staff member.</p>
-                    </div>
+                    <button class="appointment-tab-button <?= $activeAppointmentTab === 'available-slots' ? 'active' : '' ?>" 
+                            id="available-slots-tab" data-tabs-target="#available-slots" type="button" role="tab" aria-controls="available-slots" aria-selected="<?= $activeAppointmentTab === 'available-slots' ? 'true' : 'false' ?>">
+                        <i class="fas fa-list-alt"></i>
+                        Available Slots
+                        <span class="count-badge"><?= count($availableSlots) ?></span>
+                    </button>
                     
-                    <!-- Guide content -->
-                    <div class="space-y-4">
-                        <div class="border-l-4 border-blue-500 pl-4">
-                            <h4 class="font-semibold text-lg text-gray-800">Appointment Management</h4>
-                            <p class="text-gray-600">Manage your available time slots, view pending appointments, and handle appointment approvals.</p>
+                    <button class="appointment-tab-button <?= $activeAppointmentTab === 'pending' ? 'active' : '' ?>" 
+                            id="pending-tab" data-tabs-target="#pending" type="button" role="tab" aria-controls="pending" aria-selected="<?= $activeAppointmentTab === 'pending' ? 'true' : 'false' ?>">
+                        <i class="fas fa-clock"></i>
+                        Pending
+                        <span class="count-badge"><?= count($pendingAppointments) ?></span>
+                    </button>
+                    
+                    <button class="appointment-tab-button <?= $activeAppointmentTab === 'upcoming' ? 'active' : '' ?>" 
+                            id="upcoming-tab" data-tabs-target="#upcoming" type="button" role="tab" aria-controls="upcoming" aria-selected="<?= $activeAppointmentTab === 'upcoming' ? 'true' : 'false' ?>">
+                        <i class="fas fa-calendar-day"></i>
+                        Upcoming
+                        <span class="count-badge"><?= count($upcomingAppointments) ?></span>
+                    </button>
+                    
+                    <button class="appointment-tab-button <?= $activeAppointmentTab === 'cancelled' ? 'active' : '' ?>" 
+                            id="cancelled-tab" data-tabs-target="#cancelled" type="button" role="tab" aria-controls="cancelled" aria-selected="<?= $activeAppointmentTab === 'cancelled' ? 'true' : 'false' ?>">
+                        <i class="fas fa-times-circle"></i>
+                        Cancelled
+                        <span class="count-badge"><?= count($cancelledAppointments) ?></span>
+                    </button>
+                    
+                    <button class="appointment-tab-button <?= $activeAppointmentTab === 'all' ? 'active' : '' ?>" 
+                            id="all-tab" data-tabs-target="#all" type="button" role="tab" aria-controls="all" aria-selected="<?= $activeAppointmentTab === 'all' ? 'true' : 'false' ?>">
+                        <i class="fas fa-history"></i>
+                        All Appointments
+                        <span class="count-badge"><?= count($allAppointments) ?></span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Tab Contents -->
+            <div class="tab-content">
+                <!-- Add Available Slot -->
+                <div class="<?= $activeAppointmentTab === 'add-slot' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="add-slot" role="tabpanel" aria-labelledby="add-slot-tab">
+                    <h2 class="text-xl font-semibold mb-4 text-blue-700">Add Available Slot</h2>
+                    
+                    <!-- Calendar View for Date Selection -->
+                    <div class="mb-8 bg-white p-4 rounded-lg shadow">
+                        <h3 class="text-lg font-semibold mb-4 text-blue-700">Select a Date</h3>
+                        
+                        <div class="flex justify-between items-center mb-4">
+                            <button id="prevMonth" class="p-2 rounded-full hover:bg-gray-100">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <h4 id="currentMonthYear" class="text-xl font-semibold">
+                                <?= date('F Y') ?>
+                            </h4>
+                            <button id="nextMonth" class="p-2 rounded-full hover:bg-gray-100">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
                         </div>
                         
-                        <div class="border-l-4 border-green-500 pl-4">
-                            <h4 class="font-semibold text-lg text-gray-800">Account Approvals</h4>
-                            <p class="text-gray-600">Review and approve new patient registrations for system access.</p>
+                        <div class="grid grid-cols-7 gap-2 mb-2">
+                            <div class="text-center font-semibold text-red-500">Sun</div>
+                            <div class="text-center font-semibold">Mon</div>
+                            <div class="text-center font-semibold">Tue</div>
+                            <div class="text-center font-semibold">Wed</div>
+                            <div class="text-center font-semibold">Thu</div>
+                            <div class="text-center font-semibold">Fri</div>
+                            <div class="text-center font-semibold text-blue-500">Sat</div>
                         </div>
-
-                        <div class="border-l-4 border-purple-500 pl-4">
-                            <h4 class="font-semibold text-lg text-gray-800">Analytics Dashboard</h4>
-                            <p class="text-gray-600">View comprehensive analytics and insights about patients, appointments, and system usage.</p>
+                        
+                        <div id="calendar" class="grid grid-cols-7 gap-2">
+                            <!-- Calendar will be populated by JavaScript -->
+                        </div>
+                        
+                        <div class="mt-4 flex items-center space-x-4 flex-wrap gap-2">
+                            <div class="flex items-center">
+                                <div class="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                                <span class="text-sm">Selected Date</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-4 h-4 bg-red-100 rounded mr-2"></div>
+                                <span class="text-sm">Holiday</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-4 h-4 bg-blue-100 rounded mr-2"></div>
+                                <span class="text-sm">Today</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-4 h-4 bg-blue-50 rounded mr-2"></div>
+                                <span class="text-sm">Weekend</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-4 h-4 bg-yellow-100 rounded mr-2"></div>
+                                <span class="text-sm">Occupied Date</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-4 h-4 bg-gray-100 rounded mr-2"></div>
+                                <span class="text-sm">Unavailable</span>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="flex justify-end mt-6">
-                        <button type="button" onclick="closeHelpModal()" class="px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition font-medium modal-button">
-                            Got it, thanks!
-                        </button>
+                    <!-- Selected Date Display -->
+                    <div id="selectedDateSection" class="hidden mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="text-lg font-semibold text-blue-700">Selected Date</h3>
+                                <p class="text-blue-600" id="selectedDateDisplay"></p>
+                                <div class="text-sm mt-1" id="selectedDateStatus"></div>
+                            </div>
+                            <button type="button" onclick="openTimeSlotModal()" 
+                                    class="bg-blue-600 text-white px-8 py-5 rounded-full hover:bg-blue-700 transition flex items-center justify-center font-medium text-base">
+                                <i class="fas fa-clock mr-2"></i> Choose Time Slot
+                            </button>
+                        </div>
                     </div>
+                    
+                    <!-- Hidden form fields for submission -->
+                    <input type="hidden" id="selected_date" name="date">
+                    <input type="hidden" id="selected_time_slot" name="time_slot">
+                    <input type="hidden" id="selected_max_slots" name="max_slots" value="1">
                 </div>
-            </div>
-        </div>
-
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white p-6 rounded-lg shadow">
-                <div class="flex items-center">
-                    <i class="fas fa-user-injured text-2xl text-blue-600 mr-3"></i>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-700">Your Patients</h3>
-                        <p class="text-3xl font-bold text-blue-600"><?= $stats['total_patients'] ?></p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white p-6 rounded-lg shadow">
-                <div class="flex items-center">
-                    <i class="fas fa-file-medical text-2xl text-yellow-600 mr-3"></i>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-700">Pending Consultations</h3>
-                        <p class="text-3xl font-bold text-yellow-600"><?= $stats['pending_consultations'] ?></p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white p-6 rounded-lg shadow">
-                <div class="flex items-center">
-                    <i class="fas fa-calendar-check text-2xl text-purple-600 mr-3"></i>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-700">Pending Appointments</h3>
-                        <p class="text-3xl font-bold text-purple-600"><?= $stats['pending_appointments'] ?></p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white p-6 rounded-lg shadow">
-                <div class="flex items-center">
-                    <i class="fas fa-user-clock text-2xl text-red-600 mr-3"></i>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-700">Unapproved Users</h3>
-                        <p class="text-3xl font-bold text-red-600"><?= $stats['unapproved_users'] ?></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Navigation Tabs - UPDATED WITH NEW BLUE BUTTON STYLES -->
-        <div class="mb-6">
-            <div class="flex flex-wrap items-center" id="dashboardTabs" role="tablist">
-
-            <button class="nav-tab-button tab-analytics <?= $activeTab === 'analytics' ? 'active' : '' ?>" 
-                        id="analytics-tab" data-tabs-target="#analytics" type="button" role="tab" aria-controls="analytics" aria-selected="<?= $activeTab === 'analytics' ? 'true' : 'false' ?>">
-                    <i class="fas fa-chart-bar"></i>
-                    Analytics Dashboard
-                </button>
-                <button class="nav-tab-button tab-appointment-management <?= $activeTab === 'appointment-management' ? 'active' : '' ?>" 
-                        id="appointment-tab" data-tabs-target="#appointment-management" type="button" role="tab" aria-controls="appointment-management" aria-selected="<?= $activeTab === 'appointment-management' ? 'true' : 'false' ?>">
-                    <i class="fas fa-calendar-alt"></i>
-                    Appointment Management
-                    <span class="count-badge"><?= $stats['pending_appointments'] ?></span>
-                </button>
                 
-                <button class="nav-tab-button tab-account-management <?= $activeTab === 'account-management' ? 'active' : '' ?>" 
-                        id="account-tab" data-tabs-target="#account-management" type="button" role="tab" aria-controls="account-management" aria-selected="<?= $activeTab === 'account-management' ? 'true' : 'false' ?>">
-                    <i class="fas fa-user-check"></i>
-                    Account Approvals
-                    <span class="count-badge"><?= $stats['unapproved_users'] ?></span>
+                <!-- Available Slots -->
+                <div class="<?= $activeAppointmentTab === 'available-slots' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="available-slots" role="tabpanel" aria-labelledby="available-slots-tab">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-blue-700">Your Available Slots</h2>
+                        <?php
+                        // Calculate total available slots across all time slots
+                        $totalAvailableSlots = 0;
+                        $totalBookedSlots = 0;
+                        $totalMaxSlots = 0;
+                        
+                        if (!empty($availableSlots)) {
+                            foreach ($availableSlots as $slot) {
+                                $bookedCount = $slot['booked_count'] ?? 0;
+                                $maxSlots = $slot['max_slots'];
+                                $available = max(0, $maxSlots - $bookedCount);
+                                $totalAvailableSlots += $available;
+                                $totalBookedSlots += $bookedCount;
+                                $totalMaxSlots += $maxSlots;
+                            }
+                        }
+                        ?>
+                        <span class="text-sm text-gray-600">
+                            <?= $totalBookedSlots ?> booked / <?= $totalMaxSlots ?> total slots
+                        </span>
+                    </div>
+                    
+                    <?php if (empty($availableSlots)): ?>
+                        <div class="bg-blue-50 p-4 rounded-lg text-center">
+                            <p class="text-gray-600">No available slots found.</p>
+                            <button onclick="switchAppointmentTab('add-slot')" class="btn-blue mt-2">
+                                <i class="fas fa-plus-circle mr-2"></i> Add New Slot
+                            </button>
+                        </div>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Booked</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <?php foreach ($availableSlots as $slot): 
+                                        $currentDate = date('Y-m-d');
+                                        $currentTime = date('H:i:s');
+                                        $isPast = $slot['date'] < $currentDate || 
+                                                 ($slot['date'] == $currentDate && $slot['end_time'] < $currentTime);
+                                        $isToday = $slot['date'] == $currentDate;
+                                        $bookedCount = $slot['booked_count'] ?? 0;
+                                        $maxSlots = $slot['max_slots'];
+                                        $availableSlotsCount = max(0, $maxSlots - $bookedCount);
+                                        $percentage = $maxSlots > 0 ? min(100, ($bookedCount / $maxSlots) * 100) : 0;
+                                        
+                                        // Determine status class
+                                        $statusClass = 'slot-available';
+                                        $statusText = 'Available';
+                                        
+                                        if ($isPast) {
+                                            $statusClass = 'slot-past';
+                                            $statusText = 'Past';
+                                        } elseif ($availableSlotsCount === 0) {
+                                            $statusClass = 'slot-full';
+                                            $statusText = 'Full';
+                                        }
+                                    ?>
+                                        <tr class="<?= $isPast ? 'bg-gray-50' : '' ?>">
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-gray-900">
+                                                    <?= date('D, M d, Y', strtotime($slot['date'])) ?>
+                                                </div>
+                                                <?php if ($isToday): ?>
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Today</span>
+                                                <?php elseif ($isPast): ?>
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Past</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900">
+                                                    <?= date('g:i A', strtotime($slot['start_time'])) ?> - <?= date('g:i A', strtotime($slot['end_time'])) ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <?= $maxSlots ?> slots
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <?= $bookedCount ?> booked
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium 
+                                                <?= $availableSlotsCount == 0 ? 'text-red-600' : ($availableSlotsCount <= 2 ? 'text-yellow-600' : 'text-green-600') ?>">
+                                                <?= $availableSlotsCount ?> available
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 py-1 text-xs font-medium rounded-full <?= $statusClass ?>">
+                                                    <?= $statusText ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <?php if (!$isPast): ?>
+                                                    <button onclick="openEditModal(<?= htmlspecialchars(json_encode($slot)) ?>, '<?= $slot['start_time'] ?> - <?= $slot['end_time'] ?>')" 
+                                                            class="btn-blue mr-2">
+                                                        <i class="fas fa-edit mr-1"></i> Edit
+                                                    </button>
+                                                    <form method="POST" action="" class="inline">
+                                                        <input type="hidden" name="slot_id" value="<?= $slot['id'] ?>">
+                                                        <button type="submit" name="delete_slot" 
+                                                                class="btn-danger-blue" 
+                                                                onclick="return confirm('Are you sure you want to delete this slot?')">
+                                                            <i class="fas fa-trash mr-1"></i> Delete
+                                                        </button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <span class="text-gray-400">No actions available</span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Pending Appointments -->
+                <div class="<?= $activeAppointmentTab === 'pending' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="pending" role="tabpanel" aria-labelledby="pending-tab">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-blue-700">Pending Appointments</h2>
+                        <span class="text-sm text-gray-600"><?= count($pendingAppointments) ?> pending</span>
+                    </div>
+                    
+                    <?php if (empty($pendingAppointments)): ?>
+                        <div class="bg-blue-50 p-4 rounded-lg text-center">
+                            <p class="text-gray-600">No pending appointments.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Health Concerns</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <?php foreach ($pendingAppointments as $appointment): ?>
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
+                                                <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900"><?= htmlspecialchars($appointment['contact']) ?></div>
+                                                <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['email']) ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900">
+                                                    <?= date('D, M d, Y', strtotime($appointment['date'])) ?>
+                                                </div>
+                                                <div class="text-sm text-gray-500">
+                                                    <?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                    Pending
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="text-sm text-gray-900">
+                                                    <?= !empty($appointment['health_concerns']) ? htmlspecialchars($appointment['health_concerns']) : 'No health concerns specified' ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <button onclick="openAppointmentApprovalModal(<?= $appointment['id'] ?>)" 
+                                                        class="btn-success-blue mr-2">
+                                                    <i class="fas fa-check-circle mr-1"></i> Approve
+                                                </button>
+                                                <button onclick="openRejectionModal(<?= $appointment['id'] ?>)" 
+                                                        class="btn-danger-blue">
+                                                    <i class="fas fa-times-circle mr-1"></i> Reject
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Upcoming Appointments -->
+                <div class="<?= $activeAppointmentTab === 'upcoming' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="upcoming" role="tabpanel" aria-labelledby="upcoming-tab">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-blue-700">Upcoming Appointments</h2>
+                        <span class="text-sm text-gray-600"><?= count($upcomingAppointments) ?> upcoming</span>
+                    </div>
+                    
+                    <?php if (empty($upcomingAppointments)): ?>
+                        <div class="bg-blue-50 p-4 rounded-lg text-center">
+                            <p class="text-gray-600">No upcoming appointments.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority Number</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <?php foreach ($upcomingAppointments as $appointment): 
+                                        $isToday = $appointment['date'] == date('Y-m-d');
+                                    ?>
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
+                                                <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900"><?= htmlspecialchars($appointment['contact']) ?></div>
+                                                <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['email']) ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900">
+                                                    <?= date('D, M d, Y', strtotime($appointment['date'])) ?>
+                                                    <?php if ($isToday): ?>
+                                                        <span class="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Today</span>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="text-sm text-gray-500">
+                                                    <?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-bold text-red-600">
+                                                    <?= !empty($appointment['priority_number']) ? htmlspecialchars($appointment['priority_number']) : 'N/A' ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900">
+                                                    <?= !empty($appointment['invoice_number']) ? htmlspecialchars($appointment['invoice_number']) : 'N/A' ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                    Approved
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <button onclick="openCompleteConfirmationModal(
+                                                    <?= $appointment['id'] ?>, 
+                                                    '<?= htmlspecialchars(addslashes($appointment['full_name'])) ?>',
+                                                    '<?= $appointment['date'] ?>',
+                                                    '<?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>',
+                                                    '<?= $appointment['priority_number'] ?>'
+                                                )" 
+                                                        class="btn-success-blue">
+                                                    <i class="fas fa-check-circle mr-1"></i> Mark Completed
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Cancelled Appointments -->
+                <div class="<?= $activeAppointmentTab === 'cancelled' ? '' : 'hidden' ?> p-6 bg-white rounded-lg border border-gray-200" id="cancelled" role="tabpanel" aria-labelledby="cancelled-tab">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-red-700">Cancelled Appointments</h2>
+                        <span class="text-sm text-gray-600"><?= count($cancelledAppointments) ?> cancelled</span>
+                    </div>
+                    
+                    <?php if (empty($cancelledAppointments)): ?>
+                        <div class="bg-blue-50 p-6 rounded-lg text-center">
+                            <p class="text-gray-600">No cancelled appointments found.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date & Time</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cancelled By</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Original Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cancelled At</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <?php foreach ($cancelledAppointments as $appointment): 
+                                        $wasPending = empty($appointment['priority_number']) && empty($appointment['invoice_number']);
+                                        $cancelledBy = $wasPending ? 'Cancelled by Patient' : 'Cancelled by Staff';
+                                    ?>
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
+                                                <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['contact']) ?></div>
+                                                <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900"><?= date('M d, Y', strtotime($appointment['date'])) ?></div>
+                                                <div class="text-sm text-gray-500"><?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-3 py-1 text-xs font-semibold rounded-full <?= ($cancelledBy == 'Cancelled by Patient' ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800') ?>">
+                                                    <?= htmlspecialchars($cancelledBy) ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="text-sm text-gray-900 max-w-xs truncate"><?= !empty($appointment['cancel_reason']) ? htmlspecialchars($appointment['cancel_reason']) : 'No reason provided' ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full <?= $wasPending ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800' ?>">
+                                                    <?= $wasPending ? 'Pending' : 'Approved' ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <?= date('M d, Y g:i A', strtotime($appointment['cancelled_at'])) ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <button onclick="openCancelledDetailsModal(<?= htmlspecialchars(json_encode($appointment)) ?>)" 
+                                                        class="btn-blue">
+                                                    <i class="fas fa-eye mr-1"></i> View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Information Box -->
+                        <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <i class="fas fa-info-circle text-blue-500 mt-1 mr-3"></i>
+                                <div>
+                                    <h4 class="font-semibold text-blue-800">Cancellation Information</h4>
+                                    <ul class="text-sm text-blue-700 mt-2 space-y-1">
+                                        <li>• <strong>Pending appointments</strong> can be cancelled directly by patients online</li>
+                                        <li>• <strong>Approved appointments</strong> require patients to contact support for cancellation</li>
+                                        <li>• Click "View" to see detailed cancellation information</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- All Appointments -->
+                <div class="<?= $activeAppointmentTab === 'all' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="all" role="tabpanel" aria-labelledby="all-tab">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-blue-700">All Appointments (Approved, Completed, Cancelled, Rejected)</h2>
+                        <span class="text-sm text-gray-600"><?= count($allAppointments) ?> total</span>
+                    </div>
+                    
+                    <!-- Filters and Export Buttons -->
+                    <div class="mb-6 bg-gray-50 p-4 rounded-lg">
+                        <div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                            <div class="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                                <!-- Status Filter -->
+                                <div>
+                                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Status</label>
+                                    <select id="statusFilter" class="w-full md:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="all" <?= $filterStatus === 'all' ? 'selected' : '' ?>>All Statuses</option>
+                                        <option value="approved" <?= $filterStatus === 'approved' ? 'selected' : '' ?>>Approved</option>
+                                        <option value="completed" <?= $filterStatus === 'completed' ? 'selected' : '' ?>>Completed</option>
+                                        <option value="cancelled" <?= $filterStatus === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                                        <option value="rejected" <?= $filterStatus === 'rejected' ? 'selected' : '' ?>>Rejected</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Date Filter -->
+                                <div>
+                                    <label for="dateFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Date</label>
+                                    <input type="date" id="dateFilter" value="<?= $filterDate ?>" class="w-full md:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+                            
+                            <!-- Export Buttons -->
+                            <div class="flex gap-2 w-full md:w-auto">
+                                <button onclick="exportData('excel')" class="btn-success-blue flex items-center">
+                                    <i class="fas fa-file-excel mr-2"></i> Export Excel
+                                </button>
+                                <button onclick="exportData('pdf')" class="btn-danger-blue flex items-center">
+                                    <i class="fas fa-file-pdf mr-2"></i> Export PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <?php if (empty($allAppointments)): ?>
+                        <div class="bg-blue-50 p-4 rounded-lg text-center">
+                            <p class="text-gray-600">No appointments found.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient Name</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient ID</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact Number</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Appointed</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority Number</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <?php 
+                                    $filteredAppointments = array_filter($allAppointments, function($appointment) {
+                                        $allowedStatuses = ['approved', 'completed', 'cancelled', 'rejected'];
+                                        return in_array($appointment['status'], $allowedStatuses);
+                                    });
+                                    
+                                    usort($filteredAppointments, function($a, $b) {
+                                        $dateTimeA = strtotime($a['date'] . ' ' . $a['start_time']);
+                                        $dateTimeB = strtotime($b['date'] . ' ' . $b['start_time']);
+                                        return $dateTimeB - $dateTimeA;
+                                    });
+                                    
+                                    foreach ($filteredAppointments as $appointment): 
+                                        $isPast = strtotime($appointment['date']) < strtotime(date('Y-m-d'));
+                                    ?>
+                                        <tr class="<?= $isPast ? 'bg-gray-50' : '' ?>">
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
+                                                <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['email']) ?></div>
+                                                <?php if ($appointment['status'] === 'rejected' && !empty($appointment['rejection_reason'])): ?>
+                                                    <div class="mt-1 text-xs text-red-600">
+                                                        <strong>Reason:</strong> <?= htmlspecialchars($appointment['rejection_reason']) ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-blue-600"><?= !empty($appointment['unique_number']) ? htmlspecialchars($appointment['unique_number']) : 'N/A' ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900"><?= htmlspecialchars($appointment['contact']) ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900">
+                                                    <?= date('D, M d, Y', strtotime($appointment['date'])) ?>
+                                                </div>
+                                                <div class="text-sm text-gray-500">
+                                                    <?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                    <?= $appointment['status'] === 'approved' ? 'bg-green-100 text-green-800' : 
+                                                       ($appointment['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                                       ($appointment['status'] === 'rejected' ? 'bg-red-100 text-red-800' : 
+                                                       ($appointment['status'] === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'))) ?>">
+                                                    <?= ucfirst($appointment['status']) ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <?php if (!empty($appointment['priority_number'])): ?>
+                                                    <div class="text-sm font-medium text-red-600"><?= $appointment['priority_number'] ?></div>
+                                                <?php else: ?>
+                                                    <span class="text-gray-400">N/A</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <button onclick="openViewModal(<?= htmlspecialchars(json_encode($appointment)) ?>)" 
+                                                        class="btn-blue">
+                                                    <i class="fas fa-eye mr-1"></i> View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Account Management Section -->
+        <div class="<?= $activeTab === 'account-management' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="account-management" role="tabpanel" aria-labelledby="account-tab">
+            <h2 class="text-xl font-semibold mb-4 text-blue-700">Patient Account Approvals</h2>
+            
+            <?php if (empty($unapprovedUsers)): ?>
+                <div class="bg-blue-50 p-4 rounded-lg text-center">
+                    <p class="text-gray-600">No pending patient approvals.</p>
+                </div>
+            <?php else: ?>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white">
+                        <thead>
+                            <tr>
+                                <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Username</th>
+                                <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Full Name</th>
+                                <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
+                                <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Date Registered</th>
+                                <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">ID Status</th>
+                                <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($unapprovedUsers as $user): ?>
+                                <tr>
+                                    <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($user['username']) ?></td>
+                                    <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($user['full_name']) ?></td>
+                                    <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($user['email'] ?? 'N/A') ?></td>
+                                    <td class="py-2 px-4 border-b border-gray-200"><?= date('M d, Y', strtotime($user['created_at'])) ?></td>
+                                    <td class="py-2 px-4 border-b border-gray-200">
+                                        <?php if (!empty($user['id_type'])): ?>
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                <?= $user['is_valid_id'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
+                                                <?= $user['is_valid_id'] ? 'Valid ID' : 'Invalid ID' ?>
+                                            </span>
+                                            <div class="text-xs text-gray-500 mt-1"><?= $user['id_type'] ?></div>
+                                        <?php else: ?>
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                No ID Uploaded
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="py-2 px-4 border-b border-gray-200">
+                                        <button onclick="openUserDetailsModal(<?= htmlspecialchars(json_encode($user)) ?>)" 
+                                                class="btn-view-details">
+                                            <i class="fas fa-eye mr-1"></i> View Details
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <?php if ($totalPages > 1): ?>
+                    <div class="pagination mt-6">
+                        <!-- Previous Button -->
+                        <?php if ($currentPage > 1): ?>
+                            <a href="?tab=account-management&user_page=<?= $currentPage - 1 ?>" class="pagination-button">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        <?php else: ?>
+                            <span class="pagination-button disabled">
+                                <i class="fas fa-chevron-left"></i>
+                            </span>
+                        <?php endif; ?>
+
+                        <!-- Page Numbers -->
+                        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                            <?php if ($i == $currentPage): ?>
+                                <span class="pagination-button active"><?= $i ?></span>
+                            <?php else: ?>
+                                <a href="?tab=account-management&user_page=<?= $i ?>" class="pagination-button"><?= $i ?></a>
+                            <?php endif; ?>
+                        <?php endfor; ?>
+
+                        <!-- Next Button -->
+                        <?php if ($currentPage < $totalPages): ?>
+                            <a href="?tab=account-management&user_page=<?= $currentPage + 1 ?>" class="pagination-button">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php else: ?>
+                            <span class="pagination-button disabled">
+                                <i class="fas fa-chevron-right"></i>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
+
+        <!-- Analytics Dashboard Section -->
+        <div class="<?= $activeTab === 'analytics' ? '' : 'hidden' ?> p-6 bg-white rounded-lg border border-gray-200" id="analytics" role="tabpanel" aria-labelledby="analytics-tab">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold mb-6 text-blue-700">Analytics Dashboard</h2>
+                <button onclick="refreshAnalytics()" class="btn-blue flex items-center">
+                    <i class="fas fa-sync-alt mr-2"></i> Refresh Data
+                </button>
+            </div>
+            
+            <!-- Overview Cards -->
+            <div id="analyticsCards" class="analytics-grid mb-8">
+                <!-- Cards will be loaded via AJAX -->
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Appointment Status Distribution -->
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-chart-pie"></i>
+                        Appointment Status Distribution
+                    </h3>
+                    <canvas id="appointmentStatusChart" height="300"></canvas>
+                </div>
+                
+                <!-- Monthly Appointments Trend -->
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-chart-line"></i>
+                        Monthly Appointments Trend
+                    </h3>
+                    <canvas id="monthlyTrendChart" height="300"></canvas>
+                </div>
+            </div>
+
+            <!-- Additional Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Patient Registration Trend -->
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-user-plus"></i>
+                        Patient Registration Trend
+                    </h3>
+                    <canvas id="patientRegistrationChart" height="300"></canvas>
+                </div>
+                
+                <!-- Appointment Completion Rate -->
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-tasks"></i>
+                        Appointment Completion Rate
+                    </h3>
+                    <canvas id="completionRateChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Action Success/Error Modals -->
+<div id="successModal" class="modal-overlay hidden">
+    <div class="modal-container action-modal action-modal-success">
+        <div class="modal-body">
+            <div class="action-modal-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h3 class="action-modal-title" id="successModalTitle">Success</h3>
+            <div class="action-modal-message" id="successModalMessage"></div>
+        </div>
+        <div class="modal-footer">
+            <div class="flex justify-center">
+                <button type="button" onclick="closeSuccessModal()" 
+                        class="px-8 py-3 bg-green-600 text-white rounded-full hover:bg-green-700 transition font-medium">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="errorModal" class="modal-overlay hidden">
+    <div class="modal-container action-modal action-modal-error">
+        <div class="modal-body">
+            <div class="action-modal-icon">
+                <i class="fas fa-times-circle"></i>
+            </div>
+            <h3 class="action-modal-title" id="errorModalTitle">Error</h3>
+            <div class="action-modal-message" id="errorModalMessage"></div>
+        </div>
+        <div class="modal-footer">
+            <div class="flex justify-center">
+                <button type="button" onclick="closeErrorModal()" 
+                        class="px-8 py-3 bg-red-600 text-white rounded-full hover:bg-red-700 transition font-medium">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Time Slot Selection Modal -->
+<div id="timeSlotModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-4xl">
+        <div class="modal-header">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-gray-900" id="timeSlotModalTitle">
+                    Select Time Slot for <span id="modalSelectedDate" class="text-blue-600 font-semibold"></span>
+                </h3>
+                <button type="button" onclick="closeTimeSlotModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
         </div>
         
-        <!-- Tab Contents -->
-        <div class="tab-content">
-            <!-- Appointment Management Section -->
-            <div class="<?= $activeTab === 'appointment-management' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="appointment-management" role="tabpanel" aria-labelledby="appointment-tab">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-semibold text-blue-700">Appointment Management</h2>
-                </div>
-                
-                <!-- Navigation Tabs - UPDATED WITH BLUE THEME -->
-                <div class="mb-6 border-b border-gray-200">
-                    <div class="flex flex-wrap -mb-px" id="appointmentTabs" role="tablist">
-                        <button class="appointment-tab-button <?= $activeAppointmentTab === 'add-slot' ? 'active' : '' ?>" 
-                                id="add-slot-tab" data-tabs-target="#add-slot" type="button" role="tab" aria-controls="add-slot" aria-selected="<?= $activeAppointmentTab === 'add-slot' ? 'true' : 'false' ?>">
-                            <i class="fas fa-plus-circle"></i>
-                            Add Slot
-                        </button>
-                        
-                        <button class="appointment-tab-button <?= $activeAppointmentTab === 'available-slots' ? 'active' : '' ?>" 
-                                id="available-slots-tab" data-tabs-target="#available-slots" type="button" role="tab" aria-controls="available-slots" aria-selected="<?= $activeAppointmentTab === 'available-slots' ? 'true' : 'false' ?>">
-                            <i class="fas fa-list-alt"></i>
-                            Available Slots
-                            <span class="count-badge"><?= count($availableSlots) ?></span>
-                        </button>
-                        
-                        <button class="appointment-tab-button <?= $activeAppointmentTab === 'pending' ? 'active' : '' ?>" 
-                                id="pending-tab" data-tabs-target="#pending" type="button" role="tab" aria-controls="pending" aria-selected="<?= $activeAppointmentTab === 'pending' ? 'true' : 'false' ?>">
-                            <i class="fas fa-clock"></i>
-                            Pending
-                            <span class="count-badge"><?= count($pendingAppointments) ?></span>
-                        </button>
-                        
-                        <button class="appointment-tab-button <?= $activeAppointmentTab === 'upcoming' ? 'active' : '' ?>" 
-                                id="upcoming-tab" data-tabs-target="#upcoming" type="button" role="tab" aria-controls="upcoming" aria-selected="<?= $activeAppointmentTab === 'upcoming' ? 'true' : 'false' ?>">
-                            <i class="fas fa-calendar-day"></i>
-                            Upcoming
-                            <span class="count-badge"><?= count($upcomingAppointments) ?></span>
-                        </button>
-                        
-                        <button class="appointment-tab-button <?= $activeAppointmentTab === 'cancelled' ? 'active' : '' ?>" 
-                                id="cancelled-tab" data-tabs-target="#cancelled" type="button" role="tab" aria-controls="cancelled" aria-selected="<?= $activeAppointmentTab === 'cancelled' ? 'true' : 'false' ?>">
-                            <i class="fas fa-times-circle"></i>
-                            Cancelled
-                            <span class="count-badge"><?= count($cancelledAppointments) ?></span>
-                        </button>
-                        
-                        <button class="appointment-tab-button <?= $activeAppointmentTab === 'all' ? 'active' : '' ?>" 
-                                id="all-tab" data-tabs-target="#all" type="button" role="tab" aria-controls="all" aria-selected="<?= $activeAppointmentTab === 'all' ? 'true' : 'false' ?>">
-                            <i class="fas fa-history"></i>
-                            All Appointments
-                            <span class="count-badge"><?= count($allAppointments) ?></span>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Tab Contents -->
-                <div class="tab-content">
-                    <!-- Add Available Slot -->
-                    <div class="<?= $activeAppointmentTab === 'add-slot' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="add-slot" role="tabpanel" aria-labelledby="add-slot-tab">
-                        <h2 class="text-xl font-semibold mb-4 text-blue-700">Add Available Slot</h2>
-                        
-                        <!-- Calendar View for Date Selection -->
-                        <div class="mb-8 bg-white p-4 rounded-lg shadow">
-                            <h3 class="text-lg font-semibold mb-4 text-blue-700">Select a Date</h3>
-                            
-                            <div class="flex justify-between items-center mb-4">
-                                <button id="prevMonth" class="p-2 rounded-full hover:bg-gray-100">
-                                    <i class="fas fa-chevron-left"></i>
-                                </button>
-                                <h4 id="currentMonthYear" class="text-xl font-semibold">
-                                    <?= date('F Y') ?>
-                                </h4>
-                                <button id="nextMonth" class="p-2 rounded-full hover:bg-gray-100">
-                                    <i class="fas fa-chevron-right"></i>
-                                </button>
-                            </div>
-                            
-                            <div class="grid grid-cols-7 gap-2 mb-2">
-                                <div class="text-center font-semibold text-red-500">Sun</div>
-                                <div class="text-center font-semibold">Mon</div>
-                                <div class="text-center font-semibold">Tue</div>
-                                <div class="text-center font-semibold">Wed</div>
-                                <div class="text-center font-semibold">Thu</div>
-                                <div class="text-center font-semibold">Fri</div>
-                                <div class="text-center font-semibold text-blue-500">Sat</div>
-                            </div>
-                            
-                            <div id="calendar" class="grid grid-cols-7 gap-2">
-                                <!-- Calendar will be populated by JavaScript -->
-                            </div>
-                            
-                            <div class="mt-4 flex items-center space-x-4 flex-wrap gap-2">
-                                <div class="flex items-center">
-                                    <div class="w-4 h-4 bg-blue-500 rounded mr-2"></div>
-                                    <span class="text-sm">Selected Date</span>
-                                </div>
-                                <div class="flex items-center">
-                                    <div class="w-4 h-4 bg-red-100 rounded mr-2"></div>
-                                    <span class="text-sm">Holiday</span>
-                                </div>
-                                <div class="flex items-center">
-                                    <div class="w-4 h-4 bg-blue-100 rounded mr-2"></div>
-                                    <span class="text-sm">Today</span>
-                                </div>
-                                <div class="flex items-center">
-                                    <div class="w-4 h-4 bg-blue-50 rounded mr-2"></div>
-                                    <span class="text-sm">Weekend</span>
-                                </div>
-                                <div class="flex items-center">
-                                    <div class="w-4 h-4 bg-gray-100 rounded mr-2"></div>
-                                    <span class="text-sm">Unavailable</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Selected Date Display -->
-                        <div id="selectedDateSection" class="hidden mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <h3 class="text-lg font-semibold text-blue-700">Selected Date</h3>
-                                    <p class="text-blue-600" id="selectedDateDisplay"></p>
-                                </div>
-                                <button type="button" onclick="openTimeSlotModal()" 
-    class="bg-blue-600 text-white px-8 py-5 rounded-full hover:bg-blue-700 transition flex items-center justify-center font-medium text-base">
-    <i class="fas fa-clock mr-2"></i> Choose Time Slot
-</button>
-
-                            </div>
-                        </div>
-                        
-                        <!-- Hidden form fields for submission -->
-                        <input type="hidden" id="selected_date" name="date">
-                        <input type="hidden" id="selected_time_slot" name="time_slot">
-                        <input type="hidden" id="selected_max_slots" name="max_slots" value="1">
-                    </div>
-                    
-                    <!-- Available Slots -->
-                    <div class="<?= $activeAppointmentTab === 'available-slots' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="available-slots" role="tabpanel" aria-labelledby="available-slots-tab">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-blue-700">Your Available Slots</h2>
-                            <?php
-                            // Calculate total available slots across all time slots
-                            $totalAvailableSlots = 0;
-                            $totalBookedSlots = 0;
-                            $totalMaxSlots = 0;
-                            
-                            if (!empty($availableSlots)) {
-                                foreach ($availableSlots as $slot) {
-                                    $bookedCount = $slot['booked_count'] ?? 0;
-                                    $maxSlots = $slot['max_slots'];
-                                    $available = max(0, $maxSlots - $bookedCount);
-                                    $totalAvailableSlots += $available;
-                                    $totalBookedSlots += $bookedCount;
-                                    $totalMaxSlots += $maxSlots;
-                                }
-                            }
-                            ?>
-                            <span class="text-sm text-gray-600">
-                                <?= $totalBookedSlots ?> booked / <?= $totalMaxSlots ?> total slots
-                            </span>
-                        </div>
-                        
-                        <?php if (empty($availableSlots)): ?>
-                            <div class="bg-blue-50 p-4 rounded-lg text-center">
-                                <p class="text-gray-600">No available slots found.</p>
-                                <button onclick="switchAppointmentTab('add-slot')" class="btn-blue mt-2">
-                                    <i class="fas fa-plus-circle mr-2"></i> Add New Slot
-                                </button>
-                            </div>
-                        <?php else: ?>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Booked</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <?php foreach ($availableSlots as $slot): 
-                                            $currentDate = date('Y-m-d');
-                                            $currentTime = date('H:i:s');
-                                            $isPast = $slot['date'] < $currentDate || 
-                                                     ($slot['date'] == $currentDate && $slot['end_time'] < $currentTime);
-                                            $isToday = $slot['date'] == $currentDate;
-                                            $bookedCount = $slot['booked_count'] ?? 0;
-                                            $maxSlots = $slot['max_slots'];
-                                            $availableSlotsCount = max(0, $maxSlots - $bookedCount);
-                                            $percentage = $maxSlots > 0 ? min(100, ($bookedCount / $maxSlots) * 100) : 0;
-                                            
-                                            // Determine status class
-                                            $statusClass = 'slot-available';
-                                            $statusText = 'Available';
-                                            
-                                            if ($isPast) {
-                                                $statusClass = 'slot-past';
-                                                $statusText = 'Past';
-                                            } elseif ($availableSlotsCount === 0) {
-                                                $statusClass = 'slot-full';
-                                                $statusText = 'Full';
-                                            }
-                                        ?>
-                                            <tr class="<?= $isPast ? 'bg-gray-50' : '' ?>">
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm font-medium text-gray-900">
-                                                        <?= date('D, M d, Y', strtotime($slot['date'])) ?>
-                                                    </div>
-                                                    <?php if ($isToday): ?>
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Today</span>
-                                                    <?php elseif ($isPast): ?>
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Past</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900">
-                                                        <?= date('g:i A', strtotime($slot['start_time'])) ?> - <?= date('g:i A', strtotime($slot['end_time'])) ?>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    <?= $maxSlots ?> slots
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    <?= $bookedCount ?> booked
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium 
-                                                    <?= $availableSlotsCount == 0 ? 'text-red-600' : ($availableSlotsCount <= 2 ? 'text-yellow-600' : 'text-green-600') ?>">
-                                                    <?= $availableSlotsCount ?> available
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <span class="px-2 py-1 text-xs font-medium rounded-full <?= $statusClass ?>">
-                                                        <?= $statusText ?>
-                                                    </span>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <?php if (!$isPast): ?>
-                                                        <button onclick="openEditModal(<?= htmlspecialchars(json_encode($slot)) ?>, '<?= $slot['start_time'] ?> - <?= $slot['end_time'] ?>')" 
-                                                                class="btn-blue mr-2">
-                                                            <i class="fas fa-edit mr-1"></i> Edit
-                                                        </button>
-                                                        <form method="POST" action="" class="inline">
-                                                            <input type="hidden" name="slot_id" value="<?= $slot['id'] ?>">
-                                                            <button type="submit" name="delete_slot" 
-                                                                    class="btn-danger-blue" 
-                                                                    onclick="return confirm('Are you sure you want to delete this slot?')">
-                                                                <i class="fas fa-trash mr-1"></i> Delete
-                                                            </button>
-                                                        </form>
-                                                    <?php else: ?>
-                                                        <span class="text-gray-400">No actions available</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <!-- Pending Appointments -->
-                    <div class="<?= $activeAppointmentTab === 'pending' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="pending" role="tabpanel" aria-labelledby="pending-tab">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-blue-700">Pending Appointments</h2>
-                            <span class="text-sm text-gray-600"><?= count($pendingAppointments) ?> pending</span>
-                        </div>
-                        
-                        <?php if (empty($pendingAppointments)): ?>
-                            <div class="bg-blue-50 p-4 rounded-lg text-center">
-                                <p class="text-gray-600">No pending appointments.</p>
-                            </div>
-                        <?php else: ?>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Health Concerns</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <?php foreach ($pendingAppointments as $appointment): ?>
-                                            <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
-                                                    <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900"><?= htmlspecialchars($appointment['contact']) ?></div>
-                                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['email']) ?></div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900">
-                                                        <?= date('D, M d, Y', strtotime($appointment['date'])) ?>
-                                                    </div>
-                                                    <div class="text-sm text-gray-500">
-                                                        <?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                                        Pending
-                                                    </span>
-                                                </td>
-                                                <td class="px-6 py-4">
-                                                    <div class="text-sm text-gray-900">
-                                                        <?= !empty($appointment['health_concerns']) ? htmlspecialchars($appointment['health_concerns']) : 'No health concerns specified' ?>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <button onclick="openAppointmentApprovalModal(<?= $appointment['id'] ?>)" 
-                                                            class="btn-success-blue mr-2">
-                                                        <i class="fas fa-check-circle mr-1"></i> Approve
-                                                    </button>
-                                                    <button onclick="openRejectionModal(<?= $appointment['id'] ?>)" 
-                                                            class="btn-danger-blue">
-                                                        <i class="fas fa-times-circle mr-1"></i> Reject
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <!-- Upcoming Appointments -->
-                    <div class="<?= $activeAppointmentTab === 'upcoming' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="upcoming" role="tabpanel" aria-labelledby="upcoming-tab">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-blue-700">Upcoming Appointments</h2>
-                            <span class="text-sm text-gray-600"><?= count($upcomingAppointments) ?> upcoming</span>
-                        </div>
-                        
-                        <?php if (empty($upcomingAppointments)): ?>
-                            <div class="bg-blue-50 p-4 rounded-lg text-center">
-                                <p class="text-gray-600">No upcoming appointments.</p>
-                            </div>
-                        <?php else: ?>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority Number</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <?php foreach ($upcomingAppointments as $appointment): 
-                                            $isToday = $appointment['date'] == date('Y-m-d');
-                                        ?>
-                                            <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
-                                                    <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900"><?= htmlspecialchars($appointment['contact']) ?></div>
-                                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['email']) ?></div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900">
-                                                        <?= date('D, M d, Y', strtotime($appointment['date'])) ?>
-                                                        <?php if ($isToday): ?>
-                                                            <span class="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Today</span>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                    <div class="text-sm text-gray-500">
-                                                        <?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm font-bold text-red-600">
-                                                        <?= !empty($appointment['priority_number']) ? htmlspecialchars($appointment['priority_number']) : 'N/A' ?>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900">
-                                                        <?= !empty($appointment['invoice_number']) ? htmlspecialchars($appointment['invoice_number']) : 'N/A' ?>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                        Approved
-                                                    </span>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <form method="POST" action="" class="inline">
-                                                        <input type="hidden" name="appointment_id" value="<?= $appointment['id'] ?>">
-                                                        <input type="hidden" name="action" value="complete">
-                                                        <button type="submit" name="approve_appointment" 
-                                                                class="btn-blue">
-                                                            <i class="fas fa-check-circle mr-1"></i> Mark Completed
-                                                        </button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <!-- Cancelled Appointments -->
-                    <div class="<?= $activeAppointmentTab === 'cancelled' ? '' : 'hidden' ?> p-6 bg-white rounded-lg border border-gray-200" id="cancelled" role="tabpanel" aria-labelledby="cancelled-tab">
-                        <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-xl font-semibold text-red-700">Cancelled Appointments</h2>
-                            <span class="text-sm text-gray-600"><?= count($cancelledAppointments) ?> cancelled</span>
-                        </div>
-                        
-                        <?php if (empty($cancelledAppointments)): ?>
-                            <div class="bg-blue-50 p-6 rounded-lg text-center">
-                                <p class="text-gray-600">No cancelled appointments found.</p>
-                            </div>
-                        <?php else: ?>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date & Time</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cancelled By</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Original Status</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cancelled At</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <?php foreach ($cancelledAppointments as $appointment): 
-                                            // Determine if this was originally a pending appointment (user-cancelled)
-                                            $wasPending = empty($appointment['priority_number']) && empty($appointment['invoice_number']);
-                                            $cancelledBy = $wasPending ? 'Cancelled by Patient' : 'Cancelled by Staff';
-                                        ?>
-                                            <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
-                                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['contact']) ?></div>
-                                                    <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900"><?= date('M d, Y', strtotime($appointment['date'])) ?></div>
-                                                    <div class="text-sm text-gray-500"><?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?></div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <span class="px-3 py-1 text-xs font-semibold rounded-full <?= ($cancelledBy == 'Cancelled by Patient' ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800') ?>">
-                                                        <?= htmlspecialchars($cancelledBy) ?>
-                                                    </span>
-                                                </td>
-                                                <td class="px-6 py-4">
-                                                    <div class="text-sm text-gray-900 max-w-xs truncate"><?= !empty($appointment['cancel_reason']) ? htmlspecialchars($appointment['cancel_reason']) : 'No reason provided' ?></div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <span class="px-2 py-1 text-xs font-semibold rounded-full <?= $wasPending ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800' ?>">
-                                                        <?= $wasPending ? 'Pending' : 'Approved' ?>
-                                                    </span>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    <?= date('M d, Y g:i A', strtotime($appointment['cancelled_at'])) ?>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <!-- Changed from Delete to View button -->
-                                                    <button onclick="openCancelledDetailsModal(<?= htmlspecialchars(json_encode($appointment)) ?>)" 
-                                                            class="btn-blue">
-                                                        <i class="fas fa-eye mr-1"></i> View
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <!-- Information Box -->
-                            <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <div class="flex items-start">
-                                    <i class="fas fa-info-circle text-blue-500 mt-1 mr-3"></i>
-                                    <div>
-                                        <h4 class="font-semibold text-blue-800">Cancellation Information</h4>
-                                        <ul class="text-sm text-blue-700 mt-2 space-y-1">
-                                            <li>• <strong>Pending appointments</strong> can be cancelled directly by patients online</li>
-                                            <li>• <strong>Approved appointments</strong> require patients to contact support for cancellation</li>
-                                            <li>• Click "View" to see detailed cancellation information</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <!-- All Appointments -->
-                    <div class="<?= $activeAppointmentTab === 'all' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="all" role="tabpanel" aria-labelledby="all-tab">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-blue-700">All Appointments (Approved, Completed, Cancelled, Rejected)</h2>
-                            <span class="text-sm text-gray-600"><?= count($allAppointments) ?> total</span>
-                        </div>
-                        
-                        <!-- Filters and Export Buttons -->
-                        <div class="mb-6 bg-gray-50 p-4 rounded-lg">
-                            <div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-                                <div class="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-                                    <!-- Status Filter -->
-                                    <div>
-                                        <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Status</label>
-                                        <select id="statusFilter" class="w-full md:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                            <option value="all" <?= $filterStatus === 'all' ? 'selected' : '' ?>>All Statuses</option>
-                                            <option value="approved" <?= $filterStatus === 'approved' ? 'selected' : '' ?>>Approved</option>
-                                            <option value="completed" <?= $filterStatus === 'completed' ? 'selected' : '' ?>>Completed</option>
-                                            <option value="cancelled" <?= $filterStatus === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                                            <option value="rejected" <?= $filterStatus === 'rejected' ? 'selected' : '' ?>>Rejected</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <!-- Date Filter -->
-                                    <div>
-                                        <label for="dateFilter" class="block text-sm font-medium text-gray-700 mb-1">Filter by Date</label>
-                                        <input type="date" id="dateFilter" value="<?= $filterDate ?>" class="w-full md:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    </div>
-                                </div>
-                                
-                                <!-- Export Buttons -->
-                                <div class="flex gap-2 w-full md:w-auto">
-                                    <button onclick="exportData('excel')" class="btn-success-blue flex items-center">
-                                        <i class="fas fa-file-excel mr-2"></i> Export Excel
-                                    </button>
-                                    <button onclick="exportData('pdf')" class="btn-danger-blue flex items-center">
-                                        <i class="fas fa-file-pdf mr-2"></i> Export PDF
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <?php if (empty($allAppointments)): ?>
-                            <div class="bg-blue-50 p-4 rounded-lg text-center">
-                                <p class="text-gray-600">No appointments found.</p>
-                            </div>
-                        <?php else: ?>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient Name</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient ID</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact Number</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Appointed</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority Number</th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <?php foreach ($allAppointments as $appointment): 
-                                            $isPast = strtotime($appointment['date']) < strtotime(date('Y-m-d'));
-                                        ?>
-                                            <tr class="<?= $isPast ? 'bg-gray-50' : '' ?>">
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
-                                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['email']) ?></div>
-                                                    <?php if ($appointment['status'] === 'rejected' && !empty($appointment['rejection_reason'])): ?>
-                                                        <div class="mt-1 text-xs text-red-600">
-                                                            <strong>Reason:</strong> <?= htmlspecialchars($appointment['rejection_reason']) ?>
-                                                        </div>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm font-medium text-blue-600"><?= !empty($appointment['unique_number']) ? htmlspecialchars($appointment['unique_number']) : 'N/A' ?></div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900"><?= htmlspecialchars($appointment['contact']) ?></div>
-                                                    </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900">
-                                                        <?= date('D, M d, Y', strtotime($appointment['date'])) ?>
-                                                    </div>
-                                                    <div class="text-sm text-gray-500">
-                                                        <?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                        <?= $appointment['status'] === 'approved' ? 'bg-green-100 text-green-800' : 
-                                                           ($appointment['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                                                           ($appointment['status'] === 'rejected' ? 'bg-red-100 text-red-800' : 
-                                                           ($appointment['status'] === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'))) ?>">
-                                                        <?= ucfirst($appointment['status']) ?>
-                                                    </span>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <?php if (!empty($appointment['priority_number'])): ?>
-                                                        <div class="text-sm font-medium text-red-600"><?= $appointment['priority_number'] ?></div>
-                                                    <?php else: ?>
-                                                        <span class="text-gray-400">N/A</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <button onclick="openViewModal(<?= htmlspecialchars(json_encode($appointment)) ?>)" 
-                                                            class="btn-blue">
-                                                        <i class="fas fa-eye mr-1"></i> View
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+        <div class="modal-body">
+            <!-- Date Status Display -->
+            <div id="dateStatusDisplay" class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg hidden">
+                <div class="flex items-center">
+                    <i class="fas fa-info-circle text-yellow-500 mr-2"></i>
+                    <span id="dateStatusText" class="text-yellow-700 font-medium"></span>
                 </div>
             </div>
             
-            <!-- Account Management Section -->
-            <div class="<?= $activeTab === 'account-management' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="account-management" role="tabpanel" aria-labelledby="account-tab">
-                <h2 class="text-xl font-semibold mb-4 text-blue-700">Patient Account Approvals</h2>
-                
-                <?php if (empty($unapprovedUsers)): ?>
-                    <div class="bg-blue-50 p-4 rounded-lg text-center">
-                        <p class="text-gray-600">No pending patient approvals.</p>
-                    </div>
-                <?php else: ?>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full bg-white">
-                            <thead>
-                                <tr>
-                                    <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Username</th>
-                                    <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Full Name</th>
-                                    <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
-                                    <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Date Registered</th>
-                                    <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                                    <th class="py-2 px-4 border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($unapprovedUsers as $user): ?>
-                                    <tr>
-                                        <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($user['username']) ?></td>
-                                        <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($user['full_name']) ?></td>
-                                        <td class="py-2 px-4 border-b border-gray-200"><?= htmlspecialchars($user['email'] ?? 'N/A') ?></td>
-                                        <td class="py-2 px-4 border-b border-gray-200"><?= date('M d, Y', strtotime($user['created_at'])) ?></td>
-                                        <td class="py-2 px-4 border-b border-gray-200">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                <?= $user['status'] === 'approved' ? 'bg-green-100 text-green-800' : 
-                                                   ($user['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                                                   'bg-red-100 text-red-800') ?>">
-                                                <?= ucfirst($user['status'] ?? 'pending') ?>
-                                            </span>
-                                        </td>
-                                        <td class="py-2 px-4 border-b border-gray-200">
-                                            <?php if ($user['status'] !== 'approved'): ?>
-                                                <button onclick="openUserDetailsModal(<?= htmlspecialchars(json_encode($user)) ?>)" 
-                                                        class="btn-blue">
-                                                    <i class="fas fa-eye mr-1"></i> View Details
-                                                </button>
-                                            <?php else: ?>
-                                                <span class="text-gray-400">No actions available</span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    <?php if ($totalPages > 1): ?>
-                        <div class="pagination mt-6">
-                            <!-- Previous Button -->
-                            <?php if ($currentPage > 1): ?>
-                                <a href="?tab=account-management&user_page=<?= $currentPage - 1 ?>" class="pagination-button">
-                                    <i class="fas fa-chevron-left"></i>
-                                </a>
-                            <?php else: ?>
-                                <span class="pagination-button disabled">
-                                    <i class="fas fa-chevron-left"></i>
-                                </span>
-                            <?php endif; ?>
-
-                            <!-- Page Numbers -->
-                            <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                                <?php if ($i == $currentPage): ?>
-                                    <span class="pagination-button active"><?= $i ?></span>
-                                <?php else: ?>
-                                    <a href="?tab=account-management&user_page=<?= $i ?>" class="pagination-button"><?= $i ?></a>
-                                <?php endif; ?>
-                            <?php endfor; ?>
-
-                            <!-- Next Button -->
-                            <?php if ($currentPage < $totalPages): ?>
-                                <a href="?tab=account-management&user_page=<?= $currentPage + 1 ?>" class="pagination-button">
-                                    <i class="fas fa-chevron-right"></i>
-                                </a>
-                            <?php else: ?>
-                                <span class="pagination-button disabled">
-                                    <i class="fas fa-chevron-right"></i>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
-                <?php endif; ?>
-            </div>
-
-            <!-- Analytics Dashboard Section -->
-            <div class="<?= $activeTab === 'analytics' ? '' : 'hidden' ?> p-6 bg-white rounded-lg border border-gray-200" id="analytics" role="tabpanel" aria-labelledby="analytics-tab">
-                <h2 class="text-2xl font-semibold mb-6 text-blue-700">Analytics Dashboard</h2>
-                
-                <!-- Overview Cards -->
-                <div class="analytics-grid mb-8">
-                    <div class="analytics-card">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="analytics-label">Total Registered Patients</p>
-                                <p class="analytics-value"><?= $analytics['total_patients'] ?></p>
-                            </div>
-                            <i class="fas fa-users text-3xl text-blue-500"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="analytics-card">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="analytics-label">Approved Patients</p>
-                                <p class="analytics-value"><?= $analytics['approved_patients'] ?></p>
-                            </div>
-                            <i class="fas fa-user-check text-3xl text-green-500"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="analytics-card">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="analytics-label">Regular Patients</p>
-                                <p class="analytics-value"><?= $analytics['regular_patients'] ?></p>
-                            </div>
-                            <i class="fas fa-user-friends text-3xl text-purple-500"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Charts Grid -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    <!-- Appointment Status Distribution -->
-                    <div class="chart-container">
-                        <h3 class="chart-title">
-                            <i class="fas fa-chart-pie"></i>
-                            Appointment Status Distribution
-                        </h3>
-                        <canvas id="appointmentStatusChart" height="300"></canvas>
-                    </div>
-                    
-                    <!-- Monthly Appointments Trend -->
-                    <div class="chart-container">
-                        <h3 class="chart-title">
-                            <i class="fas fa-chart-line"></i>
-                            Monthly Appointments Trend
-                        </h3>
-                        <canvas id="monthlyTrendChart" height="300"></canvas>
-                    </div>
-                </div>
-
-                <!-- Additional Charts -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Patient Registration Trend -->
-                    <div class="chart-container">
-                        <h3 class="chart-title">
-                            <i class="fas fa-user-plus"></i>
-                            Patient Registration Trend
-                        </h3>
-                        <canvas id="patientRegistrationChart" height="300"></canvas>
-                    </div>
-                    
-                    <!-- Appointment Completion Rate -->
-                    <div class="chart-container">
-                        <h3 class="chart-title">
-                            <i class="fas fa-tasks"></i>
-                            Appointment Completion Rate
-                        </h3>
-                        <canvas id="completionRateChart" height="300"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Time Slot Selection Modal -->
-    <div id="timeSlotModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-8 border w-full max-w-4xl shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl leading-6 font-medium text-gray-900" id="timeSlotModalTitle">
-                        Select Time Slot for <span id="modalSelectedDate" class="text-blue-600 font-semibold"></span>
-                    </h3>
-                    <button type="button" onclick="closeTimeSlotModal()" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-                
-                <!-- Time Slots Selection -->
+            <!-- Time Slots Selection -->
+            <div class="mb-6">
                 <div class="mb-6">
-                    <div class="mb-6">
-                        <h4 class="font-medium mb-4 text-gray-700 text-lg">Morning Slots (8:00 AM - 12:00 PM)</h4>
-                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="morningSlotsContainer">
-                            <?php foreach ($morningSlots as $index => $slot): ?>
-                                <div class="time-slot border-2 border-gray-200 rounded-lg p-6 cursor-pointer transition-all duration-200 hover:border-blue-300 bg-white" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
-                                    <div class="flex flex-col items-center justify-center text-center">
-                                        <span class="font-semibold text-gray-800 text-base mb-2">
-                                            <?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?>
-                                        </span>
-                                        <span class="availability-indicator text-sm text-gray-500">
-                                            Available
-                                        </span>
-                                    </div>
+                    <h4 class="font-medium mb-4 text-gray-700 text-lg">Morning Slots (8:00 AM - 12:00 PM)</h4>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="morningSlotsContainer">
+                        <?php foreach ($morningSlots as $index => $slot): ?>
+                            <div class="time-slot border-2 border-gray-200 rounded-lg p-6 cursor-pointer transition-all duration-200 hover:border-blue-300 bg-white" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
+                                <div class="flex flex-col items-center justify-center text-center">
+                                    <span class="font-semibold text-gray-800 text-base mb-2">
+                                        <?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?>
+                                    </span>
+                                    <span class="slot-status text-xs text-gray-500">
+                                        Available
+                                    </span>
                                 </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <h4 class="font-medium mb-4 text-gray-700 text-lg">Afternoon Slots (1:00 PM - 5:00 PM)</h4>
-                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="afternoonSlotsContainer">
-                            <?php foreach ($afternoonSlots as $index => $slot): ?>
-                                <div class="time-slot border-2 border-gray-200 rounded-lg p-6 cursor-pointer transition-all duration-200 hover:border-blue-300 bg-white" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
-                                    <div class="flex flex-col items-center justify-center text-center">
-                                        <span class="font-semibold text-gray-800 text-base mb-2">
-                                            <?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?>
-                                        </span>
-                                        <span class="availability-indicator text-sm text-gray-500">
-                                            Available
-                                        </span>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <label for="max_slots" class="block text-gray-700 mb-3 font-medium">Maximum Appointments per Slot *</label>
-                        <select id="max_slots" name="max_slots" class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                        </select>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
                 </div>
                 
-                <!-- Action Buttons -->
-                <div class="flex justify-end space-x-4 mt-8">
-                    <button type="button" onclick="closeTimeSlotModal()" class="px-8 py-3 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
-                        Cancel
-                    </button>
-                    <button type="button" id="confirmSlotBtn" onclick="confirmTimeSlotSelection()" class="px-8 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition font-medium button-disabled" disabled>
-                        <i class="fas fa-check-circle mr-2"></i> Confirm Selection
-                    </button>
+                <div class="mb-6">
+                    <h4 class="font-medium mb-4 text-gray-700 text-lg">Afternoon Slots (1:00 PM - 5:00 PM)</h4>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="afternoonSlotsContainer">
+                        <?php foreach ($afternoonSlots as $index => $slot): ?>
+                            <div class="time-slot border-2 border-gray-200 rounded-lg p-6 cursor-pointer transition-all duration-200 hover:border-blue-300 bg-white" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
+                                <div class="flex flex-col items-center justify-center text-center">
+                                    <span class="font-semibold text-gray-800 text-base mb-2">
+                                        <?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?>
+                                    </span>
+                                    <span class="slot-status text-xs text-gray-500">
+                                        Available
+                                    </span>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label for="max_slots" class="block text-gray-700 mb-3 font-medium">Maximum Appointments per Slot *</label>
+                    <select id="max_slots" name="max_slots" class="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- User Details Modal -->
-    <div id="userDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-10 mx-auto p-4 border w-full max-w-5xl shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-semibold text-gray-900">Patient Registration Details</h3>
-                <button type="button" onclick="closeUserDetailsModal()" class="text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-times text-xl"></i>
+        
+        <div class="modal-footer">
+            <div class="flex justify-end space-x-4">
+                <button type="button" onclick="closeTimeSlotModal()" class="px-8 py-3 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
+                    Cancel
+                </button>
+                <button type="button" id="confirmSlotBtn" onclick="confirmTimeSlotSelection()" class="px-8 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition font-medium button-disabled" disabled>
+                    <i class="fas fa-check-circle mr-2"></i> Confirm Selection
                 </button>
             </div>
-            
-            <div class="bg-gray-50 rounded-lg mb-4">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
-                    <!-- Personal Information -->
-                    <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Personal Information</h4>
-                        <div class="space-y-3">
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Full Name:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userFullName">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Username:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userUsername">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Email:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userEmail">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Gender:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userGender">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Age:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userAge">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Contact:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userContact">N/A</p>
-                            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Details Modal -->
+<div id="userDetailsModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-4xl" style="max-height: 90vh;">
+        <div class="modal-header">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-gray-800">Patient Details</h2>
+                <button onclick="closeUserDetailsModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="modal-body" style="overflow-y: auto;">
+            <div class="space-y-6">
+                <!-- Personal Information -->
+                <div class="detail-section">
+                    <h4><i class="fas fa-user text-blue-500 mr-2"></i> Personal Information</h4>
+                    <div class="user-details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Full Name:</span>
+                            <span class="detail-value" id="userFullName">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Username:</span>
+                            <span class="detail-value" id="userUsername">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Email:</span>
+                            <span class="detail-value" id="userEmail">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Contact Number:</span>
+                            <span class="detail-value" id="userContact">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Gender:</span>
+                            <span class="detail-value" id="userGender">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Age:</span>
+                            <span class="detail-value" id="userAge">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Civil Status:</span>
+                            <span class="detail-value" id="userCivilStatus">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Occupation:</span>
+                            <span class="detail-value" id="userOccupation">—</span>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Address & Verification -->
-                    <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Address Information</h4>
-                        <div class="space-y-3 mb-4">
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Full Address:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userAddress">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Sitio:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userSitio">N/A</p>
-                            </div>
+                <!-- Address Information -->
+                <div class="detail-section">
+                    <h4><i class="fas fa-map-marker-alt text-green-500 mr-2"></i> Address Information</h4>
+                    <div class="user-details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Complete Address:</span>
+                            <span class="detail-value" id="userAddress">—</span>
                         </div>
-
-                        <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Verification</h4>
-                        <div class="space-y-3">
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Method:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userVerificationMethod">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">ID Verified:</span>
-                                <p class="text-sm font-semibold mt-1" id="userIdVerified">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Consent Given:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userVerificationConsent">N/A</p>
-                            </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Sitio:</span>
+                            <span class="detail-value" id="userSitio">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Date of Birth:</span>
+                            <span class="detail-value" id="userDateOfBirth">—</span>
                         </div>
                     </div>
+                </div>
 
-                    <!-- ID Image Section -->
-                    <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">ID Document</h4>
+                <!-- ID Verification -->
+                <div class="detail-section">
+                    <h4><i class="fas fa-id-card text-purple-500 mr-2"></i> ID Verification</h4>
+                    <div class="user-details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">ID Type:</span>
+                            <span class="detail-value" id="userIdType">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">ID Status:</span>
+                            <span class="detail-value">
+                                <span id="userIdValidationStatus" class="px-2 py-1 text-xs rounded-full" style="background: #f3f4f6; color: #6b7280;">—</span>
+                            </span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">ID Verified:</span>
+                            <span class="detail-value" id="userIdVerified">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Verification Consent:</span>
+                            <span class="detail-value" id="userVerificationConsent">—</span>
+                        </div>
+                    </div>
+                    
+                    <!-- ID Image Preview -->
+                    <div class="mt-4">
+                        <h5 class="text-sm font-medium text-gray-700 mb-2">ID Document</h5>
                         <div id="idImageSection" class="hidden">
-                            <div class="flex flex-col items-center">
-                                <div class="w-full h-48 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center mb-3 overflow-hidden">
-                                    <img id="userIdImage" src="" alt="Uploaded ID Image" 
-                                         class="w-full h-full object-contain">
-                                </div>
-                                <div class="text-center w-full">
-                                    <p class="text-xs text-gray-500 mb-2 truncate" id="imagePathDisplay"></p>
-                                    <div class="flex justify-center space-x-2">
-                                        <a id="userIdImageLink" href="#" target="_blank" 
-                                           class="inline-flex items-center bg-blue-600 text-white px-3 py-1 rounded-full text-xs hover:bg-blue-700 transition">
-                                            <i class="fas fa-external-link-alt mr-1"></i> Full Size
-                                        </a>
-                                        <button type="button" onclick="openImageModal()" 
-                                                class="inline-flex items-center bg-green-600 text-white px-3 py-1 rounded-full text-xs hover:bg-green-700 transition">
-                                            <i class="fas fa-expand mr-1"></i> Zoom
-                                        </button>
-                                    </div>
-                                </div>
+                            <div class="id-preview-container mb-3">
+                                <img id="userIdImage" src="" alt="ID Image" class="w-full h-auto">
+                            </div>
+                            <div class="flex space-x-3">
+                                <a id="userIdImageLink" href="#" target="_blank" class="btn-blue text-sm">
+                                    <i class="fas fa-external-link-alt mr-2"></i> View Original
+                                </a>
+                                <button onclick="openImageModal()" class="btn-blue text-sm">
+                                    <i class="fas fa-search mr-2"></i> Zoom Preview
+                                </button>
                             </div>
                         </div>
-                        
-                        <div id="noIdImageSection" class="hidden">
-                            <div class="w-full h-48 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-lg flex flex-col items-center justify-center p-4">
-                                <i class="fas fa-id-card text-yellow-500 text-2xl mb-2"></i>
-                                <p class="text-yellow-700 text-sm font-medium text-center">No ID Image Uploaded</p>
-                                <p class="text-yellow-600 text-xs text-center mt-1">Manual verification required</p>
-                            </div>
+                        <div id="noIdImageSection" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <p class="text-yellow-700 text-sm">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                No ID image uploaded
+                            </p>
                         </div>
                     </div>
                 </div>
 
-                <!-- ID Validation Section -->
-                <div id="idValidationSection" class="hidden px-4 pb-4">
-                    <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <div class="flex items-center justify-between mb-4">
-                            <h4 class="font-semibold text-gray-700 border-b pb-2 flex-1">ID Document Validation</h4>
-                            <button type="button" onclick="validateUploadedId(currentUserDetailsId)" 
-                                    class="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-full text-xs hover:bg-blue-700 transition whitespace-nowrap ml-2">
-                                <i class="fas fa-check-circle mr-1"></i> Validate ID
-                            </button>
+                <!-- Account Information -->
+                <div class="detail-section">
+                    <h4><i class="fas fa-user-circle text-red-500 mr-2"></i> Account Information</h4>
+                    <div class="user-details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Account Status:</span>
+                            <span class="detail-value" id="userStatus">—</span>
                         </div>
-                        
-                        <div id="idValidationLoading" class="hidden text-center py-4">
-                            <div class="inline-block">
-                                <i class="fas fa-spinner fa-spin text-blue-600 text-lg"></i>
-                                <p class="text-sm text-gray-600 mt-2">Validating ID document...</p>
-                            </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Approved:</span>
+                            <span class="detail-value" id="userApproved">—</span>
                         </div>
-
-                        <div id="idValidationContent" class="hidden space-y-3">
-                            <!-- Validation Status -->
-                            <div class="p-3 rounded-lg" id="validationStatusBox">
-                                <div class="flex items-start">
-                                    <div class="flex-shrink-0">
-                                        <i id="validationStatusIcon" class="fas fa-circle text-gray-400 mt-1"></i>
-                                    </div>
-                                    <div class="ml-3">
-                                        <h5 id="validationStatusText" class="text-sm font-semibold text-gray-700">Checking...</h5>
-                                        <p id="validationStatusMessage" class="text-xs text-gray-600 mt-1"></p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Validation Details Grid -->
-                            <div class="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200">
-                                <div>
-                                    <span class="text-xs font-medium text-gray-600">File Name:</span>
-                                    <p id="validationFileName" class="text-xs text-gray-900 mt-1 break-words">N/A</p>
-                                </div>
-                                <div>
-                                    <span class="text-xs font-medium text-gray-600">File Type:</span>
-                                    <p id="validationFileType" class="text-xs text-gray-900 mt-1">N/A</p>
-                                </div>
-                                <div>
-                                    <span class="text-xs font-medium text-gray-600">File Size:</span>
-                                    <p id="validationFileSize" class="text-xs text-gray-900 mt-1">N/A</p>
-                                </div>
-                                <div>
-                                    <span class="text-xs font-medium text-gray-600">Image Resolution:</span>
-                                    <p id="validationImageResolution" class="text-xs text-gray-900 mt-1">N/A</p>
-                                </div>
-                            </div>
-
-                            <!-- Validation Issues -->
-                            <div id="validationIssuesSection" class="hidden pt-3 border-t border-gray-200">
-                                <h5 class="text-xs font-semibold text-red-700 mb-2">⚠ Validation Issues:</h5>
-                                <ul id="validationIssuesList" class="space-y-1">
-                                </ul>
-                            </div>
-
-                            <!-- Success Message -->
-                            <div id="validationSuccessSection" class="hidden p-3 bg-green-50 border border-green-200 rounded-lg">
-                                <div class="flex items-start">
-                                    <i class="fas fa-check-circle text-green-600 mt-1 mr-3"></i>
-                                    <div>
-                                        <p class="text-xs font-semibold text-green-700">Valid ID Document</p>
-                                        <p class="text-xs text-green-600 mt-1">This ID document has passed all validation checks and is ready for approval.</p>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="detail-item">
+                            <span class="detail-label">User Role:</span>
+                            <span class="detail-value" id="userRole">—</span>
                         </div>
-
-                        <!-- No Validation Performed Yet -->
-                        <div id="noValidationYetSection" class="text-center py-4">
-                            <i class="fas fa-file-circle-question text-gray-400 text-2xl mb-2"></i>
-                            <p class="text-sm text-gray-600">Click "Validate ID" to check the uploaded ID document</p>
+                        <div class="detail-item" id="uniqueNumberSection" style="display: none;">
+                            <span class="detail-label">Patient ID:</span>
+                            <span class="detail-value text-blue-600 font-semibold" id="userUniqueNumber">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Verification Method:</span>
+                            <span class="detail-value" id="userVerificationMethod">—</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Bottom Row: Registration & Status -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 px-4 pb-4">
-                    <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Registration Details</h4>
-                        <div class="grid grid-cols-1 gap-3">
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Date Registered:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userRegisteredDate">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Last Updated:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userUpdatedDate">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Verified At:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userVerifiedAt">N/A</p>
-                            </div>
+                <!-- Registration Timeline -->
+                <div class="detail-section">
+                    <h4><i class="fas fa-history text-indigo-500 mr-2"></i> Registration Timeline</h4>
+                    <div class="user-details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Registered Date:</span>
+                            <span class="detail-value" id="userRegisteredDate">—</span>
                         </div>
-                    </div>
-
-                    <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Account Status</h4>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Status:</span>
-                                <p class="text-sm font-semibold mt-1" id="userStatus">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Approved:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userApproved">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Role:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="userRole">N/A</p>
-                            </div>
-                            <div id="uniqueNumberSection" class="hidden">
-                                <span class="text-sm font-medium text-gray-600">Unique No:</span>
-                                <p class="text-sm font-semibold text-blue-600 mt-1" id="userUniqueNumber">N/A</p>
-                            </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Last Updated:</span>
+                            <span class="detail-value" id="userUpdatedDate">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Verified At:</span>
+                            <span class="detail-value" id="userVerifiedAt">—</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Verification Notes -->
-                <div id="verificationNotesSection" class="hidden px-4 pb-4">
-                    <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Verification Notes</h4>
-                        <p class="text-sm text-gray-900" id="userVerificationNotes">N/A</p>
+                <div id="verificationNotesSection" class="detail-section hidden">
+                    <h4><i class="fas fa-sticky-note text-yellow-500 mr-2"></i> Verification Notes</h4>
+                    <div class="bg-yellow-50 border border-yellow-100 rounded-lg p-4">
+                        <p class="text-sm text-gray-700" id="userVerificationNotes">—</p>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="detail-section">
+                    <h4><i class="fas fa-cogs text-gray-500 mr-2"></i> Actions</h4>
+                    <div class="flex space-x-4">
+                        <button onclick="openApproveConfirmationModal()" 
+                                class="btn-success-blue flex-1">
+                            <i class="fas fa-check mr-2"></i> Approve Registration
+                        </button>
+                        <button onclick="openDeclineModalFromDetails()" 
+                                class="btn-danger-blue flex-1">
+                            <i class="fas fa-times mr-2"></i> Decline Registration
+                        </button>
+                        <button onclick="closeUserDetailsModal()" 
+                                class="btn-blue flex-1">
+                            <i class="fas fa-times mr-2"></i> Close Details
+                        </button>
                     </div>
                 </div>
             </div>
-            
-            <!-- Action Buttons -->
-            <div class="flex justify-end space-x-3 mt-4">
-                <button type="button" onclick="closeUserDetailsModal()" class="px-6 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
-                    <i class="fas fa-times mr-2"></i> Close
-                </button>
-                <button type="button" onclick="openApproveConfirmationModal()" class="btn-success-blue">
-                    <i class="fas fa-check-circle mr-2"></i> Approve
-                </button>
-                <button type="button" onclick="openDeclineModalFromDetails()" class="btn-danger-blue">
-                    <i class="fas fa-times-circle mr-2"></i> Decline
-                </button>
-            </div>
         </div>
     </div>
+</div>
 
-    <!-- Cancelled Appointment Details Modal -->
-    <div id="cancelledDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-10 mx-auto p-6 border w-full max-w-4xl shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-6">
+<!-- Cancelled Appointment Details Modal -->
+<div id="cancelledDetailsModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-4xl" style="max-height: 90vh;">
+        <div class="modal-header">
+            <div class="flex justify-between items-center">
                 <h3 class="text-2xl font-semibold text-gray-900">Cancelled Appointment Details</h3>
                 <button type="button" onclick="closeCancelledDetailsModal()" class="text-gray-500 hover:text-gray-700">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
-            
+        </div>
+        
+        <div class="modal-body" style="overflow-y: auto;">
             <div class="bg-gray-50 rounded-lg p-6 mb-6">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Patient Information -->
@@ -3527,1179 +3950,1323 @@ if (!empty($availableDates)) {
                     </div>
                 </div>
             </div>
-            
-            <!-- Action Buttons -->
-            <div class="flex justify-end space-x-3">
+        </div>
+        
+        <div class="modal-footer">
+            <div class="flex justify-end">
                 <button type="button" onclick="closeCancelledDetailsModal()" class="px-6 py-3 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
                     <i class="fas fa-times mr-2"></i> Close
                 </button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Approve Confirmation Modal -->
-    <div id="approveConfirmationModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100">
-                    <i class="fas fa-check-circle text-green-600 text-2xl"></i>
-                </div>
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">Confirm Resident Account Approval</h3>
-                <div class="mt-2 px-4 py-3">
-                    <p class="text-sm text-gray-600">
-                        Are you sure you want to approve this user account? This action will generate a unique patient number and grant full system access.
-                    </p>
-                    <div class="mt-4 bg-blue-50 p-3 rounded-lg">
-                        <p class="text-sm text-blue-700 font-medium">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            An approval email with the unique patient number will be sent to the user.
-                        </p>
-                    </div>
-                </div>
-                <div class="flex justify-center space-x-3 px-4 py-3 mt-4">
-                    <button type="button" onclick="closeApproveConfirmationModal()" class="px-6 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
-                        Cancel
-                    </button>
-                    <form method="POST" action="" class="inline" id="finalApproveForm">
-                        <input type="hidden" name="user_id" id="finalApproveUserId">
-                        <input type="hidden" name="action" value="approve">
-                        <button type="submit" name="approve_user" class="btn-success-blue">
-                            <i class="fas fa-check mr-1"></i> Confirm Approval
-                        </button>
-                    </form>
-                </div>
+<!-- Approve Confirmation Modal -->
+<div id="approveConfirmationModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-md">
+        <div class="modal-body">
+            <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 text-center mb-2">Confirm Resident Account Approval</h3>
+            <p class="text-gray-600 text-center mb-4">
+                Are you sure you want to approve this user account? This action will generate a unique patient number and grant full system access.
+            </p>
+            <div class="bg-blue-50 p-3 rounded-lg mb-6">
+                <p class="text-sm text-blue-700 font-medium text-center">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    An approval email with the unique patient number will be sent to the user.
+                </p>
             </div>
         </div>
-    </div>
-
-    <!-- Decline Modal -->
-    <div id="declineModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <div class="flex items-center mb-4">
-                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                        <i class="fas fa-times-circle text-red-600 text-xl"></i>
-                    </div>
-                </div>
-                <h3 class="text-xl leading-6 font-medium text-gray-900 text-center mb-2">Decline User Account</h3>
-                <p class="text-gray-600 text-center mb-6">Please provide a reason for declining this user registration.</p>
-                
-                <form id="declineForm" method="POST" action="">
-                    <input type="hidden" name="user_id" id="declineUserId">
-                    <input type="hidden" name="action" value="decline">
-                    
-                    <div class="mb-6">
-                        <label for="decline_reason" class="block text-gray-700 text-sm font-semibold mb-3">Reason for Declination *</label>
-                        <textarea id="decline_reason" name="decline_reason" rows="6" 
-                                  class="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500" 
-                                  placeholder="Please provide a detailed reason for declining this user account. This will be included in the notification email sent to the user..."
-                                  required></textarea>
-                        <p class="text-xs text-gray-500 mt-2">This reason will be sent to the user via email.</p>
-                    </div>
-                    
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                        <div class="flex items-start">
-                            <i class="fas fa-exclamation-triangle text-red-500 mt-1 mr-3"></i>
-                            <div>
-                                <h4 class="text-sm font-semibold text-red-800">Important Notice</h4>
-                                <p class="text-sm text-red-700 mt-1">
-                                    Declining this account will prevent the user from accessing the system. They will receive an email notification with the reason provided above.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex justify-end space-x-3">
-                        <button type="button" onclick="closeDeclineModal()" class="px-6 py-3 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
-                            <i class="fas fa-arrow-left mr-2"></i> Cancel
-                        </button>
-                        <button type="submit" name="approve_user" class="btn-danger-blue">
-                            <i class="fas fa-ban mr-2"></i> Confirm Decline
-                        </button>
-                    </div>
+        <div class="modal-footer">
+            <div class="flex justify-center space-x-3">
+                <button type="button" onclick="closeApproveConfirmationModal()" class="px-6 py-3 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
+                    Cancel
+                </button>
+                <form method="POST" action="" class="inline" id="finalApproveForm">
+                    <input type="hidden" name="user_id" id="finalApproveUserId">
+                    <input type="hidden" name="action" value="approve">
+                    <button type="submit" name="approve_user" class="btn-success-blue">
+                        <i class="fas fa-check mr-1"></i> Confirm Approval
+                    </button>
                 </form>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Image Zoom Modal -->
-    <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-90 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-0 left-0 w-full h-full flex items-center justify-center p-4">
-            <div class="bg-white rounded-lg max-w-4xl w-full max-h-full">
-                <div class="flex justify-between items-center p-4 border-b">
-                    <h3 class="text-lg font-semibold">ID Document Preview</h3>
-                    <button type="button" onclick="closeImageModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="p-4 overflow-auto max-h-96 flex justify-center">
-                    <img id="zoomedUserIdImage" src="" alt="Zoomed ID Image" class="max-w-full h-auto rounded-lg">
-                </div>
-                <div class="p-4 border-t text-center">
-                    <a id="zoomedUserIdImageLink" href="#" target="_blank" 
-                       class="btn-blue">
-                        <i class="fas fa-external-link-alt mr-2"></i> Open in New Tab
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Success Modal -->
-    <div id="successModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-5 border w-full max-w-md shadow-lg rounded-md bg-white modal">
-            <div class="mt-3 text-center">
-                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-                    <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                </div>
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mt-3" id="successMessage"></h3>
-                <div class="px-4 py-3 sm:px-6">
-                    <button type="button" onclick="closeSuccessModal()" class="w-full inline-flex justify-center rounded-full border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:text-sm modal-button">
-                        OK
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Error Modal -->
-    <div id="errorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-5 border w-full max-w-md shadow-lg rounded-md bg-white modal">
-            <div class="mt-3 text-center">
+<!-- Decline Modal -->
+<div id="declineModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-2xl">
+        <div class="modal-header">
+            <div class="flex items-center mb-4">
                 <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                    <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
+                    <i class="fas fa-times-circle text-red-600 text-xl"></i>
                 </div>
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mt-3" id="errorMessage"></h3>
-                <div class="px-4 py-3 sm:px-6">
-                    <button type="button" onclick="closeErrorModal()" class="w-full inline-flex justify-center rounded-full border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm modal-button">
-                        OK
-                    </button>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-900 text-center mb-2">Decline User Account</h3>
+            <p class="text-gray-600 text-center">Please provide a reason for declining this user registration.</p>
+        </div>
+        
+        <div class="modal-body">
+            <form id="declineForm" method="POST" action="">
+                <input type="hidden" name="user_id" id="declineUserId">
+                <input type="hidden" name="action" value="decline">
+                
+                <div class="mb-6">
+                    <label for="decline_reason" class="block text-gray-700 text-sm font-semibold mb-3">Reason for Declination *</label>
+                    <textarea id="decline_reason" name="decline_reason" rows="6" 
+                              class="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500" 
+                              placeholder="Please provide a detailed reason for declining this user account. This will be included in the notification email sent to the user..."
+                              required></textarea>
+                    <p class="text-xs text-gray-500 mt-2">This reason will be sent to the user via email.</p>
                 </div>
+                
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <i class="fas fa-exclamation-triangle text-red-500 mt-1 mr-3"></i>
+                        <div>
+                            <h4 class="text-sm font-semibold text-red-800">Important Notice</h4>
+                            <p class="text-sm text-red-700 mt-1">
+                                Declining this account will prevent the user from accessing the system. They will receive an email notification with the reason provided above.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <div class="modal-footer">
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeDeclineModal()" class="px-6 py-3 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
+                    <i class="fas fa-arrow-left mr-2"></i> Cancel
+                </button>
+                <button type="submit" form="declineForm" name="approve_user" class="btn-danger-blue">
+                    <i class="fas fa-ban mr-2"></i> Confirm Decline
+                </button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Appointment Approval Confirmation Modal -->
-    <div id="appointmentApprovalModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100">
-                    <i class="fas fa-check-circle text-green-600 text-2xl"></i>
-                </div>
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">Confirm Resident Appointment</h3>
-                <div class="mt-2 px-4 py-3">
-                    <p class="text-sm text-gray-600">
-                        Are you sure you want to approve this resident's appointment? This action will generate a priority number and invoice for the appointment.
-                    </p>
-                    <div class="mt-4 bg-blue-50 p-3 rounded-lg">
-                        <p class="text-sm text-blue-700 font-medium">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            An approval email with appointment details will be sent to the resident.
-                        </p>
-                    </div>
-                </div>
-                <div class="flex justify-center space-x-3 px-4 py-3 mt-4">
-                    <button type="button" onclick="closeAppointmentApprovalModal()" class="px-6 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
-                        Cancel
-                    </button>
-                    <form method="POST" action="" class="inline" id="finalAppointmentApproveForm">
-                        <input type="hidden" name="appointment_id" id="finalAppointmentApproveId">
-                        <input type="hidden" name="action" value="approve">
-                        <button type="submit" name="approve_appointment" class="btn-success-blue">
-                            <i class="fas fa-check mr-1"></i> Confirm Approval
-                        </button>
-                    </form>
-                </div>
+<!-- Mark as Completed Confirmation Modal -->
+<div id="completeConfirmationModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-md">
+        <div class="modal-body">
+            <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 text-center mb-2">Confirm Appointment Completion</h3>
+            <p class="text-gray-600 text-center mb-4" id="completePatientDetails">
+                Are you sure you want to mark this appointment as completed?
+            </p>
+            <div class="bg-blue-50 p-3 rounded-lg mb-6">
+                <p class="text-sm text-blue-700 font-medium text-center">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    This action will update the appointment status to "completed" and cannot be undone.
+                </p>
             </div>
         </div>
-    </div>
-
-    <!-- Rejection Modal -->
-    <div id="rejectionModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Reject Appointment</h3>
-                <form id="rejectionForm" method="POST" action="">
-                    <input type="hidden" name="appointment_id" id="reject_appointment_id">
-                    <input type="hidden" name="action" value="reject">
-                    
-                    <div class="mb-4">
-                        <label for="rejection_reason" class="block text-gray-700 mb-2 font-medium">Reason for Rejection *</label>
-                        <textarea id="rejection_reason" name="rejection_reason" rows="4" 
-                                  class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                  placeholder="Please provide a reason for rejecting this appointment..." required></textarea>
-                    </div>
-                    
-                    <div class="flex justify-end space-x-3 mt-6">
-                        <button type="button" onclick="closeRejectionModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium modal-button">
-                            Cancel
-                        </button>
-                        <button type="submit" name="approve_appointment" class="btn-danger-blue">
-                            Confirm Rejection
-                        </button>
-                    </div>
+        <div class="modal-footer">
+            <div class="flex justify-center space-x-3">
+                <button type="button" onclick="closeCompleteConfirmationModal()" class="px-6 py-3 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
+                    Cancel
+                </button>
+                <form method="POST" action="" class="inline" id="finalCompleteForm">
+                    <input type="hidden" name="appointment_id" id="finalCompleteAppointmentId">
+                    <input type="hidden" name="action" value="complete">
+                    <button type="submit" name="approve_appointment" class="btn-success-blue">
+                        <i class="fas fa-check mr-1"></i> Confirm Completion
+                    </button>
                 </form>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- View Appointment Modal -->
-    <div id="viewModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Appointment Details</h3>
-                <div class="bg-gray-50 p-4 rounded-lg mb-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <h4 class="font-semibold text-gray-700">Patient Information</h4>
-                            <div class="mt-2 space-y-2">
-                                <div>
-                                    <span class="text-sm font-medium text-gray-600">Full Name:</span>
-                                    <p class="text-sm text-gray-900" id="viewFullName"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-gray-600">Patient ID:</span>
-                                    <p class="text-sm text-gray-900" id="viewPatientId"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-gray-600">Contact Number:</span>
-                                    <p class="text-sm text-gray-900" id="viewContact"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-gray-600">Email:</span>
-                                    <p class="text-sm text-gray-900" id="viewEmail"></p>
-                                </div>
+<!-- Appointment Approval Confirmation Modal -->
+<div id="appointmentApprovalModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-md">
+        <div class="modal-body">
+            <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 text-center mb-2">Confirm Resident Appointment</h3>
+            <p class="text-gray-600 text-center mb-4">
+                Are you sure you want to approve this resident's appointment? This action will generate a priority number and invoice for the appointment.
+            </p>
+            <div class="bg-blue-50 p-3 rounded-lg mb-6">
+                <p class="text-sm text-blue-700 font-medium text-center">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    An approval email with appointment details will be sent to the resident.
+                </p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div class="flex justify-center space-x-3">
+                <button type="button" onclick="closeAppointmentApprovalModal()" class="px-6 py-3 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
+                    Cancel
+                </button>
+                <form method="POST" action="" class="inline" id="finalAppointmentApproveForm">
+                    <input type="hidden" name="appointment_id" id="finalAppointmentApproveId">
+                    <input type="hidden" name="action" value="approve">
+                    <button type="submit" name="approve_appointment" class="btn-success-blue">
+                        <i class="fas fa-check mr-1"></i> Confirm Approval
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rejection Modal -->
+<div id="rejectionModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-md">
+        <div class="modal-header">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Reject Appointment</h3>
+        </div>
+        <div class="modal-body">
+            <form id="rejectionForm" method="POST" action="">
+                <input type="hidden" name="appointment_id" id="reject_appointment_id">
+                <input type="hidden" name="action" value="reject">
+                
+                <div class="mb-4">
+                    <label for="rejection_reason" class="block text-gray-700 mb-2 font-medium">Reason for Rejection *</label>
+                    <textarea id="rejection_reason" name="rejection_reason" rows="4" 
+                              class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                              placeholder="Please provide a reason for rejecting this appointment..." required></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeRejectionModal()" class="px-6 py-3 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
+                    Cancel
+                </button>
+                <button type="submit" form="rejectionForm" name="approve_appointment" class="btn-danger-blue">
+                    Confirm Rejection
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Appointment Modal -->
+<div id="viewModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-2xl">
+        <div class="modal-header">
+            <h3 class="text-lg font-semibold text-gray-900">Appointment Details</h3>
+        </div>
+        <div class="modal-body">
+            <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="font-semibold text-gray-700">Patient Information</h4>
+                        <div class="mt-2 space-y-2">
+                            <div>
+                                <span class="text-sm font-medium text-gray-600">Full Name:</span>
+                                <p class="text-sm text-gray-900" id="viewFullName"></p>
                             </div>
-                        </div>
-                        <div>
-                            <h4 class="font-semibold text-gray-700">Appointment Details</h4>
-                            <div class="mt-2 space-y-2">
-                                <div>
-                                    <span class="text-sm font-medium text-gray-600">Date:</span>
-                                    <p class="text-sm text-gray-900" id="viewDate"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-gray-600">Time:</span>
-                                    <p class="text-sm text-gray-900" id="viewTime"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-gray-600">Status:</span>
-                                    <p class="text-sm" id="viewStatus"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-gray-600">Priority Number:</span>
-                                    <p class="text-sm text-gray-900" id="viewPriorityNumber"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm font-medium text-gray-600">Invoice Number:</span>
-                                    <p class="text-sm text-gray-900" id="viewInvoiceNumber"></p>
-                                </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-600">Patient ID:</span>
+                                <p class="text-sm text-gray-900" id="viewPatientId"></p>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-600">Contact Number:</span>
+                                <p class="text-sm text-gray-900" id="viewContact"></p>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-600">Email:</span>
+                                <p class="text-sm text-gray-900" id="viewEmail"></p>
                             </div>
                         </div>
                     </div>
-                    <div class="mt-4">
-                        <h4 class="font-semibold text-gray-700">Health Concerns</h4>
-                        <p class="text-sm text-gray-900 mt-2 bg-white p-3 rounded border" id="viewHealthConcerns"></p>
+                    <div>
+                        <h4 class="font-semibold text-gray-700">Appointment Details</h4>
+                        <div class="mt-2 space-y-2">
+                            <div>
+                                <span class="text-sm font-medium text-gray-600">Date:</span>
+                                <p class="text-sm text-gray-900" id="viewDate"></p>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-600">Time:</span>
+                                <p class="text-sm text-gray-900" id="viewTime"></p>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-600">Status:</span>
+                                <p class="text-sm" id="viewStatus"></p>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-600">Priority Number:</span>
+                                <p class="text-sm text-gray-900" id="viewPriorityNumber"></p>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-600">Invoice Number:</span>
+                                <p class="text-sm text-gray-900" id="viewInvoiceNumber"></p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mt-4" id="viewRejectionReasonSection" style="display: none;">
-                        <h4 class="font-semibold text-red-700">Rejection Reason</h4>
-                        <p class="text-sm text-red-600 mt-2 bg-red-50 p-3 rounded border" id="viewRejectionReason"></p>
+                </div>
+                <div class="mt-4">
+                    <h4 class="font-semibold text-gray-700">Health Concerns</h4>
+                    <p class="text-sm text-gray-900 mt-2 bg-white p-3 rounded border" id="viewHealthConcerns"></p>
+                </div>
+                <div class="mt-4" id="viewRejectionReasonSection" style="display: none;">
+                    <h4 class="font-semibold text-red-700">Rejection Reason</h4>
+                    <p class="text-sm text-red-600 mt-2 bg-red-50 p-3 rounded border" id="viewRejectionReason"></p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div class="flex justify-end">
+                <button type="button" onclick="closeViewModal()" class="btn-blue">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Slot Modal -->
+<div id="editModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-md">
+        <div class="modal-header">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Edit Appointment Slot</h3>
+        </div>
+        <div class="modal-body">
+            <form id="editSlotForm" method="POST" action="">
+                <input type="hidden" name="slot_id" id="edit_slot_id">
+                
+                <div class="mb-4">
+                    <label for="edit_date" class="block text-gray-700 mb-2 font-medium">Date *</label>
+                    <input type="date" id="edit_date" name="date" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2 font-medium">Time Slot *</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Morning</h3>
+                            <div class="space-y-2">
+                                <?php foreach ($morningSlots as $slot): ?>
+                                    <div class="flex items-center">
+                                        <input type="radio" id="edit_morning_<?= str_replace(':', '', $slot['start']) ?>" 
+                                               name="time_slot" value="<?= $slot['start'] ?> - <?= $slot['end'] ?>" 
+                                               class="mr-2" required>
+                                        <label for="edit_morning_<?= str_replace(':', '', $slot['start']) ?>"><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></label>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Afternoon</h3>
+                            <div class="space-y-2">
+                                <?php foreach ($afternoonSlots as $slot): ?>
+                                    <div class="flex items-center">
+                                        <input type="radio" id="edit_afternoon_<?= str_replace(':', '', $slot['start']) ?>" 
+                                               name="time_slot" value="<?= $slot['start'] ?> - <?= $slot['end'] ?>" 
+                                               class="mr-2" required>
+                                        <label for="edit_afternoon_<?= str_replace(':', '', $slot['start']) ?>"><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></label>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="flex justify-end space-x-3 mt-6">
-                    <button type="button" onclick="closeViewModal()" class="btn-blue">
-                        Close
-                    </button>
+                <div class="mb-4">
+                    <label for="edit_max_slots" class="block text-gray-700 mb-2 font-medium">Maximum Appointments *</label>
+                    <select id="edit_max_slots" name="max_slots" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
                 </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeEditModal()" class="px-6 py-3 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium">
+                    Cancel
+                </button>
+                <button type="submit" form="editSlotForm" name="update_slot" class="btn-blue">
+                    Save Changes
+                </button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Edit Slot Modal -->
-    <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Appointment Slot</h3>
-                <form id="editSlotForm" method="POST" action="">
-                    <input type="hidden" name="slot_id" id="edit_slot_id">
-                    
-                    <div class="mb-4">
-                        <label for="edit_date" class="block text-gray-700 mb-2 font-medium">Date *</label>
-                        <input type="date" id="edit_date" name="date" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-gray-700 mb-2 font-medium">Time Slot *</label>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <h3 class="text-sm font-medium text-gray-700 mb-2">Morning</h3>
-                                <div class="space-y-2">
-                                    <?php foreach ($morningSlots as $slot): ?>
-                                        <div class="flex items-center">
-                                            <input type="radio" id="edit_morning_<?= str_replace(':', '', $slot['start']) ?>" 
-                                                   name="time_slot" value="<?= $slot['start'] ?> - <?= $slot['end'] ?>" 
-                                                   class="mr-2" required>
-                                            <label for="edit_morning_<?= str_replace(':', '', $slot['start']) ?>"><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></label>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                            <div>
-                                <h3 class="text-sm font-medium text-gray-700 mb-2">Afternoon</h3>
-                                <div class="space-y-2">
-                                    <?php foreach ($afternoonSlots as $slot): ?>
-                                        <div class="flex items-center">
-                                            <input type="radio" id="edit_afternoon_<?= str_replace(':', '', $slot['start']) ?>" 
-                                                   name="time_slot" value="<?= $slot['start'] ?> - <?= $slot['end'] ?>" 
-                                                   class="mr-2" required>
-                                            <label for="edit_afternoon_<?= str_replace(':', '', $slot['start']) ?>"><?= date('g:i A', strtotime($slot['start'])) ?> - <?= date('g:i A', strtotime($slot['end'])) ?></label>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label for="edit_max_slots" class="block text-gray-700 mb-2 font-medium">Maximum Appointments *</label>
-                        <select id="edit_max_slots" name="max_slots" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                        </select>
-                    </div>
-                    
-                    <div class="flex justify-end space-x-3 mt-6">
-                        <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition font-medium modal-button">
-                            Cancel
-                        </button>
-                        <button type="submit" name="update_slot" class="btn-blue">
-                            Save Changes
-                        </button>
-                    </div>
-                </form>
+<!-- Image Zoom Modal -->
+<div id="imageModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-4xl">
+        <div class="modal-header">
+            <h3 class="text-lg font-semibold">ID Document Preview</h3>
+            <button type="button" onclick="closeImageModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="flex justify-center">
+                <img id="zoomedUserIdImage" src="" alt="Zoomed ID Image" class="max-w-full h-auto rounded-lg">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div class="text-center">
+                <a id="zoomedUserIdImageLink" href="#" target="_blank" 
+                   class="btn-blue">
+                    <i class="fas fa-external-link-alt mr-2"></i> Open in New Tab
+                </a>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-    // Global variable to store current user ID
-    let currentUserDetailsId = null;
+<script>
+// Global variable to store current user ID
+let currentUserDetailsId = null;
 
-    // Time Slot Modal functions
-    function openTimeSlotModal() {
-        if (!selectedDate) {
-            showErrorModal('Please select a date first');
-            return;
-        }
-        
-        // Update modal title with selected date
-        const modalTitle = document.getElementById('modalSelectedDate');
-        modalTitle.textContent = document.getElementById('selectedDateDisplay').textContent;
-        
-        // Reset time slot selection
-        selectedTimeSlot = null;
-        updateConfirmButtonState();
-        
-        // Update time slots for selected date
-        updateTimeSlotsForDate(selectedDate);
-        
-        document.getElementById('timeSlotModal').classList.remove('hidden');
+// Calendar and Time Slot functionality
+let currentMonth = <?= date('m') ?>;
+let currentYear = <?= date('Y') ?>;
+let selectedDate = null;
+let selectedTimeSlot = null;
+const phHolidays = <?= json_encode($phHolidays) ?>;
+const dateSlots = <?= json_encode($dateSlots) ?>;
+const occupiedSlotsByDate = <?= json_encode($occupiedSlotsByDate) ?>;
+const nextAvailableDate = '<?= $nextAvailableDate ?>';
+
+// Enhanced Modal Management Functions
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.add('active');
+    }, 10);
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.classList.remove('active');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 300);
+}
+
+// Enhanced Success/Error Modal Functions
+function showSuccessModal(message) {
+    document.getElementById('successModalTitle').textContent = 'Success';
+    document.getElementById('successModalMessage').innerHTML = message;
+    openModal('successModal');
+    
+    // Auto-close after 5 seconds
+    setTimeout(() => {
+        closeSuccessModal();
+    }, 5000);
+}
+
+function closeSuccessModal() {
+    closeModal('successModal');
+}
+
+function showErrorModal(message) {
+    document.getElementById('errorModalTitle').textContent = 'Error';
+    document.getElementById('errorModalMessage').textContent = message;
+    openModal('errorModal');
+    
+    // Auto-close after 5 seconds
+    setTimeout(() => {
+        closeErrorModal();
+    }, 5000);
+}
+
+function closeErrorModal() {
+    closeModal('errorModal');
+}
+
+// Time Slot Modal functions
+function openTimeSlotModal() {
+    if (!selectedDate) {
+        showErrorModal('Please select a date first');
+        return;
     }
-
-    function closeTimeSlotModal() {
-        document.getElementById('timeSlotModal').classList.add('hidden');
+    
+    const modalTitle = document.getElementById('modalSelectedDate');
+    modalTitle.textContent = document.getElementById('selectedDateDisplay').textContent;
+    
+    const dateStatusDisplay = document.getElementById('dateStatusDisplay');
+    const dateStatusText = document.getElementById('dateStatusText');
+    
+    if (occupiedSlotsByDate[selectedDate] && occupiedSlotsByDate[selectedDate].length > 0) {
+        dateStatusDisplay.classList.remove('hidden');
+        const occupiedCount = occupiedSlotsByDate[selectedDate].length;
+        dateStatusText.textContent = `This date already has ${occupiedCount} time slot(s) set. You can add additional time slots if needed.`;
+    } else {
+        dateStatusDisplay.classList.add('hidden');
     }
+    
+    selectedTimeSlot = null;
+    updateConfirmButtonState();
+    updateTimeSlotsForDate(selectedDate);
+    openModal('timeSlotModal');
+}
 
-    function confirmTimeSlotSelection() {
-        if (!selectedDate || !selectedTimeSlot) {
-            showErrorModal('Please select both a date and time slot');
-            return;
-        }
-        
-        const maxSlots = document.getElementById('max_slots').value;
-        
-        // Create a form and submit it
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '';
-        
-        const dateInput = document.createElement('input');
-        dateInput.type = 'hidden';
-        dateInput.name = 'date';
-        dateInput.value = selectedDate;
-        
-        const timeInput = document.createElement('input');
-        timeInput.type = 'hidden';
-        timeInput.name = 'time_slot';
-        timeInput.value = selectedTimeSlot;
-        
-        const maxInput = document.createElement('input');
-        maxInput.type = 'hidden';
-        maxInput.name = 'max_slots';
-        maxInput.value = maxSlots;
-        
-        const submitInput = document.createElement('input');
-        submitInput.type = 'hidden';
-        submitInput.name = 'add_slot';
-        submitInput.value = '1';
-        
-        form.appendChild(dateInput);
-        form.appendChild(timeInput);
-        form.appendChild(maxInput);
-        form.appendChild(submitInput);
-        
-        document.body.appendChild(form);
-        form.submit();
+function closeTimeSlotModal() {
+    closeModal('timeSlotModal');
+}
+
+function confirmTimeSlotSelection() {
+    if (!selectedDate || !selectedTimeSlot) {
+        showErrorModal('Please select both a date and time slot');
+        return;
     }
+    
+    const maxSlots = document.getElementById('max_slots').value;
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '';
+    
+    const dateInput = document.createElement('input');
+    dateInput.type = 'hidden';
+    dateInput.name = 'date';
+    dateInput.value = selectedDate;
+    
+    const timeInput = document.createElement('input');
+    timeInput.type = 'hidden';
+    timeInput.name = 'time_slot';
+    timeInput.value = selectedTimeSlot;
+    
+    const maxInput = document.createElement('input');
+    maxInput.type = 'hidden';
+    maxInput.name = 'max_slots';
+    maxInput.value = maxSlots;
+    
+    const submitInput = document.createElement('input');
+    submitInput.type = 'hidden';
+    submitInput.name = 'add_slot';
+    submitInput.value = '1';
+    
+    form.appendChild(dateInput);
+    form.appendChild(timeInput);
+    form.appendChild(maxInput);
+    form.appendChild(submitInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
 
-    function updateConfirmButtonState() {
-        const confirmBtn = document.getElementById('confirmSlotBtn');
-        if (selectedTimeSlot) {
-            confirmBtn.disabled = false;
-            confirmBtn.classList.remove('button-disabled');
-            confirmBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+function updateConfirmButtonState() {
+    const confirmBtn = document.getElementById('confirmSlotBtn');
+    if (selectedTimeSlot) {
+        confirmBtn.disabled = false;
+        confirmBtn.classList.remove('button-disabled');
+        confirmBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+    } else {
+        confirmBtn.disabled = true;
+        confirmBtn.classList.add('button-disabled');
+        confirmBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+    }
+}
+
+function updateTimeSlotsForDate(dateStr) {
+    const currentDate = new Date();
+    const isToday = dateStr === currentDate.toISOString().split('T')[0];
+    
+    document.querySelectorAll('.time-slot').forEach(slot => {
+        slot.classList.remove('selected', 'disabled', 'occupied', 'bg-blue-500', 'text-white', 'border-blue-600', 'border-yellow-400', 'bg-yellow-50');
+        slot.classList.add('bg-white', 'border-gray-200');
+        slot.style.cursor = 'pointer';
+        
+        const statusEl = slot.querySelector('.slot-status');
+        statusEl.textContent = 'Available';
+        statusEl.className = 'slot-status text-xs text-gray-500';
+    });
+    
+    const occupiedSlots = occupiedSlotsByDate[dateStr] || [];
+    
+    document.querySelectorAll('.time-slot').forEach(slot => {
+        const timeRange = slot.getAttribute('data-time');
+        
+        if (occupiedSlots.includes(timeRange)) {
+            slot.classList.add('occupied', 'disabled');
+            slot.style.cursor = 'not-allowed';
+            
+            const statusEl = slot.querySelector('.slot-status');
+            statusEl.textContent = 'Already Set';
+            statusEl.className = 'slot-status text-xs text-yellow-600 font-medium';
+            
+            slot.onclick = null;
         } else {
-            confirmBtn.disabled = true;
-            confirmBtn.classList.add('button-disabled');
-            confirmBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            slot.onclick = function() {
+                if (!this.classList.contains('disabled') && !this.classList.contains('occupied')) {
+                    selectTimeSlot(this, timeRange);
+                }
+            };
         }
-    }
-
-    function updateTimeSlotsForDate(dateStr) {
-        const currentDate = new Date();
-        const isToday = dateStr === currentDate.toISOString().split('T')[0];
-        
-        // Reset all time slots
+    });
+    
+    if (isToday) {
         document.querySelectorAll('.time-slot').forEach(slot => {
-            slot.classList.remove('selected', 'disabled', 'bg-blue-500', 'text-white', 'border-blue-600');
-            slot.classList.add('bg-white', 'border-gray-200');
-            slot.style.cursor = 'pointer';
+            if (slot.classList.contains('disabled')) return;
             
-            // Reset availability indicator
-            const indicator = slot.querySelector('.availability-indicator');
-            indicator.textContent = 'Available';
-            indicator.classList.remove('text-red-500', 'text-green-500');
-            indicator.classList.add('text-gray-500');
-            
-            // Remove existing click events
-            const newSlot = slot.cloneNode(true);
-            slot.parentNode.replaceChild(newSlot, slot);
-        });
-        
-        // Disable time slots that are already occupied/used
-        document.querySelectorAll('.time-slot').forEach(slot => {
             const timeRange = slot.getAttribute('data-time');
-            const isOccupied = isTimeSlotOccupied(dateStr, timeRange);
+            const [startTime] = timeRange.split(' - ');
+            const slotDateTime = new Date(`${dateStr}T${startTime}`);
             
-            if (isOccupied) {
+            if (slotDateTime < currentDate) {
                 slot.classList.add('disabled');
                 slot.style.cursor = 'not-allowed';
-                const indicator = slot.querySelector('.availability-indicator');
-                indicator.textContent = 'Already Booked';
-                indicator.classList.remove('text-gray-500');
-                indicator.classList.add('text-red-500');
+                const statusEl = slot.querySelector('.slot-status');
+                statusEl.textContent = 'Past';
+                statusEl.className = 'slot-status text-xs text-red-500';
             }
         });
-        
-        // Add click events to time slots (only if not disabled)
-        document.querySelectorAll('.time-slot').forEach(slot => {
-            slot.addEventListener('click', function() {
-                if (!this.classList.contains('disabled')) {
-                    selectTimeSlot(this, this.getAttribute('data-time'));
-                }
-            });
-        });
-        
-        // Disable past time slots for today
-        if (isToday) {
-            document.querySelectorAll('.time-slot').forEach(slot => {
-                // Skip if already disabled due to being occupied
-                if (slot.classList.contains('disabled')) return;
-                
-                const timeRange = slot.getAttribute('data-time');
-                const [startTime] = timeRange.split(' - ');
-                const slotDateTime = new Date(`${dateStr}T${startTime}`);
-                
-                if (slotDateTime < currentDate) {
-                    slot.classList.add('disabled');
-                    slot.style.cursor = 'not-allowed';
-                    const indicator = slot.querySelector('.availability-indicator');
-                    indicator.textContent = 'Past';
-                    indicator.classList.remove('text-gray-500');
-                    indicator.classList.add('text-red-500');
-                }
-            });
-        }
-        
-        // Reset time slot selection and update button state
-        selectedTimeSlot = null;
-        updateConfirmButtonState();
     }
+    
+    selectedTimeSlot = null;
+    updateConfirmButtonState();
+}
 
-    function selectTimeSlot(slotEl, timeRange) {
-        if (slotEl.classList.contains('disabled')) {
-            return;
-        }
-        
-        // Remove previous selection
-        document.querySelectorAll('.time-slot').forEach(el => {
-            if (!el.classList.contains('disabled')) {
-                el.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
-                el.classList.add('bg-white', 'border-gray-200');
-            }
-        });
-        
-        // Add selection to clicked slot
-        slotEl.classList.remove('bg-white', 'border-gray-200');
-        slotEl.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
-        
-        selectedTimeSlot = timeRange;
-        document.getElementById('selected_time_slot').value = timeRange;
-        
-        // Update button state
-        updateConfirmButtonState();
+function selectTimeSlot(slotEl, timeRange) {
+    if (slotEl.classList.contains('disabled') || slotEl.classList.contains('occupied')) {
+        return;
     }
+    
+    document.querySelectorAll('.time-slot').forEach(el => {
+        if (!el.classList.contains('disabled') && !el.classList.contains('occupied')) {
+            el.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+            el.classList.add('bg-white', 'border-gray-200');
+        }
+    });
+    
+    slotEl.classList.remove('bg-white', 'border-gray-200');
+    slotEl.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+    
+    selectedTimeSlot = timeRange;
+    document.getElementById('selected_time_slot').value = timeRange;
+    
+    updateConfirmButtonState();
+}
 
-    // User Details Modal functions
-    function openUserDetailsModal(user) {
-        console.log('User data for modal:', user);
+// User Details Modal functions
+function openUserDetailsModal(user) {
+    console.log('User data for modal:', user);
+    
+    currentUserDetailsId = user.id;
+    
+    // Set user data in the modal
+    document.getElementById('userFullName').textContent = user.full_name || 'N/A';
+    document.getElementById('userUsername').textContent = user.username || 'N/A';
+    document.getElementById('userEmail').textContent = user.email || 'N/A';
+    document.getElementById('userGender').textContent = user.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'N/A';
+    document.getElementById('userAge').textContent = user.age || 'N/A';
+    document.getElementById('userContact').textContent = user.contact || 'N/A';
+    document.getElementById('userCivilStatus').textContent = user.civil_status || 'N/A';
+    document.getElementById('userOccupation').textContent = user.occupation || 'N/A';
+    document.getElementById('userDateOfBirth').textContent = user.date_of_birth ? new Date(user.date_of_birth).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+    
+    document.getElementById('userAddress').textContent = user.address || 'N/A';
+    document.getElementById('userSitio').textContent = user.sitio || 'N/A';
+    
+    const verificationMethod = user.verification_method ? 
+        user.verification_method.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A';
+    document.getElementById('userVerificationMethod').textContent = verificationMethod;
+    
+    const idVerifiedElement = document.getElementById('userIdVerified');
+    if (user.id_verified === 1 || user.id_verified === true) {
+        idVerifiedElement.textContent = 'Yes';
+        idVerifiedElement.className = 'detail-value text-green-600';
+    } else {
+        idVerifiedElement.textContent = 'No';
+        idVerifiedElement.className = 'detail-value text-red-600';
+    }
+    
+    const consentElement = document.getElementById('userVerificationConsent');
+    if (user.verification_consent === 1 || user.verification_consent === true) {
+        consentElement.textContent = 'Yes';
+        consentElement.className = 'detail-value text-green-600';
+    } else {
+        consentElement.textContent = 'No';
+        consentElement.className = 'detail-value text-red-600';
+    }
+    
+    // Handle ID image
+    const idImageSection = document.getElementById('idImageSection');
+    const noIdImageSection = document.getElementById('noIdImageSection');
+    const idImage = document.getElementById('userIdImage');
+    const idImageLink = document.getElementById('userIdImageLink');
+    const zoomedIdImage = document.getElementById('zoomedUserIdImage');
+    const zoomedIdImageLink = document.getElementById('zoomedUserIdImageLink');
+    
+    const imagePath = user.display_image_path || user.id_image_path;
+    
+    if (imagePath && imagePath.trim() !== '') {
+        console.log('Displaying ID image from path:', imagePath);
         
-        // Set user data in the modal
-        document.getElementById('userFullName').textContent = user.full_name || 'N/A';
-        document.getElementById('userUsername').textContent = user.username || 'N/A';
-        document.getElementById('userEmail').textContent = user.email || 'N/A';
-        document.getElementById('userGender').textContent = user.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'N/A';
-        document.getElementById('userAge').textContent = user.age || 'N/A';
-        document.getElementById('userContact').textContent = user.contact || 'N/A';
-        
-        // Address information
-        document.getElementById('userAddress').textContent = user.address || 'N/A';
-        document.getElementById('userSitio').textContent = user.sitio || 'N/A';
-        
-        // Verification information
-        const verificationMethod = user.verification_method ? 
-            user.verification_method.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A';
-        document.getElementById('userVerificationMethod').textContent = verificationMethod;
-        
-        const idVerifiedElement = document.getElementById('userIdVerified');
-        if (user.id_verified === 1 || user.id_verified === true) {
-            idVerifiedElement.textContent = 'Yes';
-            idVerifiedElement.className = 'text-sm font-semibold text-green-600 mt-1';
-        } else {
-            idVerifiedElement.textContent = 'No';
-            idVerifiedElement.className = 'text-sm font-semibold text-red-600 mt-1';
-        }
-        
-        const consentElement = document.getElementById('userVerificationConsent');
-        if (user.verification_consent === 1 || user.verification_consent === true) {
-            consentElement.textContent = 'Yes';
-            consentElement.className = 'text-sm text-green-600 mt-1';
-        } else {
-            consentElement.textContent = 'No';
-            consentElement.className = 'text-sm text-red-600 mt-1';
-        }
-        
-        // Handle ID image - Use display_image_path from query or fallback to id_image_path
-        const idImageSection = document.getElementById('idImageSection');
-        const noIdImageSection = document.getElementById('noIdImageSection');
-        const idImage = document.getElementById('userIdImage');
-        const idImageLink = document.getElementById('userIdImageLink');
-        const imagePathDisplay = document.getElementById('imagePathDisplay');
-        const zoomedIdImage = document.getElementById('zoomedUserIdImage');
-        const zoomedIdImageLink = document.getElementById('zoomedUserIdImageLink');
-        
-        // Use display_image_path if available from query, otherwise use id_image_path
-        const imagePath = user.display_image_path || user.id_image_path;
-        
-        if (imagePath && imagePath.trim() !== '') {
-            console.log('Displaying ID image from path:', imagePath);
+        const testImage = new Image();
+        testImage.onload = function() {
+            idImage.src = imagePath;
+            zoomedIdImage.src = imagePath;
+            idImageLink.href = imagePath;
+            zoomedIdImageLink.href = imagePath;
             
-            // Create a new image to test loading
-            const testImage = new Image();
-            testImage.onload = function() {
-                // Image loads successfully
-                idImage.src = imagePath;
-                zoomedIdImage.src = imagePath;
-                idImageLink.href = imagePath;
-                zoomedIdImageLink.href = imagePath;
-                imagePathDisplay.textContent = imagePath;
-                
-                // Show image section, hide no-image section
-                idImageSection.classList.remove('hidden');
-                noIdImageSection.classList.add('hidden');
-            };
-            
-            testImage.onerror = function() {
-                // Image fails to load
-                console.error('Failed to load ID image:', imagePath);
-                idImageSection.classList.add('hidden');
-                noIdImageSection.classList.remove('hidden');
-            };
-            
-            testImage.src = imagePath;
-            
-        } else {
-            console.log('No ID image available');
+            idImageSection.classList.remove('hidden');
+            noIdImageSection.classList.add('hidden');
+        };
+        
+        testImage.onerror = function() {
+            console.error('Failed to load ID image:', imagePath);
             idImageSection.classList.add('hidden');
             noIdImageSection.classList.remove('hidden');
-        }
-        
-        // Handle verification notes
-        const verificationNotesSection = document.getElementById('verificationNotesSection');
-        const verificationNotes = document.getElementById('userVerificationNotes');
-        if (user.verification_notes) {
-            verificationNotesSection.classList.remove('hidden');
-            verificationNotes.textContent = user.verification_notes;
-        } else {
-            verificationNotesSection.classList.add('hidden');
-        }
-        
-        // Registration details
-        document.getElementById('userRegisteredDate').textContent = user.created_at ? 
-            new Date(user.created_at).toLocaleString('en-US', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            }) : 'N/A';
-        
-        document.getElementById('userUpdatedDate').textContent = user.updated_at ? 
-            new Date(user.updated_at).toLocaleString('en-US', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            }) : 'N/A';
-        
-        document.getElementById('userVerifiedAt').textContent = user.verified_at ? 
-            new Date(user.verified_at).toLocaleString('en-US', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            }) : 'Not verified';
-        
-        // Status information
-        const statusElement = document.getElementById('userStatus');
-        statusElement.textContent = user.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : 'Pending';
-        statusElement.className = 'text-sm font-semibold ' + 
-            (user.status === 'approved' ? 'text-green-600 mt-1' :
-             user.status === 'pending' ? 'text-yellow-600 mt-1' :
-             user.status === 'declined' ? 'text-red-600 mt-1' : 'text-yellow-600 mt-1');
-        
-        const approvedElement = document.getElementById('userApproved');
-        if (user.approved === 1 || user.approved === true) {
-            approvedElement.textContent = 'Yes';
-            approvedElement.className = 'text-sm text-green-600 mt-1';
-        } else {
-            approvedElement.textContent = 'No';
-            approvedElement.className = 'text-sm text-red-600 mt-1';
-        }
-        
-        document.getElementById('userRole').textContent = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Patient';
-        
-        // Handle unique number
-        const uniqueNumberSection = document.getElementById('uniqueNumberSection');
-        const uniqueNumberElement = document.getElementById('userUniqueNumber');
-        if (user.unique_number) {
-            uniqueNumberSection.classList.remove('hidden');
-            uniqueNumberElement.textContent = user.unique_number;
-        } else {
-            uniqueNumberSection.classList.add('hidden');
-        }
-        
-        // Store current user ID for approve/decline functionality
-        currentUserDetailsId = user.id;
-        
-        // Show ID validation section if ID image exists
-        showIdValidationSection(user);
-        
-        document.getElementById('userDetailsModal').classList.remove('hidden');
-    }
-
-    function closeUserDetailsModal() {
-        document.getElementById('userDetailsModal').classList.add('hidden');
-    }
-
-    // Cancelled Appointment Details Modal functions
-    function openCancelledDetailsModal(appointment) {
-        console.log('Cancelled appointment data:', appointment);
-        
-        // Set appointment data in the modal
-        document.getElementById('cancelledFullName').textContent = appointment.full_name || 'N/A';
-        document.getElementById('cancelledPatientId').textContent = appointment.unique_number || 'N/A';
-        document.getElementById('cancelledContact').textContent = appointment.contact || 'N/A';
-        document.getElementById('cancelledEmail').textContent = appointment.email || 'N/A';
-        
-        // Appointment details
-        document.getElementById('cancelledDate').textContent = appointment.date ? 
-            new Date(appointment.date).toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric'
-            }) : 'N/A';
-        
-        document.getElementById('cancelledTime').textContent = appointment.start_time && appointment.end_time ? 
-            new Date('1970-01-01T' + appointment.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) + ' - ' + 
-            new Date('1970-01-01T' + appointment.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A';
-        
-        document.getElementById('cancelledBy').textContent = appointment.cancelled_by || 'N/A';
-        document.getElementById('cancelledAt').textContent = appointment.cancelled_at ? 
-            new Date(appointment.cancelled_at).toLocaleString('en-US', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            }) : 'N/A';
-        
-        // Determine original status
-        const wasPending = !appointment.priority_number && !appointment.invoice_number;
-        const originalStatus = wasPending ? 'Pending' : 'Approved';
-        document.getElementById('cancelledOriginalStatus').textContent = originalStatus;
-        document.getElementById('cancelledOriginalStatus').className = 'text-sm font-semibold ' + 
-            (wasPending ? 'text-yellow-600 mt-1' : 'text-green-600 mt-1');
-        
-        // Cancellation reason
-        const reason = appointment.cancel_reason || 'No reason provided for cancellation.';
-        document.getElementById('cancelledReason').textContent = reason;
-        
-        // Additional information
-        document.getElementById('cancelledPriorityNumber').textContent = appointment.priority_number || 'N/A';
-        document.getElementById('cancelledInvoiceNumber').textContent = appointment.invoice_number || 'N/A';
-        document.getElementById('cancelledHealthConcerns').textContent = appointment.health_concerns || 'No health concerns specified';
-        
-        document.getElementById('cancelledDetailsModal').classList.remove('hidden');
-    }
-
-    function closeCancelledDetailsModal() {
-        document.getElementById('cancelledDetailsModal').classList.add('hidden');
-    }
-
-    // Approve Confirmation Modal functions
-    function openApproveConfirmationModal() {
-        document.getElementById('finalApproveUserId').value = currentUserDetailsId;
-        document.getElementById('approveConfirmationModal').classList.remove('hidden');
-    }
-
-    function closeApproveConfirmationModal() {
-        document.getElementById('approveConfirmationModal').classList.add('hidden');
-    }
-
-    // ID Validation functions
-    function validateUploadedId(userId) {
-        const idValidationSection = document.getElementById('idValidationSection');
-        const idValidationLoading = document.getElementById('idValidationLoading');
-        const idValidationContent = document.getElementById('idValidationContent');
-        const noValidationYetSection = document.getElementById('noValidationYetSection');
-        
-        // Show loading state
-        idValidationLoading.classList.remove('hidden');
-        idValidationContent.classList.add('hidden');
-        noValidationYetSection.classList.add('hidden');
-        
-        // Create FormData for AJAX request
-        const formData = new FormData();
-        formData.append('user_id', userId);
-        
-        // Send validation request
-        fetch('/community-health-tracker/api/validate_id.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            idValidationLoading.classList.add('hidden');
-            
-            if (data.success) {
-                displayIdValidationResult(data);
-            } else {
-                showIdValidationError(data.error || 'An error occurred during validation');
-            }
-        })
-        .catch(error => {
-            idValidationLoading.classList.add('hidden');
-            console.error('Validation error:', error);
-            showIdValidationError('Failed to validate ID document. Please try again.');
-        });
-    }
-
-    function displayIdValidationResult(data) {
-        const idValidationSection = document.getElementById('idValidationSection');
-        const idValidationContent = document.getElementById('idValidationContent');
-        const noValidationYetSection = document.getElementById('noValidationYetSection');
-        const validationStatusBox = document.getElementById('validationStatusBox');
-        const validationStatusIcon = document.getElementById('validationStatusIcon');
-        const validationStatusText = document.getElementById('validationStatusText');
-        const validationStatusMessage = document.getElementById('validationStatusMessage');
-        const validationIssuesSection = document.getElementById('validationIssuesSection');
-        const validationIssuesList = document.getElementById('validationIssuesList');
-        const validationSuccessSection = document.getElementById('validationSuccessSection');
-        
-        // Show content and hide placeholder
-        idValidationContent.classList.remove('hidden');
-        noValidationYetSection.classList.add('hidden');
-        
-        // Set file details
-        document.getElementById('validationFileName').textContent = data.file_name || 'N/A';
-        document.getElementById('validationFileType').textContent = data.file_type || 'N/A';
-        document.getElementById('validationFileSize').textContent = data.file_size_formatted || 'N/A';
-        
-        // Set image resolution if available
-        if (data.image_width && data.image_height) {
-            document.getElementById('validationImageResolution').textContent = data.image_width + 'x' + data.image_height + 'px';
-        } else {
-            document.getElementById('validationImageResolution').textContent = 'N/A';
-        }
-        
-        // Handle validation status
-        if (data.validation_passed) {
-            // Success state
-            validationStatusBox.className = 'p-3 rounded-lg bg-green-50 border border-green-200';
-            validationStatusIcon.className = 'fas fa-check-circle text-green-600 mt-1';
-            validationStatusText.textContent = 'Validation Passed';
-            validationStatusText.className = 'text-sm font-semibold text-green-700';
-            validationStatusMessage.textContent = data.message || 'ID document is valid and meets all requirements';
-            validationStatusMessage.className = 'text-xs text-green-600 mt-1';
-            
-            validationIssuesSection.classList.add('hidden');
-            validationSuccessSection.classList.remove('hidden');
-        } else {
-            // Failure state
-            validationStatusBox.className = 'p-3 rounded-lg bg-red-50 border border-red-200';
-            validationStatusIcon.className = 'fas fa-exclamation-circle text-red-600 mt-1';
-            validationStatusText.textContent = 'Validation Failed';
-            validationStatusText.className = 'text-sm font-semibold text-red-700';
-            validationStatusMessage.textContent = data.message || 'ID document failed validation checks';
-            validationStatusMessage.className = 'text-xs text-red-600 mt-1';
-            
-            validationSuccessSection.classList.add('hidden');
-            
-            // Display validation issues
-            if (data.validation_issues && data.validation_issues.length > 0) {
-                validationIssuesList.innerHTML = '';
-                data.validation_issues.forEach(issue => {
-                    const listItem = document.createElement('li');
-                    listItem.className = 'text-xs text-red-600 flex items-start';
-                    listItem.innerHTML = '<i class="fas fa-times-circle mr-2 mt-0.5 flex-shrink-0"></i><span>' + htmlEscape(issue) + '</span>';
-                    validationIssuesList.appendChild(listItem);
-                });
-                validationIssuesSection.classList.remove('hidden');
-            } else {
-                validationIssuesSection.classList.add('hidden');
-            }
-        }
-    }
-
-    function showIdValidationError(errorMessage) {
-        const idValidationSection = document.getElementById('idValidationSection');
-        const idValidationContent = document.getElementById('idValidationContent');
-        const noValidationYetSection = document.getElementById('noValidationYetSection');
-        const validationStatusBox = document.getElementById('validationStatusBox');
-        const validationStatusIcon = document.getElementById('validationStatusIcon');
-        const validationStatusText = document.getElementById('validationStatusText');
-        const validationStatusMessage = document.getElementById('validationStatusMessage');
-        
-        idValidationContent.classList.remove('hidden');
-        noValidationYetSection.classList.add('hidden');
-        
-        validationStatusBox.className = 'p-3 rounded-lg bg-red-50 border border-red-200';
-        validationStatusIcon.className = 'fas fa-exclamation-triangle text-red-600 mt-1';
-        validationStatusText.textContent = 'Validation Error';
-        validationStatusText.className = 'text-sm font-semibold text-red-700';
-        validationStatusMessage.textContent = errorMessage;
-        validationStatusMessage.className = 'text-xs text-red-600 mt-1';
-        
-        document.getElementById('validationIssuesSection').classList.add('hidden');
-        document.getElementById('validationSuccessSection').classList.add('hidden');
-    }
-
-    function htmlEscape(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
         };
-        return text.replace(/[&<>"']/g, m => map[m]);
-    }
-
-    // Show ID validation section when opening user details
-    function showIdValidationSection(user) {
-        const idValidationSection = document.getElementById('idValidationSection');
-        const noValidationYetSection = document.getElementById('noValidationYetSection');
-        const idValidationContent = document.getElementById('idValidationContent');
         
-        if (user.id_image_path && user.id_image_path.trim() !== '') {
-            idValidationSection.classList.remove('hidden');
-            noValidationYetSection.classList.remove('hidden');
-            idValidationContent.classList.add('hidden');
+        testImage.src = imagePath;
+        
+    } else {
+        console.log('No ID image available');
+        idImageSection.classList.add('hidden');
+        noIdImageSection.classList.remove('hidden');
+    }
+    
+    // Display ID type and validation status
+    const idTypeElement = document.getElementById('userIdType');
+    const idValidationStatus = document.getElementById('userIdValidationStatus');
+    
+    if (user.id_type) {
+        idTypeElement.textContent = user.id_type;
+        
+        const isValidId = user.is_valid_id;
+        if (isValidId) {
+            idValidationStatus.textContent = 'Valid ID';
+            idValidationStatus.className = 'px-2 py-1 text-xs rounded-full bg-green-100 text-green-800';
         } else {
-            idValidationSection.classList.add('hidden');
+            idValidationStatus.textContent = 'Invalid ID Type';
+            idValidationStatus.className = 'px-2 py-1 text-xs rounded-full bg-red-100 text-red-800';
         }
+    } else {
+        idTypeElement.textContent = 'No ID Uploaded';
+        idValidationStatus.textContent = 'No ID Found';
+        idValidationStatus.className = 'px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800';
     }
-
-    // Decline Modal functions
-    function openDeclineModalFromDetails() {
-        closeUserDetailsModal();
-        setTimeout(() => {
-            openDeclineModal(currentUserDetailsId);
-        }, 100);
+    
+    // Handle verification notes
+    const verificationNotesSection = document.getElementById('verificationNotesSection');
+    const verificationNotes = document.getElementById('userVerificationNotes');
+    if (user.verification_notes && user.verification_notes.trim() !== '') {
+        verificationNotesSection.classList.remove('hidden');
+        verificationNotes.textContent = user.verification_notes;
+    } else {
+        verificationNotesSection.classList.add('hidden');
     }
-
-    function openDeclineModal(userId) {
-        document.getElementById('declineUserId').value = userId;
-        document.getElementById('decline_reason').value = '';
-        document.getElementById('declineModal').classList.remove('hidden');
+    
+    // Registration details
+    document.getElementById('userRegisteredDate').textContent = user.created_at ? 
+        new Date(user.created_at).toLocaleString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : 'N/A';
+    
+    document.getElementById('userUpdatedDate').textContent = user.updated_at ? 
+        new Date(user.updated_at).toLocaleString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : 'N/A';
+    
+    document.getElementById('userVerifiedAt').textContent = user.verified_at ? 
+        new Date(user.verified_at).toLocaleString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : 'Not verified';
+    
+    // Status information
+    const statusElement = document.getElementById('userStatus');
+    statusElement.textContent = user.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : 'Pending';
+    statusElement.className = 'detail-value ' + 
+        (user.status === 'approved' ? 'text-green-600' :
+         user.status === 'pending' ? 'text-yellow-600' :
+         user.status === 'declined' ? 'text-red-600' : 'text-yellow-600');
+    
+    const approvedElement = document.getElementById('userApproved');
+    if (user.approved === 1 || user.approved === true) {
+        approvedElement.textContent = 'Yes';
+        approvedElement.className = 'detail-value text-green-600';
+    } else {
+        approvedElement.textContent = 'No';
+        approvedElement.className = 'detail-value text-red-600';
     }
-
-    function closeDeclineModal() {
-        document.getElementById('declineModal').classList.add('hidden');
+    
+    document.getElementById('userRole').textContent = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Patient';
+    
+    // Handle unique number
+    const uniqueNumberSection = document.getElementById('uniqueNumberSection');
+    const uniqueNumberElement = document.getElementById('userUniqueNumber');
+    if (user.unique_number) {
+        uniqueNumberSection.style.display = 'block';
+        uniqueNumberElement.textContent = user.unique_number;
+    } else {
+        uniqueNumberSection.style.display = 'none';
     }
+    
+    openModal('userDetailsModal');
+}
 
-    // Image Modal functions
-    function openImageModal() {
-        document.getElementById('imageModal').classList.remove('hidden');
+function closeUserDetailsModal() {
+    closeModal('userDetailsModal');
+}
+
+// Cancelled Appointment Details Modal functions
+function openCancelledDetailsModal(appointment) {
+    console.log('Cancelled appointment data:', appointment);
+    
+    document.getElementById('cancelledFullName').textContent = appointment.full_name || 'N/A';
+    document.getElementById('cancelledPatientId').textContent = appointment.unique_number || 'N/A';
+    document.getElementById('cancelledContact').textContent = appointment.contact || 'N/A';
+    document.getElementById('cancelledEmail').textContent = appointment.email || 'N/A';
+    
+    document.getElementById('cancelledDate').textContent = appointment.date ? 
+        new Date(appointment.date).toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric'
+        }) : 'N/A';
+    
+    document.getElementById('cancelledTime').textContent = appointment.start_time && appointment.end_time ? 
+        new Date('1970-01-01T' + appointment.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) + ' - ' + 
+        new Date('1970-01-01T' + appointment.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A';
+    
+    document.getElementById('cancelledBy').textContent = appointment.cancelled_by || 'N/A';
+    document.getElementById('cancelledAt').textContent = appointment.cancelled_at ? 
+        new Date(appointment.cancelled_at).toLocaleString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : 'N/A';
+    
+    const wasPending = !appointment.priority_number && !appointment.invoice_number;
+    const originalStatus = wasPending ? 'Pending' : 'Approved';
+    document.getElementById('cancelledOriginalStatus').textContent = originalStatus;
+    document.getElementById('cancelledOriginalStatus').className = 'text-sm font-semibold ' + 
+        (wasPending ? 'text-yellow-600 mt-1' : 'text-green-600 mt-1');
+    
+    const reason = appointment.cancel_reason || 'No reason provided for cancellation.';
+    document.getElementById('cancelledReason').textContent = reason;
+    
+    document.getElementById('cancelledPriorityNumber').textContent = appointment.priority_number || 'N/A';
+    document.getElementById('cancelledInvoiceNumber').textContent = appointment.invoice_number || 'N/A';
+    document.getElementById('cancelledHealthConcerns').textContent = appointment.health_concerns || 'No health concerns specified';
+    
+    openModal('cancelledDetailsModal');
+}
+
+function closeCancelledDetailsModal() {
+    closeModal('cancelledDetailsModal');
+}
+
+// Mark as Completed Confirmation Modal functions
+function openCompleteConfirmationModal(appointmentId, patientName, appointmentDate, appointmentTime, priorityNumber) {
+    document.getElementById('finalCompleteAppointmentId').value = appointmentId;
+    
+    const detailsElement = document.getElementById('completePatientDetails');
+    detailsElement.innerHTML = `
+        Are you sure you want to mark <strong>${patientName}</strong>'s appointment as completed?<br><br>
+        <strong>Appointment Details:</strong><br>
+        Date: ${new Date(appointmentDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
+        Time: ${appointmentTime}<br>
+        Priority Number: ${priorityNumber}
+    `;
+    
+    openModal('completeConfirmationModal');
+}
+
+function closeCompleteConfirmationModal() {
+    closeModal('completeConfirmationModal');
+}
+
+// Approve Confirmation Modal functions
+function openApproveConfirmationModal() {
+    document.getElementById('finalApproveUserId').value = currentUserDetailsId;
+    openModal('approveConfirmationModal');
+}
+
+function closeApproveConfirmationModal() {
+    closeModal('approveConfirmationModal');
+}
+
+// Decline Modal functions
+function openDeclineModalFromDetails() {
+    closeUserDetailsModal();
+    setTimeout(() => {
+        openDeclineModal(currentUserDetailsId);
+    }, 100);
+}
+
+function openDeclineModal(userId) {
+    document.getElementById('declineUserId').value = userId;
+    document.getElementById('decline_reason').value = '';
+    openModal('declineModal');
+}
+
+function closeDeclineModal() {
+    closeModal('declineModal');
+}
+
+// Image Modal functions
+function openImageModal() {
+    openModal('imageModal');
+}
+
+function closeImageModal() {
+    closeModal('imageModal');
+}
+
+// Appointment Approval Confirmation Modal functions
+function openAppointmentApprovalModal(appointmentId) {
+    document.getElementById('finalAppointmentApproveId').value = appointmentId;
+    openModal('appointmentApprovalModal');
+}
+
+function closeAppointmentApprovalModal() {
+    closeModal('appointmentApprovalModal');
+}
+
+// Tab functionality
+function switchTab(tabId) {
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tabId);
+    window.history.pushState({}, '', url);
+    
+    document.querySelectorAll('.tab-content > div').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+    
+    document.getElementById(tabId).classList.remove('hidden');
+    
+    document.querySelectorAll('#dashboardTabs button').forEach(tabBtn => {
+        tabBtn.classList.remove('active');
+    });
+    
+    const activeTabBtn = document.querySelector(`#dashboardTabs button[data-tabs-target="#${tabId}"]`);
+    activeTabBtn.classList.add('active');
+}
+
+function switchAppointmentTab(tabId) {
+    const url = new URL(window.location);
+    url.searchParams.set('appointment_tab', tabId);
+    window.history.pushState({}, '', url);
+    
+    document.querySelectorAll('#appointment-management .tab-content > div').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+    
+    document.getElementById(tabId).classList.remove('hidden');
+    
+    document.querySelectorAll('#appointmentTabs button').forEach(tabBtn => {
+        tabBtn.classList.remove('active');
+    });
+    
+    const activeTabBtn = document.querySelector(`#appointmentTabs button[data-tabs-target="#${tabId}"]`);
+    activeTabBtn.classList.add('active');
+}
+
+// Modal functions
+function openEditModal(slot, timeSlotValue) {
+    document.getElementById('edit_slot_id').value = slot.id;
+    document.getElementById('edit_date').value = slot.date;
+    document.getElementById('edit_max_slots').value = slot.max_slots;
+    
+    const timeSlotInputs = document.querySelectorAll('#editSlotForm input[name="time_slot"]');
+    timeSlotInputs.forEach(input => {
+        if (input.value === timeSlotValue) {
+            input.checked = true;
+        }
+    });
+    
+    openModal('editModal');
+}
+
+function closeEditModal() {
+    closeModal('editModal');
+}
+
+function openRejectionModal(appointmentId) {
+    document.getElementById('reject_appointment_id').value = appointmentId;
+    document.getElementById('rejection_reason').value = '';
+    openModal('rejectionModal');
+}
+
+function closeRejectionModal() {
+    closeModal('rejectionModal');
+}
+
+// View Modal functions
+function openViewModal(appointment) {
+    document.getElementById('viewFullName').textContent = appointment.full_name || 'N/A';
+    document.getElementById('viewPatientId').textContent = appointment.unique_number || 'N/A';
+    document.getElementById('viewContact').textContent = appointment.contact || 'N/A';
+    document.getElementById('viewEmail').textContent = appointment.email || 'N/A';
+    document.getElementById('viewDate').textContent = appointment.date ? new Date(appointment.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+    document.getElementById('viewTime').textContent = appointment.start_time && appointment.end_time ? 
+        new Date('1970-01-01T' + appointment.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) + ' - ' + 
+        new Date('1970-01-01T' + appointment.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A';
+    
+    const statusElement = document.getElementById('viewStatus');
+    statusElement.textContent = appointment.status ? appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1) : 'N/A';
+    statusElement.className = 'text-sm font-semibold ' + 
+        (appointment.status === 'approved' ? 'text-green-600' :
+         appointment.status === 'pending' ? 'text-yellow-600' :
+         appointment.status === 'rejected' ? 'text-red-600' :
+         appointment.status === 'completed' ? 'text-blue-600' : 'text-gray-600');
+    
+    document.getElementById('viewPriorityNumber').textContent = appointment.priority_number || 'N/A';
+    document.getElementById('viewInvoiceNumber').textContent = appointment.invoice_number || 'N/A';
+    document.getElementById('viewHealthConcerns').textContent = appointment.health_concerns || 'No health concerns specified';
+    
+    if (appointment.status === 'rejected' && appointment.rejection_reason) {
+        document.getElementById('viewRejectionReason').textContent = appointment.rejection_reason;
+        document.getElementById('viewRejectionReasonSection').style.display = 'block';
+    } else {
+        document.getElementById('viewRejectionReasonSection').style.display = 'none';
     }
+    
+    openModal('viewModal');
+}
 
-    function closeImageModal() {
-        document.getElementById('imageModal').classList.add('hidden');
+function closeViewModal() {
+    closeModal('viewModal');
+}
+
+// Help modal functions
+function openHelpModal() {
+    openModal('helpModal');
+}
+
+function closeHelpModal() {
+    closeModal('helpModal');
+}
+
+// Export functionality
+function exportData(type) {
+    const status = document.getElementById('statusFilter').value;
+    const date = document.getElementById('dateFilter').value;
+    
+    let url = `?export=${type}`;
+    if (status !== 'all') {
+        url += `&status=${status}`;
     }
-
-    // Appointment Approval Confirmation Modal functions
-    function openAppointmentApprovalModal(appointmentId) {
-        document.getElementById('finalAppointmentApproveId').value = appointmentId;
-        document.getElementById('appointmentApprovalModal').classList.remove('hidden');
+    if (date) {
+        url += `&date=${date}`;
     }
+    
+    window.location.href = url;
+}
 
-    function closeAppointmentApprovalModal() {
-        document.getElementById('appointmentApprovalModal').classList.add('hidden');
+// Filter functionality
+function applyFilters() {
+    const status = document.getElementById('statusFilter').value;
+    const date = document.getElementById('dateFilter').value;
+    
+    let url = '?';
+    if (status !== 'all') {
+        url += `status=${status}&`;
     }
+    if (date) {
+        url += `date=${date}&`;
+    }
+    
+    if (url === '?') {
+        url = '';
+    } else {
+        url = url.slice(0, -1);
+    }
+    
+    window.location.href = url;
+}
 
-    // Tab functionality
-    function switchTab(tabId) {
-        // Update URL with tab parameter without page reload
-        const url = new URL(window.location);
-        url.searchParams.set('tab', tabId);
-        window.history.pushState({}, '', url);
+// Calendar functionality
+function generateCalendar(month, year) {
+    const calendarEl = document.getElementById('calendar');
+    calendarEl.innerHTML = '';
+    
+    const firstDay = new Date(year, month - 1, 1).getDay();
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    document.getElementById('currentMonthYear').textContent = `${monthNames[month - 1]} ${year}`;
+    
+    for (let i = 0; i < firstDay; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.classList.add('calendar-day', 'disabled', 'text-center', 'p-2', 'rounded', 'bg-gray-100', 'text-gray-400');
+        calendarEl.appendChild(emptyCell);
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const currentTime = new Date();
+    
+    let autoSelected = false;
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+        const dateObj = new Date(year, month - 1, day);
         
-        // Hide all tab contents
-        document.querySelectorAll('.tab-content > div').forEach(tab => {
-            tab.classList.add('hidden');
+        const dayCell = document.createElement('div');
+        dayCell.classList.add('calendar-day', 'text-center', 'p-2', 'rounded', 'border', 'border-gray-200');
+        
+        const isToday = dateObj.toDateString() === today.toDateString();
+        const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+        const isPast = dateObj < today;
+        const isHoliday = phHolidays.hasOwnProperty(dateStr);
+        const hasSlots = dateSlots.hasOwnProperty(dateStr);
+        const hasOccupiedSlots = occupiedSlotsByDate.hasOwnProperty(dateStr) && occupiedSlotsByDate[dateStr].length > 0;
+        
+        if (isPast) {
+            dayCell.classList.add('disabled', 'bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
+            dayCell.title = 'This date has passed and cannot be selected';
+        } else if (isHoliday) {
+            dayCell.classList.add('holiday', 'bg-red-50', 'text-red-700', 'border-red-200', 'cursor-not-allowed');
+            dayCell.title = 'Holiday: ' + phHolidays[dateStr];
+        } else if (hasOccupiedSlots) {
+            dayCell.classList.add('occupied', 'bg-yellow-50', 'text-yellow-800', 'border-yellow-300');
+            dayCell.title = 'This date already has time slots set';
+            
+            const statusIndicator = document.createElement('div');
+            statusIndicator.classList.add('date-status-display', 'occupied');
+            statusIndicator.textContent = 'Set Date';
+            dayCell.appendChild(statusIndicator);
+        } else if (isWeekend) {
+            dayCell.classList.add('weekend', 'bg-blue-50', 'text-blue-700', 'border-blue-200');
+            if (!hasSlots) {
+                dayCell.classList.add('no-slots');
+            } else {
+                dayCell.classList.add('has-slots');
+            }
+        } else if (isToday) {
+            dayCell.classList.add('today', 'bg-blue-100', 'text-blue-700', 'border-blue-200');
+            if (!hasSlots) {
+                dayCell.classList.add('no-slots');
+            } else {
+                dayCell.classList.add('has-slots');
+            }
+        } else {
+            dayCell.classList.add('bg-white', 'text-gray-700');
+            if (!hasSlots) {
+                dayCell.classList.add('no-slots');
+            } else {
+                dayCell.classList.add('has-slots');
+            }
+        }
+        
+        if (!autoSelected && !isPast && !isHoliday && !hasOccupiedSlots && dateStr === nextAvailableDate) {
+            dayCell.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+            selectedDate = dateStr;
+            autoSelected = true;
+            
+            document.getElementById('selectedDateDisplay').textContent = `${monthNames[month - 1]} ${day}, ${year}`;
+            document.getElementById('selected_date').value = dateStr;
+            
+            const dateStatusElement = document.getElementById('selectedDateStatus');
+            if (hasOccupiedSlots) {
+                dateStatusElement.textContent = '⚠ This date already has time slots set';
+                dateStatusElement.className = 'text-sm text-yellow-600';
+            } else {
+                dateStatusElement.textContent = '✓ Available date';
+                dateStatusElement.className = 'text-sm text-green-600';
+            }
+            
+            document.getElementById('selectedDateSection').classList.remove('hidden');
+        }
+        
+        const dayNumber = document.createElement('div');
+        dayNumber.classList.add('font-semibold', 'text-lg', 'mb-1');
+        dayNumber.textContent = day;
+        dayCell.appendChild(dayNumber);
+        
+        if (!isPast && !isHoliday && !hasOccupiedSlots) {
+            const dayIndicator = document.createElement('div');
+            dayIndicator.classList.add('day-indicator');
+            dayCell.appendChild(dayIndicator);
+        }
+        
+        if (isHoliday) {
+            const holidayIndicator = document.createElement('div');
+            holidayIndicator.classList.add('text-xs', 'font-medium', 'text-red-500');
+            holidayIndicator.textContent = 'HOLIDAY';
+            dayCell.appendChild(holidayIndicator);
+        }
+        
+        if (isToday) {
+            const todayIndicator = document.createElement('div');
+            todayIndicator.classList.add('text-xs', 'font-medium', 'text-blue-600');
+            todayIndicator.textContent = 'TODAY';
+            dayCell.appendChild(todayIndicator);
+        }
+        
+        if (isWeekend && !isPast && !isHoliday && !hasOccupiedSlots) {
+            const weekendIndicator = document.createElement('div');
+            weekendIndicator.classList.add('text-xs', 'font-medium', 'text-blue-500');
+            weekendIndicator.textContent = 'WEEKEND';
+            dayCell.appendChild(weekendIndicator);
+        }
+        
+        if (!isPast && !isHoliday) {
+            dayCell.addEventListener('click', () => selectDate(dateStr, day, month, year, hasOccupiedSlots));
+        } else {
+            dayCell.style.cursor = 'not-allowed';
+        }
+        
+        calendarEl.appendChild(dayCell);
+    }
+}
+
+function selectDate(dateStr, day, month, year, hasOccupiedSlots) {
+    selectedDate = dateStr;
+    
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    document.getElementById('selectedDateDisplay').textContent = `${monthNames[month - 1]} ${day}, ${year}`;
+    document.getElementById('selected_date').value = dateStr;
+    
+    const dateStatusElement = document.getElementById('selectedDateStatus');
+    if (hasOccupiedSlots) {
+        dateStatusElement.textContent = '⚠ This date already has time slots set';
+        dateStatusElement.className = 'text-sm text-yellow-600';
+    } else {
+        dateStatusElement.textContent = '✓ Available date';
+        dateStatusElement.className = 'text-sm text-green-600';
+    }
+    
+    document.querySelectorAll('.calendar-day').forEach(dayEl => {
+        dayEl.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+    });
+    
+    event.currentTarget.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
+    
+    document.getElementById('selectedDateSection').classList.remove('hidden');
+    
+    selectedTimeSlot = null;
+}
+
+// Initialize tabs and charts
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeTab = urlParams.get('tab') || 'appointment-management';
+    const activeAppointmentTab = urlParams.get('appointment_tab') || 'add-slot';
+    
+    switchTab(activeTab);
+    switchAppointmentTab(activeAppointmentTab);
+    
+    document.querySelectorAll('#dashboardTabs button').forEach(tabBtn => {
+        tabBtn.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-tabs-target').replace('#', '');
+            switchTab(targetTab);
         });
-        
-        // Show selected tab content
-        document.getElementById(tabId).classList.remove('hidden');
-        
-        // Update active tab style
-        document.querySelectorAll('#dashboardTabs button').forEach(tabBtn => {
-            tabBtn.classList.remove('active');
+    });
+    
+    document.querySelectorAll('#appointmentTabs button').forEach(tabBtn => {
+        tabBtn.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-tabs-target').replace('#', '');
+            switchAppointmentTab(targetTab);
         });
-        
-        // Set active tab
-        const activeTabBtn = document.querySelector(`#dashboardTabs button[data-tabs-target="#${tabId}"]`);
-        activeTabBtn.classList.add('active');
-    }
-
-    function switchAppointmentTab(tabId) {
-        // Update URL with appointment_tab parameter without page reload
-        const url = new URL(window.location);
-        url.searchParams.set('appointment_tab', tabId);
-        window.history.pushState({}, '', url);
-        
-        // Hide all tab contents
-        document.querySelectorAll('#appointment-management .tab-content > div').forEach(tab => {
-            tab.classList.add('hidden');
-        });
-        
-        // Show selected tab content
-        document.getElementById(tabId).classList.remove('hidden');
-        
-        // Update active tab style
-        document.querySelectorAll('#appointmentTabs button').forEach(tabBtn => {
-            tabBtn.classList.remove('active');
-        });
-        
-        // Set active tab
-        const activeTabBtn = document.querySelector(`#appointmentTabs button[data-tabs-target="#${tabId}"]`);
-        activeTabBtn.classList.add('active');
-    }
-
-    // Modal functions
-    function openEditModal(slot, timeSlotValue) {
-        document.getElementById('edit_slot_id').value = slot.id;
-        document.getElementById('edit_date').value = slot.date;
-        document.getElementById('edit_max_slots').value = slot.max_slots;
-        
-        // Set the time slot radio button
-        const timeSlotInputs = document.querySelectorAll('#editSlotForm input[name="time_slot"]');
-        timeSlotInputs.forEach(input => {
-            if (input.value === timeSlotValue) {
-                input.checked = true;
+    });
+    
+    generateCalendar(currentMonth, currentYear);
+    
+    document.getElementById('prevMonth').addEventListener('click', function() {
+        currentMonth--;
+        if (currentMonth < 1) {
+            currentMonth = 12;
+            currentYear--;
+        }
+        generateCalendar(currentMonth, currentYear);
+    });
+    
+    document.getElementById('nextMonth').addEventListener('click', function() {
+        currentMonth++;
+        if (currentMonth > 12) {
+            currentMonth = 1;
+            currentYear++;
+        }
+        generateCalendar(currentMonth, currentYear);
+    });
+    
+    document.querySelectorAll('.time-slot').forEach(slot => {
+        slot.addEventListener('click', function() {
+            if (!this.classList.contains('disabled') && !this.classList.contains('occupied')) {
+                const timeRange = this.getAttribute('data-time');
+                selectTimeSlot(this, timeRange);
             }
         });
-        
-        document.getElementById('editModal').classList.remove('hidden');
-    }
-
-    function closeEditModal() {
-        document.getElementById('editModal').classList.add('hidden');
-    }
-
-    function openRejectionModal(appointmentId) {
-        document.getElementById('reject_appointment_id').value = appointmentId;
-        document.getElementById('rejection_reason').value = '';
-        document.getElementById('rejectionModal').classList.remove('hidden');
-    }
-
-    function closeRejectionModal() {
-        document.getElementById('rejectionModal').classList.add('hidden');
+    });
+    
+    document.getElementById('statusFilter').addEventListener('change', applyFilters);
+    document.getElementById('dateFilter').addEventListener('change', applyFilters);
+    
+    if (activeTab === 'analytics') {
+        initializeCharts();
     }
     
-    // View Modal functions
-    function openViewModal(appointment) {
-        document.getElementById('viewFullName').textContent = appointment.full_name || 'N/A';
-        document.getElementById('viewPatientId').textContent = appointment.unique_number || 'N/A';
-        document.getElementById('viewContact').textContent = appointment.contact || 'N/A';
-        document.getElementById('viewEmail').textContent = appointment.email || 'N/A';
-        document.getElementById('viewDate').textContent = appointment.date ? new Date(appointment.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
-        document.getElementById('viewTime').textContent = appointment.start_time && appointment.end_time ? 
-            new Date('1970-01-01T' + appointment.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) + ' - ' + 
-            new Date('1970-01-01T' + appointment.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A';
-        
-        // Status with color coding
-        const statusElement = document.getElementById('viewStatus');
-        statusElement.textContent = appointment.status ? appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1) : 'N/A';
-        statusElement.className = 'text-sm font-semibold ' + 
-            (appointment.status === 'approved' ? 'text-green-600' :
-             appointment.status === 'pending' ? 'text-yellow-600' :
-             appointment.status === 'rejected' ? 'text-red-600' :
-             appointment.status === 'completed' ? 'text-blue-600' : 'text-gray-600');
-        
-        document.getElementById('viewPriorityNumber').textContent = appointment.priority_number || 'N/A';
-        document.getElementById('viewInvoiceNumber').textContent = appointment.invoice_number || 'N/A';
-        document.getElementById('viewHealthConcerns').textContent = appointment.health_concerns || 'No health concerns specified';
-        
-        if (appointment.status === 'rejected' && appointment.rejection_reason) {
-            document.getElementById('viewRejectionReason').textContent = appointment.rejection_reason;
-            document.getElementById('viewRejectionReasonSection').style.display = 'block';
-        } else {
-            document.getElementById('viewRejectionReasonSection').style.display = 'none';
-        }
-        
-        document.getElementById('viewModal').classList.remove('hidden');
-    }
-
-    function closeViewModal() {
-        document.getElementById('viewModal').classList.add('hidden');
-    }
+    // Show success message if exists
+    <?php if ($success): ?>
+        showSuccessModal('<?= addslashes($success) ?>');
+    <?php endif; ?>
     
-    function showSuccessModal(message) {
-        document.getElementById('successMessage').innerHTML = message;
-        const modal = document.getElementById('successModal');
-        modal.classList.remove('hidden');
-        setTimeout(() => {
-            modal.querySelector('.modal').classList.add('active');
-        }, 10);
-        
-        // Auto close after 5 seconds
-        setTimeout(() => {
-            closeSuccessModal();
-        }, 5000);
-    }
+    <?php if ($error): ?>
+        showErrorModal('<?= addslashes($error) ?>');
+    <?php endif; ?>
+});
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modals = ['timeSlotModal', 'userDetailsModal', 'cancelledDetailsModal', 'completeConfirmationModal', 
+                    'approveConfirmationModal', 'declineModal', 'imageModal', 'editModal', 'rejectionModal', 
+                    'successModal', 'errorModal', 'helpModal', 'viewModal', 'appointmentApprovalModal'];
     
-    function closeSuccessModal() {
-        const modal = document.getElementById('successModal');
-        modal.querySelector('.modal').classList.remove('active');
-        setTimeout(() => {
-            modal.classList.add('hidden');
-        }, 300);
+    modals.forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (modal && event.target === modal) {
+            closeModal(modalId);
+        }
+    });
+}
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const openModals = document.querySelectorAll('.modal-overlay.active');
+        openModals.forEach(modal => {
+            const modalId = modal.id;
+            closeModal(modalId);
+        });
     }
+});
+
+// Refresh analytics function
+function refreshAnalytics() {
+    const loader = document.getElementById('ajaxLoader');
+    loader.style.display = 'block';
     
-    function showErrorModal(message) {
-        document.getElementById('errorMessage').textContent = message;
-        const modal = document.getElementById('errorModal');
-        modal.classList.remove('hidden');
-        setTimeout(() => {
-            modal.querySelector('.modal').classList.add('active');
-        }, 10);
-        
-        // Auto close after 5 seconds
-        setTimeout(() => {
-            closeErrorModal();
-        }, 5000);
-    }
-    
-    function closeErrorModal() {
-        const modal = document.getElementById('errorModal');
-        modal.querySelector('.modal').classList.remove('active');
-        setTimeout(() => {
-            modal.classList.add('hidden');
-        }, 300);
-    }
+    setTimeout(() => {
+        location.reload();
+    }, 1000);
+}
 
-    // Help modal functions
-    function openHelpModal() {
-        document.getElementById('helpModal').classList.remove('hidden');
-    }
-
-    function closeHelpModal() {
-        document.getElementById('helpModal').classList.add('hidden');
-    }
-
-    // Export functionality
-    function exportData(type) {
-        const status = document.getElementById('statusFilter').value;
-        const date = document.getElementById('dateFilter').value;
-        
-        let url = `?export=${type}`;
-        if (status !== 'all') {
-            url += `&status=${status}`;
-        }
-        if (date) {
-            url += `&date=${date}`;
-        }
-        
-        window.location.href = url;
-    }
-
-    // Filter functionality
-    function applyFilters() {
-        const status = document.getElementById('statusFilter').value;
-        const date = document.getElementById('dateFilter').value;
-        
-        let url = '?';
-        if (status !== 'all') {
-            url += `status=${status}&`;
-        }
-        if (date) {
-            url += `date=${date}&`;
-        }
-        
-        // Remove trailing & or ? if no parameters
-        if (url === '?') {
-            url = '';
-        } else {
-            url = url.slice(0, -1);
-        }
-        
-        window.location.href = url;
-    }
-
-    // Chart initialization
+// Chart initialization
 function initializeCharts() {
     // Appointment Status Distribution Chart
     const appointmentStatusCtx = document.getElementById('appointmentStatusChart').getContext('2d');
@@ -4841,7 +5408,7 @@ function initializeCharts() {
             plugins: {
                 legend: {
                     display: false
-                }
+                    }
             },
             scales: {
                 y: {
@@ -4921,338 +5488,6 @@ function initializeCharts() {
     document.getElementById('completionRateChart').parentNode.style.position = 'relative';
     document.getElementById('completionRateChart').parentNode.appendChild(completionRateText);
 }
-
-    // Calendar functionality
-    let currentMonth = <?= date('m') ?>;
-    let currentYear = <?= date('Y') ?>;
-    let selectedDate = null;
-    let selectedTimeSlot = null;
-    const phHolidays = <?= json_encode($phHolidays) ?>;
-    const dateSlots = <?= json_encode($dateSlots) ?>;
-    const nextAvailableDate = '<?= $nextAvailableDate ?>';
-
-    // Function to check if a time slot is already used/occupied
-    function isTimeSlotOccupied(dateStr, timeRange) {
-        if (!dateSlots[dateStr]) return false;
-        
-        const [startTime, endTime] = timeRange.split(' - ');
-        
-        // Check if this exact time slot already exists for the selected date
-        for (const slot of dateSlots[dateStr]) {
-            if (slot.start_time === startTime && slot.end_time === endTime) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    function generateCalendar(month, year) {
-        const calendarEl = document.getElementById('calendar');
-        calendarEl.innerHTML = '';
-        
-        const firstDay = new Date(year, month - 1, 1).getDay();
-        const daysInMonth = new Date(year, month, 0).getDate();
-        
-        // Update month/year display
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-        document.getElementById('currentMonthYear').textContent = `${monthNames[month - 1]} ${year}`;
-        
-        // Add empty cells for days before the first day of the month
-        for (let i = 0; i < firstDay; i++) {
-            const emptyCell = document.createElement('div');
-            emptyCell.classList.add('calendar-day', 'disabled', 'text-center', 'p-2', 'rounded', 'bg-gray-100', 'text-gray-400');
-            calendarEl.appendChild(emptyCell);
-        }
-        
-        // Add cells for each day of the month
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const currentTime = new Date();
-        
-        // Auto-select the next available date on first load
-        let autoSelected = false;
-        
-        for (let day = 1; day <= daysInMonth; day++) {
-            const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-            const dateObj = new Date(year, month - 1, day);
-            
-            const dayCell = document.createElement('div');
-            dayCell.classList.add('calendar-day', 'text-center', 'p-2', 'rounded', 'border', 'border-gray-200');
-            
-            // Check if it's today
-            const isToday = dateObj.toDateString() === today.toDateString();
-            
-            // Check if it's a weekend
-            const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-            
-            // Check if it's in the past
-            const isPast = dateObj < today;
-            
-            // Check if it's a holiday
-            const isHoliday = phHolidays.hasOwnProperty(dateStr);
-            
-            // Check if date has available slots
-            const hasSlots = dateSlots.hasOwnProperty(dateStr);
-            
-            // Add appropriate classes based on date status
-            if (isPast) {
-                dayCell.classList.add('disabled', 'bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
-                dayCell.title = 'This date has passed and cannot be selected';
-            } else if (isHoliday) {
-                dayCell.classList.add('holiday', 'bg-red-50', 'text-red-700', 'border-red-200', 'cursor-not-allowed');
-                dayCell.title = 'Holiday: ' + phHolidays[dateStr];
-            } else if (isWeekend) {
-                dayCell.classList.add('weekend', 'bg-blue-50', 'text-blue-700', 'border-blue-200');
-                if (!hasSlots) {
-                    dayCell.classList.add('no-slots');
-                } else {
-                    dayCell.classList.add('has-slots');
-                }
-            } else if (isToday) {
-                dayCell.classList.add('today', 'bg-blue-100', 'text-blue-700', 'border-blue-200');
-                if (!hasSlots) {
-                    dayCell.classList.add('no-slots');
-                } else {
-                    dayCell.classList.add('has-slots');
-                }
-            } else {
-                dayCell.classList.add('bg-white', 'text-gray-700');
-                if (!hasSlots) {
-                    dayCell.classList.add('no-slots');
-                } else {
-                    dayCell.classList.add('has-slots');
-                }
-            }
-            
-            // Auto-select the next available date on first load
-            if (!autoSelected && !isPast && !isHoliday && hasSlots && dateStr === nextAvailableDate) {
-                dayCell.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
-                selectedDate = dateStr;
-                autoSelected = true;
-                
-                // Update selected date display
-                document.getElementById('selectedDateDisplay').textContent = `${monthNames[month - 1]} ${day}, ${year}`;
-                document.getElementById('selected_date').value = dateStr;
-                
-                // Show selected date section
-                document.getElementById('selectedDateSection').classList.remove('hidden');
-            }
-            
-            // Add day number
-            const dayNumber = document.createElement('div');
-            dayNumber.classList.add('font-semibold', 'text-lg', 'mb-1');
-            dayNumber.textContent = day;
-            dayCell.appendChild(dayNumber);
-            
-            // Add day indicator for slots
-            if (!isPast && !isHoliday) {
-                const dayIndicator = document.createElement('div');
-                dayIndicator.classList.add('day-indicator');
-                dayCell.appendChild(dayIndicator);
-            }
-            
-            // Add holiday indicator
-            if (isHoliday) {
-                const holidayIndicator = document.createElement('div');
-                holidayIndicator.classList.add('text-xs', 'font-medium', 'text-red-500');
-                holidayIndicator.textContent = 'HOLIDAY';
-                dayCell.appendChild(holidayIndicator);
-            }
-            
-            // Add today indicator
-            if (isToday) {
-                const todayIndicator = document.createElement('div');
-                todayIndicator.classList.add('text-xs', 'font-medium', 'text-blue-600');
-                todayIndicator.textContent = 'TODAY';
-                dayCell.appendChild(todayIndicator);
-            }
-            
-            // Add weekend indicator
-            if (isWeekend && !isPast && !isHoliday) {
-                const weekendIndicator = document.createElement('div');
-                weekendIndicator.classList.add('text-xs', 'font-medium', 'text-blue-500');
-                weekendIndicator.textContent = 'WEEKEND';
-                dayCell.appendChild(weekendIndicator);
-            }
-            
-            // Add click event if not disabled
-            if (!isPast && !isHoliday) {
-                dayCell.addEventListener('click', () => selectDate(dateStr, day, month, year));
-            } else {
-                dayCell.style.cursor = 'not-allowed';
-            }
-            
-            calendarEl.appendChild(dayCell);
-        }
-    }
-    
-    function selectDate(dateStr, day, month, year) {
-        selectedDate = dateStr;
-        
-        // Update selected date display
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-        document.getElementById('selectedDateDisplay').textContent = `${monthNames[month - 1]} ${day}, ${year}`;
-        document.getElementById('selected_date').value = dateStr;
-        
-        // Update calendar UI
-        document.querySelectorAll('.calendar-day').forEach(dayEl => {
-            dayEl.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
-        });
-        
-        // Add selection to clicked day
-        event.currentTarget.classList.add('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
-        
-        // Show selected date section
-        document.getElementById('selectedDateSection').classList.remove('hidden');
-        
-        // Reset time slot selection
-        selectedTimeSlot = null;
-    }
-    
-    // Initialize tabs and charts
-    document.addEventListener('DOMContentLoaded', function() {
-        // Set active tab based on URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const activeTab = urlParams.get('tab') || 'appointment-management';
-        const activeAppointmentTab = urlParams.get('appointment_tab') || 'add-slot';
-        
-        switchTab(activeTab);
-        switchAppointmentTab(activeAppointmentTab);
-        
-        // Add click event listeners to all tab buttons
-        document.querySelectorAll('#dashboardTabs button').forEach(tabBtn => {
-            tabBtn.addEventListener('click', function() {
-                const targetTab = this.getAttribute('data-tabs-target').replace('#', '');
-                switchTab(targetTab);
-            });
-        });
-        
-        // Add click event listeners to appointment tab buttons
-        document.querySelectorAll('#appointmentTabs button').forEach(tabBtn => {
-            tabBtn.addEventListener('click', function() {
-                const targetTab = this.getAttribute('data-tabs-target').replace('#', '');
-                switchAppointmentTab(targetTab);
-            });
-        });
-        
-        // Initialize calendar
-        generateCalendar(currentMonth, currentYear);
-        
-        // Month navigation
-        document.getElementById('prevMonth').addEventListener('click', function() {
-            currentMonth--;
-            if (currentMonth < 1) {
-                currentMonth = 12;
-                currentYear--;
-            }
-            generateCalendar(currentMonth, currentYear);
-        });
-        
-        document.getElementById('nextMonth').addEventListener('click', function() {
-            currentMonth++;
-            if (currentMonth > 12) {
-                currentMonth = 1;
-                currentYear++;
-            }
-            generateCalendar(currentMonth, currentYear);
-        });
-        
-        // Add time slot selection
-        document.querySelectorAll('.time-slot').forEach(slot => {
-            slot.addEventListener('click', function() {
-                if (!this.classList.contains('disabled')) {
-                    const timeRange = this.getAttribute('data-time');
-                    selectTimeSlot(this, timeRange);
-                }
-            });
-        });
-        
-        // Filter event listeners
-        document.getElementById('statusFilter').addEventListener('change', applyFilters);
-        document.getElementById('dateFilter').addEventListener('change', applyFilters);
-        
-        // Initialize charts if analytics tab is active
-        if (activeTab === 'analytics') {
-            initializeCharts();
-        }
-        
-        // Show success/error modals if messages exist
-        <?php if ($success): ?>
-            showSuccessModal('<?= addslashes($success) ?>');
-        <?php endif; ?>
-        
-        <?php if ($error): ?>
-            showErrorModal('<?= addslashes($error) ?>');
-        <?php endif; ?>
-    });
-
-    // Close modal when clicking outside
-    window.onclick = function(event) {
-        const timeSlotModal = document.getElementById('timeSlotModal');
-        if (event.target === timeSlotModal) {
-            closeTimeSlotModal();
-        }
-        
-        const userDetailsModal = document.getElementById('userDetailsModal');
-        if (event.target === userDetailsModal) {
-            closeUserDetailsModal();
-        }
-        
-        const cancelledDetailsModal = document.getElementById('cancelledDetailsModal');
-        if (event.target === cancelledDetailsModal) {
-            closeCancelledDetailsModal();
-        }
-        
-        const approveConfirmationModal = document.getElementById('approveConfirmationModal');
-        if (event.target === approveConfirmationModal) {
-            closeApproveConfirmationModal();
-        }
-        
-        const declineModal = document.getElementById('declineModal');
-        if (event.target === declineModal) {
-            closeDeclineModal();
-        }
-        
-        const imageModal = document.getElementById('imageModal');
-        if (event.target === imageModal) {
-            closeImageModal();
-        }
-        
-        const modal = document.getElementById('editModal');
-        if (event.target === modal) {
-            closeEditModal();
-        }
-        
-        const rejectionModal = document.getElementById('rejectionModal');
-        if (event.target === rejectionModal) {
-            closeRejectionModal();
-        }
-        
-        const successModal = document.getElementById('successModal');
-        if (event.target === successModal) {
-            closeSuccessModal();
-        }
-        
-        const errorModal = document.getElementById('errorModal');
-        if (event.target === errorModal) {
-            closeErrorModal();
-        }
-        
-        const helpModal = document.getElementById('helpModal');
-        if (event.target === helpModal) {
-            closeHelpModal();
-        }
-        
-        const viewModal = document.getElementById('viewModal');
-        if (event.target === viewModal) {
-            closeViewModal();
-        }
-        
-        const appointmentApprovalModal = document.getElementById('appointmentApprovalModal');
-        if (event.target === appointmentApprovalModal) {
-            closeAppointmentApprovalModal();
-        }
-    }
-    </script>
+</script>
 </body>
 </html>

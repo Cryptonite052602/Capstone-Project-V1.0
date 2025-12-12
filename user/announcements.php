@@ -81,6 +81,18 @@ try {
 } catch (PDOException $e) {
     $error = 'Error fetching announcements: ' . $e->getMessage();
 }
+
+// Calculate statistics
+$respondedCount = count(array_filter($announcements, function($a) {
+    return !empty($a['user_status']);
+}));
+$acceptedCount = count(array_filter($announcements, function($a) {
+    return $a['user_status'] === 'accepted';
+}));
+$dismissedCount = count(array_filter($announcements, function($a) {
+    return $a['user_status'] === 'dismissed';
+}));
+$pendingCount = count($announcements) - $respondedCount;
 ?>
 
 <!DOCTYPE html>
@@ -92,221 +104,425 @@ try {
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Consistent blue theme matching landing page */
+        /* Color Variables */
         :root {
             --primary-blue: #0073D3;
             --secondary-blue: #4A90E2;
             --light-blue: #E8F2FF;
             --dark-blue: #1B4F8C;
-            --text-dark: #1f2937;
-            --text-light: #6b7280;
-            --bg-light: #f9fafb;
-            --border-light: #e5e7eb;
+            --success-green: #10B981;
+            --warning-yellow: #F59E0B;
+            --danger-red: #EF4444;
+            --info-teal: #06B6D4;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-400: #9CA3AF;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
         }
 
         body {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            color: var(--text-dark);
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--gray-50);
+            color: var(--gray-800);
+        }
+
+        /* Layout Container */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Card Design */
+        .card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--gray-200);
+            background: var(--gray-50);
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Button Styles */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            font-size: 0.875rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
         }
 
         .btn-primary {
-            background-color: var(--primary-blue);
+            background: var(--primary-blue);
             color: white;
-            font-weight: 600;
-            border-radius: 9999px;
-            transition: all 0.3s ease;
-            border: 2px solid var(--primary-blue);
+            border-color: var(--primary-blue);
         }
 
         .btn-primary:hover {
-            background-color: var(--dark-blue);
+            background: var(--dark-blue);
             border-color: var(--dark-blue);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         .btn-secondary {
-            background-color: white;
-            color: var(--primary-blue);
-            font-weight: 600;
-            border-radius: 9999px;
-            transition: all 0.3s ease;
-            border: 2px solid var(--primary-blue);
+            background: white;
+            color: var(--gray-700);
+            border-color: var(--gray-300);
         }
 
         .btn-secondary:hover {
-            background-color: var(--light-blue);
+            background: var(--gray-50);
+            border-color: var(--gray-400);
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: var(--success-green);
+            color: white;
+            border-color: var(--success-green);
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            border-color: #059669;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-outline-success {
+            background: white;
+            color: var(--success-green);
+            border-color: var(--success-green);
+        }
+
+        .btn-outline-success:hover {
+            background: #D1FAE5;
+        }
+
+        .btn-outline-secondary {
+            background: white;
+            color: var(--gray-600);
+            border-color: var(--gray-300);
+        }
+
+        .btn-outline-secondary:hover {
+            background: var(--gray-50);
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+        }
+
+        /* Stats Cards - Consistent with staff page */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 1.25rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-blue);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--gray-500);
+        }
+
+        /* Announcement Item - Updated with consistent styling */
+        .announcement-item {
+            background: white;
+            border-radius: 10px;
+            border: 1px solid var(--gray-200);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            transition: all 0.2s;
+        }
+
+        .announcement-item:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             transform: translateY(-2px);
         }
 
-        .info-card {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            border: 1px solid var(--border-light);
+        .announcement-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .announcement-title {
+            font-weight: 600;
+            color: var(--gray-800);
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .announcement-meta {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+        }
+
+        .announcement-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .announcement-content {
+            color: var(--gray-600);
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
             overflow: hidden;
         }
 
-        /* Priority badges */
+        .announcement-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        /* Priority Badge - Consistent with staff page */
         .priority-badge {
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 700;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            text-transform: uppercase;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
         }
-        
+
         .priority-high {
-            background: linear-gradient(135deg, #fee2e2, #fecaca);
-            color: #dc2626;
-            border: 2px solid #fecaca;
+            background: #FEE2E2;
+            color: #DC2626;
+            border: 1px solid #FECACA;
         }
-        
+
         .priority-medium {
-            background: linear-gradient(135deg, #fef3c7, #fde68a);
-            color: #d97706;
-            border: 2px solid #fde68a;
+            background: #FEF3C7;
+            color: #D97706;
+            border: 1px solid #FDE68A;
         }
-        
+
         .priority-normal {
-            background: linear-gradient(135deg, var(--light-blue), #bfdbfe);
+            background: var(--light-blue);
             color: var(--primary-blue);
-            border: 2px solid #bfdbfe;
+            border: 1px solid #BFDBFE;
         }
-        
-        /* Status badges */
+
+        /* Status Badge - Consistent with staff page */
         .status-badge {
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 700;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border: 1px solid;
         }
-        
+
         .status-accepted {
-            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
-            color: #065f46;
-            border: 2px solid #a7f3d0;
+            background: #D1FAE5;
+            color: #059669;
+            border-color: #A7F3D0;
         }
-        
+
         .status-dismissed {
-            background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+            background: #F3F4F6;
             color: #374151;
-            border: 2px solid #e5e7eb;
+            border-color: #E5E7EB;
         }
-        
-        /* Image preview */
+
+        /* Response Section - Updated styling */
+        .response-section {
+            background: var(--gray-50);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-top: 1rem;
+        }
+
+        .response-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 1rem;
+        }
+
+        .response-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn-response {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-accept {
+            background: white;
+            color: var(--success-green);
+            border-color: var(--success-green);
+        }
+
+        .btn-accept:hover {
+            background: #D1FAE5;
+            transform: translateY(-1px);
+        }
+
+        .btn-dismiss {
+            background: white;
+            color: var(--gray-600);
+            border-color: var(--gray-300);
+        }
+
+        .btn-dismiss:hover {
+            background: var(--gray-100);
+            transform: translateY(-1px);
+        }
+
+        .response-status {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background: white;
+            border: 1px solid var(--gray-200);
+        }
+
+        /* Response Stats - Consistent with staff page */
+        .response-stats {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .response-stat {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .response-icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+        }
+
+        .accepted-icon {
+            background: #D1FAE5;
+            color: #059669;
+        }
+
+        .pending-icon {
+            background: #FEF3C7;
+            color: #D97706;
+        }
+
+        .dismissed-icon {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+
+        /* Image Preview */
         .image-preview {
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
-            border: 2px solid var(--border-light);
-            transition: all 0.3s ease;
+            border: 1px solid var(--gray-200);
+            margin-bottom: 1rem;
+            max-height: 200px;
+            cursor: pointer;
         }
-        
-        .image-preview:hover {
-            border-color: var(--primary-blue);
-            transform: scale(1.02);
-        }
-        
+
         .image-preview img {
             width: 100%;
             height: 100%;
             object-fit: cover;
             transition: transform 0.3s ease;
         }
-        
+
         .image-preview:hover img {
             transform: scale(1.05);
         }
-        
-        /* Response buttons */
-        .response-buttons {
-            display: flex;
-            gap: 16px;
-            margin-top: 20px;
-        }
-        
-        .btn-accept {
-            flex: 1;
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-            padding: 14px 20px;
-            border-radius: 12px;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);
-        }
-        
-        .btn-accept:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3);
-        }
-        
-        .btn-dismiss {
-            flex: 1;
-            background: white;
-            color: #374151;
-            padding: 14px 20px;
-            border-radius: 12px;
-            font-weight: 600;
-            border: 2px solid #d1d5db;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-dismiss:hover {
-            background: #f3f4f6;
-            transform: translateY(-3px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* View image button */
+
         .btn-view-image {
-            background: linear-gradient(135deg, var(--light-blue), #bfdbfe);
-            color: var(--dark-blue);
-            border: 2px solid #bfdbfe;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
+            background: white;
+            color: var(--primary-blue);
+            border: 1px solid var(--primary-blue);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
             cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        
-        .btn-view-image:hover {
-            background: #bfdbfe;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
+            transition: all 0.2s;
         }
 
-        /* Modal styles */
+        .btn-view-image:hover {
+            background: var(--light-blue);
+            transform: translateY(-1px);
+        }
+
+        /* Modal - Consistent with staff page */
         .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.5);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -321,363 +537,410 @@ try {
             visibility: visible;
         }
 
-        .modal-content {
-            background-color: white;
-            border-radius: 20px;
-            max-width: 900px;
+        .modal {
+            background: white;
+            border-radius: 12px;
+            max-width: 800px;
             width: 90%;
             max-height: 90vh;
             overflow-y: auto;
-            padding: 2.5rem;
-            position: relative;
-            transform: translateY(-20px);
-            transition: transform 0.3s ease;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: modalSlideIn 0.3s ease;
         }
 
-        .modal-overlay.active .modal-content {
-            transform: translateY(0);
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
-        .close-modal {
-            position: absolute;
-            top: 1.5rem;
-            right: 1.5rem;
-            background: var(--light-blue);
-            border: none;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            font-size: 1.25rem;
-            color: var(--primary-blue);
-            cursor: pointer;
-            z-index: 10;
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--gray-200);
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
         }
 
-        .close-modal:hover {
-            background: var(--primary-blue);
-            color: white;
-            transform: rotate(90deg);
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--gray-800);
         }
 
-        /* Announcement card enhancements */
-        .announcement-header {
-            background: linear-gradient(135deg, var(--light-blue), white);
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--gray-500);
+            cursor: pointer;
+            padding: 0.25rem;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: var(--gray-700);
+        }
+
+        .modal-body {
             padding: 1.5rem;
-            border-bottom: 2px solid var(--border-light);
         }
 
-        .announcement-content {
+        .modal-footer {
             padding: 1.5rem;
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
         }
 
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: var(--secondary-blue);
-            border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--primary-blue);
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
         }
 
-        /* Stats cards */
-        .stat-card {
-            background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
-            color: white;
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 115, 211, 0.2);
+        .empty-icon {
+            font-size: 3rem;
+            color: var(--gray-300);
+            margin-bottom: 1rem;
         }
 
-        .stat-card-secondary {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.2);
+        .empty-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 0.5rem;
         }
 
-        /* Message truncation */
-        .line-clamp-3 {
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+        .empty-description {
+            color: var(--gray-500);
+            font-size: 0.875rem;
         }
 
+        /* Utility Classes */
         .whitespace-pre-line {
             white-space: pre-line;
         }
 
-        /* Responsive adjustments */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Responsive Design */
         @media (max-width: 768px) {
+            .announcement-header {
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+            
+            .announcement-actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+            
             .response-buttons {
                 flex-direction: column;
             }
             
-            .modal-content {
-                width: 95%;
-                padding: 1.5rem;
-                margin: 0.5rem;
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
             }
             
-            .stat-card, .stat-card-secondary {
-                padding: 1.5rem;
+            .response-stats {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 1rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .modal {
+                width: 95%;
+                margin: 0.5rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body class="min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-7xl">
+    <div class="main-container px-4 py-8">
         <!-- Header -->
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
-            <div class="mb-6 md:mb-0">
-                <div class="flex items-center gap-4 mb-4">
-                    <div class="w-12 h-12 bg-gradient-to-br from-[#0073D3] to-[#4A90E2] rounded-2xl flex items-center justify-center shadow-lg">
-                        <i class="fas fa-bullhorn text-white text-xl"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-3xl font-bold text-gray-800">Community Announcements</h1>
-                        <p class="text-gray-600 mt-1">Barangay Luz Health Monitoring System</p>
-                    </div>
+        <div class="mb-8">
+            <div class="flex flex-col gap-4">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Community Announcements</h1>
+                    <p class="text-gray-600 mt-1">Stay updated with important barangay health information</p>
                 </div>
-                <p class="text-gray-600 max-w-2xl">Stay updated with the latest community health news, alerts, and important information from our staff.</p>
-            </div>
-            
-            <div class="flex space-x-4">
-                <div class="stat-card">
-                    <p class="text-white/90 font-semibold text-sm">Total Announcements</p>
-                    <p class="text-3xl font-bold text-white mt-2"><?= count($announcements) ?></p>
-                </div>
-                <div class="stat-card-secondary">
-                    <p class="text-white/90 font-semibold text-sm">Responded</p>
-                    <p class="text-3xl font-bold text-white mt-2">
-                        <?php 
-                            $respondedCount = count(array_filter($announcements, function($a) {
-                                return !empty($a['user_status']);
-                            }));
-                            echo $respondedCount;
-                        ?>
-                    </p>
+                
+                <!-- Stats Cards - Consistent with staff page -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-bullhorn text-blue-600"></i>
+                            </div>
+                            <div>
+                                <div class="stat-value"><?= count($announcements) ?></div>
+                                <div class="stat-label">Total Announcements</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-check-circle text-green-600"></i>
+                            </div>
+                            <div>
+                                <div class="stat-value"><?= $acceptedCount ?></div>
+                                <div class="stat-label">Accepted</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-clock text-yellow-600"></i>
+                            </div>
+                            <div>
+                                <div class="stat-value"><?= $pendingCount ?></div>
+                                <div class="stat-label">Pending Response</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-times-circle text-gray-600"></i>
+                            </div>
+                            <div>
+                                <div class="stat-value"><?= $dismissedCount ?></div>
+                                <div class="stat-label">Dismissed</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Alerts -->
+        <!-- Messages -->
         <?php if ($error): ?>
-            <div class="bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-200 text-red-700 px-6 py-4 rounded-2xl mb-6 flex items-center shadow-sm">
-                <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center mr-4">
-                    <i class="fas fa-exclamation-circle text-red-500"></i>
-                </div>
-                <div>
-                    <p class="font-medium"><?= htmlspecialchars($error) ?></p>
-                </div>
+            <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+                <i class="fas fa-exclamation-circle text-red-500"></i>
+                <span class="text-red-700"><?= htmlspecialchars($error) ?></span>
             </div>
         <?php endif; ?>
         
         <?php if ($success): ?>
-            <div class="bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-200 text-green-700 px-6 py-4 rounded-2xl mb-6 flex items-center shadow-sm">
-                <div class="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mr-4">
-                    <i class="fas fa-check-circle text-green-500"></i>
-                </div>
-                <div>
-                    <p class="font-medium"><?= htmlspecialchars($success) ?></p>
-                </div>
+            <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                <i class="fas fa-check-circle text-green-500"></i>
+                <span class="text-green-700"><?= htmlspecialchars($success) ?></span>
             </div>
         <?php endif; ?>
 
         <!-- Announcements List -->
-        <div class="space-y-6">
+        <div class="space-y-4">
             <?php if (empty($announcements)): ?>
-                <div class="info-card p-12 text-center">
-                    <div class="w-24 h-24 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <i class="fas fa-bullhorn text-4xl text-blue-300"></i>
-                    </div>
-                    <h3 class="text-2xl font-semibold text-gray-700 mb-3">No Announcements Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto mb-8">There are currently no active announcements. Check back later for updates from our community health team.</p>
-                    <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-2xl border-2 border-blue-200 max-w-md mx-auto">
-                        <h4 class="font-semibold text-blue-800 mb-2">Stay Informed</h4>
-                        <p class="text-blue-700 text-sm">Important announcements will appear here when available. Make sure to check regularly for updates.</p>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <div class="empty-icon">
+                                <i class="fas fa-bullhorn"></i>
+                            </div>
+                            <h3 class="empty-title">No Announcements Available</h3>
+                            <p class="empty-description">There are currently no active announcements. Check back later for updates.</p>
+                        </div>
                     </div>
                 </div>
             <?php else: ?>
                 <?php foreach ($announcements as $announcement): ?>
-                    <div class="info-card overflow-hidden">
-                        <!-- Header Section -->
+                    <div class="announcement-item">
+                        <!-- Header -->
                         <div class="announcement-header">
-                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <div class="flex items-start gap-4">
-                                    <div class="w-14 h-14 bg-gradient-to-br from-[#0073D3] to-[#4A90E2] rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-                                        <i class="fas fa-bullhorn text-white text-lg"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="font-bold text-xl text-gray-800 mb-1"><?= htmlspecialchars($announcement['title']) ?></h3>
-                                        <div class="flex items-center gap-2 flex-wrap">
-                                            <p class="text-gray-600 text-sm">
-                                                By <span class="font-semibold text-blue-600"><?= htmlspecialchars($announcement['staff_name'] ?? 'Community Staff') ?></span>
-                                            </p>
-                                            <span class="text-gray-400">•</span>
-                                            <span class="text-gray-500 text-sm">
-                                                <i class="fas fa-calendar-alt mr-1"></i>
-                                                <?= date('M d, Y', strtotime($announcement['post_date'])) ?>
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex gap-2">
-                                    <span class="priority-badge priority-<?= $announcement['priority'] ?>">
-                                        <i class="fas fa-flag text-xs"></i>
-                                        <?= ucfirst($announcement['priority']) ?> Priority
+                            <div class="flex-1">
+                                <h3 class="announcement-title"><?= htmlspecialchars($announcement['title']) ?></h3>
+                                <div class="announcement-meta">
+                                    <span class="flex items-center gap-1">
+                                        <i class="fas fa-user"></i>
+                                        <?= htmlspecialchars($announcement['staff_name'] ?? 'Community Staff') ?>
                                     </span>
-                                    <?php if ($announcement['user_status']): ?>
-                                        <div class="status-badge status-<?= $announcement['user_status'] ?>">
-                                            <i class="fas fa-<?= $announcement['user_status'] === 'accepted' ? 'check' : 'times' ?> text-xs"></i>
-                                            <?= ucfirst($announcement['user_status']) ?>
-                                        </div>
-                                    <?php endif; ?>
+                                    <span class="mx-2">•</span>
+                                    <span class="flex items-center gap-1">
+                                        <i class="fas fa-calendar"></i>
+                                        <?= date('M d, Y', strtotime($announcement['post_date'])) ?>
+                                    </span>
                                 </div>
                             </div>
+                            <div class="announcement-actions">
+                                <button onclick="openViewModal(<?= htmlspecialchars(json_encode($announcement, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>)"
+                                        class="btn btn-secondary btn-sm"
+                                        title="View Details">
+                                    <i class="fas fa-eye"></i> View
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Priority and Status Badges -->
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            <span class="priority-badge priority-<?= $announcement['priority'] ?>">
+                                <i class="fas fa-flag text-xs"></i>
+                                <?= ucfirst($announcement['priority']) ?> Priority
+                            </span>
                             
-                            <?php if ($announcement['expiry_date']): ?>
-                                <div class="mt-4 flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-4 py-2 rounded-lg w-fit">
-                                    <i class="fas fa-clock"></i>
-                                    <span class="font-medium">Expires:</span>
-                                    <?= date('M d, Y', strtotime($announcement['expiry_date'])) ?>
-                                </div>
+                            <?php if ($announcement['user_status']): ?>
+                                <span class="status-badge status-<?= $announcement['user_status'] ?>">
+                                    <?php if ($announcement['user_status'] === 'accepted'): ?>
+                                        <i class="fas fa-check text-xs"></i>
+                                    <?php else: ?>
+                                        <i class="fas fa-times text-xs"></i>
+                                    <?php endif; ?>
+                                    <?= ucfirst($announcement['user_status']) ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="status-badge" style="background: #FEF3C7; color: #D97706; border-color: #FDE68A;">
+                                    <i class="fas fa-clock text-xs"></i>
+                                    Pending Response
+                                </span>
                             <?php endif; ?>
                         </div>
-                        
-                        <!-- Content Section -->
-                        <div class="announcement-content">
-                            <?php if ($announcement['image_path']): ?>
-                                <div class="mb-6">
-                                    <div class="flex justify-between items-center mb-3">
-                                        <p class="text-sm font-semibold text-gray-700">Announcement Image</p>
-                                        <button onclick="openImageModal('<?= htmlspecialchars($announcement['image_path']) ?>')" 
-                                                class="btn-view-image">
-                                            <i class="fas fa-expand"></i> View Full Image
-                                        </button>
-                                    </div>
-                                    <div class="image-preview max-h-64">
-                                        <img src="<?= htmlspecialchars($announcement['image_path']) ?>" 
-                                             alt="Announcement Image"
-                                             onclick="openImageModal('<?= htmlspecialchars($announcement['image_path']) ?>')"
-                                             class="cursor-pointer">
-                                    </div>
+
+                        <!-- Image Preview -->
+                        <?php if ($announcement['image_path']): ?>
+                            <div class="mb-3">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm font-medium text-gray-700">Attached Image</span>
+                                    <button onclick="openImageModal('<?= htmlspecialchars($announcement['image_path']) ?>')" 
+                                            class="btn-view-image">
+                                        <i class="fas fa-expand mr-1"></i> View Full
+                                    </button>
                                 </div>
-                            <?php endif; ?>
-                            
-                            <div class="mb-6">
-                                <p class="text-gray-700 line-clamp-3">
-                                    <?= nl2br(htmlspecialchars($announcement['message'])) ?>
-                                </p>
-                                <?php if (strlen($announcement['message']) > 200): ?>
-                                    <button onclick="openViewModal(<?= htmlspecialchars(json_encode($announcement, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>)" 
-                                            class="text-blue-600 hover:text-blue-800 font-medium text-sm mt-2 inline-flex items-center gap-1">
+                                <div class="image-preview">
+                                    <img src="<?= htmlspecialchars($announcement['image_path']) ?>" 
+                                         alt="Announcement Image"
+                                         onclick="openImageModal('<?= htmlspecialchars($announcement['image_path']) ?>')">
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Content Preview -->
+                        <div class="announcement-content line-clamp-2">
+                            <?= htmlspecialchars($announcement['message']) ?>
+                        </div>
+
+                        <!-- Expiry Date -->
+                        <?php if ($announcement['expiry_date']): ?>
+                            <div class="mb-3">
+                                <span class="text-sm text-blue-600 flex items-center gap-1">
+                                    <i class="fas fa-clock"></i>
+                                    Expires: <?= date('M d, Y', strtotime($announcement['expiry_date'])) ?>
+                                </span>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Footer -->
+                        <div class="announcement-footer">
+                            <div>
+                                <?php if (strlen($announcement['message']) > 100): ?>
+                                    <button onclick="openViewModal(<?= htmlspecialchars(json_encode($announcement, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>)"
+                                            class="text-blue-600 hover:text-blue-800 font-medium text-sm inline-flex items-center gap-1">
                                         Read full message
                                         <i class="fas fa-arrow-right text-xs"></i>
                                     </button>
                                 <?php endif; ?>
                             </div>
                             
-                            <!-- Response Section -->
-                            <div class="border-t border-gray-100 pt-6">
-                                <?php if ($announcement['user_status'] === 'accepted'): ?>
-                                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5">
-                                        <div class="flex items-center gap-4">
-                                            <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                                                <i class="fas fa-check-circle text-green-500 text-xl"></i>
-                                            </div>
-                                            <div class="flex-1">
-                                                <p class="text-green-800 font-semibold">You have accepted this announcement</p>
-                                                <?php if ($announcement['response_date']): ?>
-                                                    <p class="text-green-700 text-sm mt-1">
-                                                        <i class="fas fa-clock mr-1"></i>
-                                                        Responded on <?= date('M d, Y \a\t h:i A', strtotime($announcement['response_date'])) ?>
-                                                    </p>
-                                                <?php endif; ?>
-                                            </div>
+                            <div class="response-stats">
+                                <?php if ($announcement['response_date']): ?>
+                                    <div class="response-stat">
+                                        <div class="response-icon <?= $announcement['user_status'] === 'accepted' ? 'accepted-icon' : 'dismissed-icon' ?>">
+                                            <i class="fas fa-<?= $announcement['user_status'] === 'accepted' ? 'check' : 'times' ?>"></i>
                                         </div>
-                                        <form method="POST" action="" class="mt-4">
-                                            <input type="hidden" name="announcement_id" value="<?= $announcement['id'] ?>">
-                                            <button type="submit" name="respond_to_announcement" value="dismissed" 
-                                                    class="text-sm text-green-600 hover:text-green-800 font-medium underline focus:outline-none inline-flex items-center gap-1">
-                                                <i class="fas fa-exchange-alt text-xs"></i>
-                                                Change to Dismissed
-                                            </button>
-                                        </form>
-                                    </div>
-                                <?php elseif ($announcement['user_status'] === 'dismissed'): ?>
-                                    <div class="bg-gradient-to-r from-gray-50 to-slate-50 border-2 border-gray-200 rounded-xl p-5">
-                                        <div class="flex items-center gap-4">
-                                            <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                                                <i class="fas fa-times-circle text-gray-500 text-xl"></i>
-                                            </div>
-                                            <div class="flex-1">
-                                                <p class="text-gray-800 font-semibold">You have dismissed this announcement</p>
-                                                <?php if ($announcement['response_date']): ?>
-                                                    <p class="text-gray-600 text-sm mt-1">
-                                                        <i class="fas fa-clock mr-1"></i>
-                                                        Responded on <?= date('M d, Y \a\t h:i A', strtotime($announcement['response_date'])) ?>
-                                                    </p>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                        <form method="POST" action="" class="mt-4">
-                                            <input type="hidden" name="announcement_id" value="<?= $announcement['id'] ?>">
-                                            <button type="submit" name="respond_to_announcement" value="accepted" 
-                                                    class="text-sm text-blue-600 hover:text-blue-800 font-medium underline focus:outline-none inline-flex items-center gap-1">
-                                                <i class="fas fa-exchange-alt text-xs"></i>
-                                                Change to Accepted
-                                            </button>
-                                        </form>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-xl p-5">
-                                        <div class="flex items-center gap-4 mb-5">
-                                            <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                                                <i class="fas fa-question-circle text-blue-500 text-xl"></i>
-                                            </div>
-                                            <div>
-                                                <p class="text-blue-800 font-semibold">Action Required</p>
-                                                <p class="text-blue-700 text-sm mt-1">Please respond to this announcement to help us track community engagement.</p>
-                                            </div>
-                                        </div>
-                                        <div class="response-buttons">
-                                            <form method="POST" action="" class="flex-1">
-                                                <input type="hidden" name="announcement_id" value="<?= $announcement['id'] ?>">
-                                                <button type="submit" name="respond_to_announcement" value="accepted" 
-                                                        class="btn-accept w-full">
-                                                    <i class="fas fa-check-circle"></i>
-                                                    Accept Announcement
-                                                </button>
-                                            </form>
-                                            <form method="POST" action="" class="flex-1">
-                                                <input type="hidden" name="announcement_id" value="<?= $announcement['id'] ?>">
-                                                <button type="submit" name="respond_to_announcement" value="dismissed" 
-                                                        class="btn-dismiss w-full">
-                                                    <i class="fas fa-times-circle"></i>
-                                                    Dismiss Announcement
-                                                </button>
-                                            </form>
-                                        </div>
+                                        <span class="text-gray-600">Responded</span>
                                     </div>
                                 <?php endif; ?>
                             </div>
+                        </div>
+
+                        <!-- Response Section -->
+                        <div class="response-section">
+                            <?php if ($announcement['user_status'] === 'accepted'): ?>
+                                <div class="response-status">
+                                    <div class="response-icon accepted-icon">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="font-medium text-gray-800">You accepted this announcement</p>
+                                        <?php if ($announcement['response_date']): ?>
+                                            <p class="text-sm text-gray-500 mt-1">
+                                                Responded on <?= date('M d, Y \a\t h:i A', strtotime($announcement['response_date'])) ?>
+                                            </p>
+                                        <?php endif; ?>
+                                    </div>
+                                    <form method="POST" action="">
+                                        <input type="hidden" name="announcement_id" value="<?= $announcement['id'] ?>">
+                                        <button type="submit" name="respond_to_announcement" value="dismissed" 
+                                                class="btn btn-outline-secondary btn-sm">
+                                            <i class="fas fa-times mr-1"></i> Dismiss
+                                        </button>
+                                    </form>
+                                </div>
+                            <?php elseif ($announcement['user_status'] === 'dismissed'): ?>
+                                <div class="response-status">
+                                    <div class="response-icon dismissed-icon">
+                                        <i class="fas fa-times"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="font-medium text-gray-800">You dismissed this announcement</p>
+                                        <?php if ($announcement['response_date']): ?>
+                                            <p class="text-sm text-gray-500 mt-1">
+                                                Responded on <?= date('M d, Y \a\t h:i A', strtotime($announcement['response_date'])) ?>
+                                            </p>
+                                        <?php endif; ?>
+                                    </div>
+                                    <form method="POST" action="">
+                                        <input type="hidden" name="announcement_id" value="<?= $announcement['id'] ?>">
+                                        <button type="submit" name="respond_to_announcement" value="accepted" 
+                                                class="btn btn-outline-success btn-sm">
+                                            <i class="fas fa-check mr-1"></i> Accept
+                                        </button>
+                                    </form>
+                                </div>
+                            <?php else: ?>
+                                <div class="space-y-3">
+                                    <p class="response-title">Please respond to this announcement:</p>
+                                    <div class="response-buttons">
+                                        <form method="POST" action="" class="flex-1">
+                                            <input type="hidden" name="announcement_id" value="<?= $announcement['id'] ?>">
+                                            <button type="submit" name="respond_to_announcement" value="accepted" 
+                                                    class="btn-response btn-accept">
+                                                <i class="fas fa-check-circle"></i>
+                                                Accept Announcement
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="" class="flex-1">
+                                            <input type="hidden" name="announcement_id" value="<?= $announcement['id'] ?>">
+                                            <button type="submit" name="respond_to_announcement" value="dismissed" 
+                                                    class="btn-response btn-dismiss">
+                                                <i class="fas fa-times-circle"></i>
+                                                Dismiss Announcement
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -687,12 +950,17 @@ try {
 
     <!-- View Announcement Modal -->
     <div id="viewModal" class="modal-overlay">
-        <div class="modal-content">
-            <button class="close-modal" onclick="closeViewModal()">&times;</button>
-            <div id="modalContent"></div>
-            <div class="mt-8 flex justify-end">
-                <button onclick="closeViewModal()" class="btn-secondary px-6 py-3">
-                    <i class="fas fa-times mr-2"></i> Close
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Announcement Details</h2>
+                <button class="modal-close" onclick="closeViewModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modalContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeViewModal()" class="btn btn-secondary">
+                    Close
                 </button>
             </div>
         </div>
@@ -700,32 +968,27 @@ try {
 
     <!-- Image Modal -->
     <div id="imageModal" class="modal-overlay">
-        <div class="modal-content max-w-4xl">
-            <button class="close-modal" onclick="closeImageModal()">&times;</button>
-            <div class="p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                        <i class="fas fa-image text-white"></i>
-                    </div>
-                    Announcement Image
-                </h2>
-                <div class="relative bg-gray-50 rounded-2xl p-2 border-2 border-gray-200">
-                    <img id="modalImage" src="" alt="Announcement Image" class="w-full h-auto max-h-[60vh] object-contain rounded-xl">
-                </div>
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Announcement Image</h2>
+                <button class="modal-close" onclick="closeImageModal()">&times;</button>
             </div>
-            <div class="mt-8 flex justify-end space-x-4">
-                <button id="downloadImage" class="btn-primary px-6 py-3">
+            <div class="modal-body">
+                <img id="modalImage" src="" alt="Announcement Image" class="w-full h-auto rounded-lg">
+            </div>
+            <div class="modal-footer">
+                <button id="downloadImage" class="btn btn-primary">
                     <i class="fas fa-download mr-2"></i> Download Image
                 </button>
-                <button onclick="closeImageModal()" class="btn-secondary px-6 py-3">
-                    <i class="fas fa-times mr-2"></i> Close
+                <button onclick="closeImageModal()" class="btn btn-secondary">
+                    Close
                 </button>
             </div>
         </div>
     </div>
 
     <script>
-        // View Announcement Modal Function
+        // View Announcement Modal
         function openViewModal(announcement) {
             const modal = document.getElementById('viewModal');
             const modalContent = document.getElementById('modalContent');
@@ -739,164 +1002,154 @@ try {
             });
             
             let content = `
-                <div class="mb-8">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-3xl font-bold text-gray-800">${announcement.title || 'No Title'}</h2>
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-800">${announcement.title || 'No Title'}</h3>
+                            <div class="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                                <span class="flex items-center gap-1">
+                                    <i class="fas fa-user"></i>
+                                    ${announcement.staff_name || 'Community Staff'}
+                                </span>
+                                <span class="flex items-center gap-1">
+                                    <i class="fas fa-calendar"></i>
+                                    ${postDate}
+                                </span>
+                            </div>
+                        </div>
                         <span class="priority-badge priority-${announcement.priority || 'normal'}">
                             <i class="fas fa-flag text-xs"></i>
                             ${announcement.priority ? announcement.priority.charAt(0).toUpperCase() + announcement.priority.slice(1) : 'Normal'} Priority
                         </span>
                     </div>
                     
-                    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 rounded-2xl mb-8 border-2 border-blue-200">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <p class="text-sm text-gray-600 mb-1">Posted by:</p>
-                                <p class="font-bold text-gray-800 text-lg">${announcement.staff_name || 'Community Staff'}</p>
+                    ${announcement.expiry_date ? `
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-clock text-blue-500"></i>
+                                <div>
+                                    <p class="font-medium text-blue-800">Expiration Date</p>
+                                    <p class="text-sm text-blue-600">
+                                        ${new Date(announcement.expiry_date).toLocaleDateString('en-US', { 
+                                            year: 'numeric', 
+                                            month: 'long', 
+                                            day: 'numeric'
+                                        })}
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <p class="text-sm text-gray-600 mb-1">Posted on:</p>
-                                <p class="font-bold text-gray-800 text-lg">${postDate}</p>
+                        </div>
+                    ` : ''}
+                    
+                    ${announcement.image_path ? `
+                        <div>
+                            <h4 class="font-medium text-gray-800 mb-2">Attached Image</h4>
+                            <div class="border border-gray-200 rounded-lg overflow-hidden">
+                                <img src="${announcement.image_path}" 
+                                     alt="Announcement Image" 
+                                     class="w-full h-auto max-h-[300px] object-contain">
                             </div>
-                            <div>
-                                <p class="text-sm text-gray-600 mb-1">Audience:</p>
-                                <p class="font-bold text-gray-800">
-                                    ${announcement.audience_type === 'public' ? 'All Community Members' : 
-                                      announcement.audience_type === 'landing_page' ? 'Public Website' : 
-                                      'Specific Recipients'}
-                                </p>
-                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div>
+                        <h4 class="font-medium text-gray-800 mb-2">Message Content</h4>
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <p class="text-gray-700 whitespace-pre-line">${announcement.message || 'No message provided'}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-medium text-gray-800 mb-3">Your Response</h4>
             `;
             
-            if (announcement.expiry_date) {
-                const expiryDate = new Date(announcement.expiry_date).toLocaleDateString('en-US', { 
+            if (announcement.user_status === 'accepted') {
+                const responseDate = announcement.response_date ? new Date(announcement.response_date).toLocaleDateString('en-US', { 
                     year: 'numeric', 
                     month: 'long', 
-                    day: 'numeric'
-                });
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }) : '';
+                
                 content += `
-                            <div>
-                                <p class="text-sm text-gray-600 mb-1">Expires:</p>
-                                <p class="font-bold text-gray-800">${expiryDate}</p>
-                            </div>
+                    <div class="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
+                        <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-check text-green-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-semibold text-green-800">You accepted this announcement</p>
+                            ${responseDate ? `<p class="text-sm text-green-600 mt-1">Responded on ${responseDate}</p>` : ''}
+                        </div>
+                        <form method="POST" action="">
+                            <input type="hidden" name="announcement_id" value="${announcement.id}">
+                            <button type="submit" name="respond_to_announcement" value="dismissed" 
+                                    class="btn btn-outline-secondary">
+                                <i class="fas fa-times mr-2"></i> Dismiss
+                            </button>
+                        </form>
+                    </div>
+                `;
+            } else if (announcement.user_status === 'dismissed') {
+                const responseDate = announcement.response_date ? new Date(announcement.response_date).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }) : '';
+                
+                content += `
+                    <div class="flex items-center gap-3 p-4 bg-gray-100 rounded-lg border border-gray-200">
+                        <div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                            <i class="fas fa-times text-gray-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-semibold text-gray-800">You dismissed this announcement</p>
+                            ${responseDate ? `<p class="text-sm text-gray-600 mt-1">Responded on ${responseDate}</p>` : ''}
+                        </div>
+                        <form method="POST" action="">
+                            <input type="hidden" name="announcement_id" value="${announcement.id}">
+                            <button type="submit" name="respond_to_announcement" value="accepted" 
+                                    class="btn btn-outline-success">
+                                <i class="fas fa-check mr-2"></i> Accept
+                            </button>
+                        </form>
+                    </div>
+                `;
+            } else {
+                content += `
+                    <div class="flex items-center gap-3 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-exclamation text-yellow-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-semibold text-yellow-800">No response recorded</p>
+                            <p class="text-sm text-yellow-600 mt-1">Please respond using the buttons below.</p>
+                        </div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <form method="POST" action="" class="w-full">
+                            <input type="hidden" name="announcement_id" value="${announcement.id}">
+                            <button type="submit" name="respond_to_announcement" value="accepted" 
+                                    class="btn btn-success w-full">
+                                <i class="fas fa-check-circle mr-2"></i>
+                                Accept Announcement
+                            </button>
+                        </form>
+                        <form method="POST" action="" class="w-full">
+                            <input type="hidden" name="announcement_id" value="${announcement.id}">
+                            <button type="submit" name="respond_to_announcement" value="dismissed" 
+                                    class="btn btn-outline-secondary w-full">
+                                <i class="fas fa-times-circle mr-2"></i>
+                                Dismiss Announcement
+                            </button>
+                        </form>
+                    </div>
                 `;
             }
             
             content += `</div></div>`;
-            
-            if (announcement.image_path) {
-                content += `
-                    <div class="mb-8">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-gray-800 text-xl">Attached Image</h3>
-                            <button onclick="openImageModal('${announcement.image_path}')" 
-                                    class="btn-view-image">
-                                <i class="fas fa-expand mr-1"></i> View Full Image
-                            </button>
-                        </div>
-                        <div class="image-preview max-h-96">
-                            <img src="${announcement.image_path}" 
-                                 alt="Announcement Image"
-                                 onclick="openImageModal('${announcement.image_path}')"
-                                 class="cursor-pointer">
-                        </div>
-                    </div>
-                `;
-            }
-            
-            content += `
-                <div class="mb-8">
-                    <h3 class="font-bold text-gray-800 text-xl mb-4">Message Content</h3>
-                    <div class="bg-gray-50 p-8 rounded-2xl border-2 border-gray-200">
-                        <p class="text-gray-700 whitespace-pre-line text-lg leading-relaxed">${announcement.message || 'No message provided'}</p>
-                    </div>
-                </div>
-                
-                <div class="bg-gradient-to-r from-blue-50 to-gray-50 p-6 rounded-2xl border-2 border-blue-200">
-                    <h3 class="font-bold text-gray-800 text-xl mb-6">Your Response</h3>
-            `;
-            
-            if (announcement.user_status === 'accepted') {
-                content += `
-                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5">
-                        <div class="flex items-center gap-4">
-                            <div class="w-16 h-16 bg-green-100 rounded-xl flex items-center justify-center">
-                                <i class="fas fa-check-circle text-green-500 text-2xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-green-800 font-bold text-lg">You accepted this announcement</p>
-                `;
-                
-                if (announcement.response_date) {
-                    const responseDate = new Date(announcement.response_date).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    content += `<p class="text-green-700 mt-2"><i class="fas fa-clock mr-2"></i>${responseDate}</p>`;
-                }
-                
-                content += `</div></div></div>`;
-            } else if (announcement.user_status === 'dismissed') {
-                content += `
-                    <div class="bg-gradient-to-r from-gray-50 to-slate-50 border-2 border-gray-200 rounded-xl p-5">
-                        <div class="flex items-center gap-4">
-                            <div class="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center">
-                                <i class="fas fa-times-circle text-gray-500 text-2xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-gray-800 font-bold text-lg">You dismissed this announcement</p>
-                `;
-                
-                if (announcement.response_date) {
-                    const responseDate = new Date(announcement.response_date).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    content += `<p class="text-gray-600 mt-2"><i class="fas fa-clock mr-2"></i>${responseDate}</p>`;
-                }
-                
-                content += `</div></div></div>`;
-            } else {
-                content += `
-                    <div class="bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-200 rounded-xl p-5">
-                        <div class="flex items-center gap-4">
-                            <div class="w-16 h-16 bg-yellow-100 rounded-xl flex items-center justify-center">
-                                <i class="fas fa-exclamation-circle text-yellow-500 text-2xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-yellow-800 font-bold text-lg">No response recorded</p>
-                                <p class="text-yellow-700 mt-2">Please respond to this announcement using the buttons below.</p>
-                            </div>
-                        </div>
-                        <div class="response-buttons mt-6">
-                            <form method="POST" action="" class="flex-1">
-                                <input type="hidden" name="announcement_id" value="${announcement.id}">
-                                <button type="submit" name="respond_to_announcement" value="accepted" 
-                                        class="btn-accept w-full">
-                                    <i class="fas fa-check-circle"></i>
-                                    Accept Announcement
-                                </button>
-                            </form>
-                            <form method="POST" action="" class="flex-1">
-                                <input type="hidden" name="announcement_id" value="${announcement.id}">
-                                <button type="submit" name="respond_to_announcement" value="dismissed" 
-                                        class="btn-dismiss w-full">
-                                    <i class="fas fa-times-circle"></i>
-                                    Dismiss Announcement
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            content += `</div>`;
             
             modalContent.innerHTML = content;
             modal.classList.add('active');
@@ -910,7 +1163,7 @@ try {
             document.body.style.overflow = 'auto';
         }
 
-        // Image Modal Functions
+        // Image Modal
         function openImageModal(imageSrc) {
             const modal = document.getElementById('imageModal');
             const image = document.getElementById('modalImage');
@@ -960,15 +1213,15 @@ try {
             }
         });
 
-        // Add animation to announcement cards on load
+        // Initialize animation for announcement cards
         document.addEventListener('DOMContentLoaded', function() {
-            const cards = document.querySelectorAll('.info-card');
+            const cards = document.querySelectorAll('.announcement-item');
             cards.forEach((card, index) => {
                 card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
+                card.style.transform = 'translateY(10px)';
                 
                 setTimeout(() => {
-                    card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                    card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
                     card.style.opacity = '1';
                     card.style.transform = 'translateY(0)';
                 }, index * 100);

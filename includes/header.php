@@ -3,12 +3,35 @@ ob_start(); // Start output buffering
 
 require_once __DIR__ . '/auth.php';
 
-
 // Set timezone to Philippine time
 date_default_timezone_set('Asia/Manila');
 
 // Get current page to determine active state
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// Get user's profile picture if exists
+$profile_picture = null;
+if (isset($_SESSION['user']['id'])) {
+    // Define paths for profile pictures
+    $profile_dir = __DIR__ . '/../uploads/profiles/';
+    
+    // Create directory if it doesn't exist
+    if (!file_exists($profile_dir)) {
+        mkdir($profile_dir, 0777, true);
+    }
+    
+    // Check for profile picture
+    $user_id = $_SESSION['user']['id'];
+    $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+    
+    foreach ($allowed_extensions as $ext) {
+        $potential_file = $profile_dir . 'profile_' . $user_id . '.' . $ext;
+        if (file_exists($potential_file)) {
+            $profile_picture = '/community-health-tracker/uploads/profiles/profile_' . $user_id . '.' . $ext;
+            break;
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -16,8 +39,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barangay Toong Health Monitoring and Tracking</title>
-    <link rel="icon" type="image/png" href="../asssets/images/toong-logo.png">
+    <title>Barangay Luz Health Monitoring and Tracking</title>
+    <link rel="icon" type="image/png" href="../asssets/images/Luz.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/community-health-tracker/assets/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -111,6 +134,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
         align-items: center;
         gap: 0.5rem;
         text-decoration: none;
+        cursor: pointer;
+        border: none;
+        outline: none;
     }
 
     .logout-btn:hover {
@@ -347,6 +373,38 @@ $current_page = basename($_SERVER['PHP_SELF']);
         height: 32px;
         width: 32px;
         border-radius: 50%;
+        background-size: cover;
+        background-position: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    .profile-avatar:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .profile-avatar.has-image::after {
+        content: 'Change';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.6rem;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .profile-avatar.has-image:hover::after {
+        opacity: 1;
     }
 
     .profile-info {
@@ -356,7 +414,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     }
 
     .welcome-text {
-        color: #51E800;
+        color: white;
         font-size: 0.875rem;
     }
 
@@ -390,6 +448,107 @@ $current_page = basename($_SERVER['PHP_SELF']);
     .modal-close-btn:hover {
         background-color: rgba(0, 0, 0, 0.1);
         transform: rotate(90deg);
+    }
+
+    /* Profile Picture Upload Modal */
+    .profile-modal-content {
+        background: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    .profile-preview {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 4px solid #3C96E1;
+        margin: 0 auto;
+    }
+
+    .profile-upload-btn {
+        background: #3C96E1;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 9999px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .profile-upload-btn:hover {
+        background: #2B7CC9;
+        transform: translateY(-1px);
+    }
+
+    .profile-remove-btn {
+        background: #ef4444;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 9999px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .profile-remove-btn:hover {
+        background: #dc2626;
+        transform: translateY(-1px);
+    }
+
+    /* Logout Modal Styles */
+    .logout-modal-content {
+        background: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    .logout-modal-buttons {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+    }
+
+    .logout-cancel-btn {
+        flex: 1;
+        padding: 0.75rem 1.5rem;
+        border-radius: 9999px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: 2px solid #d1d5db;
+        background: white;
+        color: #4b5563;
+        cursor: pointer;
+    }
+
+    .logout-cancel-btn:hover {
+        background: #f3f4f6;
+        border-color: #9ca3af;
+    }
+
+    .logout-confirm-btn {
+        flex: 1;
+        padding: 0.75rem 1.5rem;
+        border-radius: 9999px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        background: #ef4444;
+        color: white;
+        cursor: pointer;
+    }
+
+    .logout-confirm-btn:hover {
+        background: #dc2626;
+        transform: translateY(-1px);
     }
 
     /* Responsive adjustments */
@@ -463,6 +622,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .profile-section {
             padding-left: 0.5rem;
         }
+
+        .profile-avatar {
+            height: 28px;
+            width: 28px;
+        }
     }
 
     @media (max-width: 640px) {
@@ -525,11 +689,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <!-- Barangay Toong Logo -->
-                        <img src="../asssets/images/toong-logo.png" alt="Barangay Toong Logo"
+                        <img src="../asssets/images/Luz.jpg" alt="Barangay Luz Logo"
                             class="logo-image">
                         <!-- Updated Header Title with Barangay Toong text -->
                         <div class="header-title-container">
-                            <div class="barangay-text">Barangay Toong</div>
+                            <div class="barangay-text">Barangay Luz</div>
                             <a href="/community-health-tracker/" class="main-title">Health Center Admin Panel</a>
                         </div>
                     </div>
@@ -537,17 +701,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="flex items-center space-x-4">
                         <!-- Search Bar -->
                         <div class="search-container">
-                            <input type="search" placeholder="Search" class="search-input text-black">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="search-icon h-5 w-5" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                            
                         </div>
                         
                         <!-- Profile Section -->
                         <div class="profile-section">
-                            <div class="profile-avatar"></div>
+                            <div class="profile-avatar <?php echo $profile_picture ? 'has-image' : ''; ?>"
+                                 style="<?php echo $profile_picture ? 'background-image: url(\'' . $profile_picture . '\')' : ''; ?>"
+                                 onclick="openProfileModal('admin')">
+                                <?php if (!$profile_picture): ?>
+                                    <i class="fas fa-user-circle text-2xl text-gray-400 absolute inset-0 flex items-center justify-center"></i>
+                                <?php endif; ?>
+                            </div>
                             <div class="profile-info">
                                 <span class="welcome-text">Welcome Super Admin!</span>
                                 <span class="username-text"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
@@ -555,10 +720,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         </div>
                         
                         <!-- Enhanced Logout Button - UPDATED FOR FULL ROUND -->
-                        <a href="../auth/logout.php" class="logout-btn">
-                            <i class="fas fa-sign-out-alt"></i>
+                        <button type="button" onclick="showLogoutModal('admin')" class="logout-btn">
                             <span>Logout</span>
-                        </a>
+                        </button>
                     </div>
                 </div>
 
@@ -577,18 +741,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                     Manage Accounts
                                 </a>
                             </div>
-                            <div class="nav-connection">
-                                <a href="../admin/patient_info.php"
-                                    class="nav-tab <?= ($current_page == 'patient_info.php') ? 'active' : '' ?>">
-                                    Patient Info
-                                </a>
-                            </div>
-                            <div class="nav-connection">
-                                <a href="../admin/reports.php"
-                                    class="nav-tab <?= ($current_page == 'reports.php') ? 'active' : '' ?>">
-                                    Reports
-                                </a>
-                            </div>
+                        
                             <div class="nav-connection">
                                 <a href="../admin/appointments.php"
                                     class="nav-tab <?= ($current_page == 'appointments.php') ? 'active' : '' ?>">
@@ -596,9 +749,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 </a>
                             </div>
                             <div class="nav-connection">
-                                <a href="../admin/staff_schedules.php"
-                                    class="nav-tab <?= ($current_page == 'staff_schedules.php') ? 'active' : '' ?>">
-                                    Schedules
+                                <a href="../admin/Inventory_medicine.php"
+                                    class="nav-tab <?= ($current_page == 'Inventory_medicine.php') ? 'active' : '' ?>">
+                                    Medicine Inventory
                                 </a>
                             </div>
                         </div>
@@ -633,23 +786,29 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <!-- Barangay Toong Logo -->
-                        <img src="../asssets/images/toong-logo.png" alt="Barangay Toong Logo"
+                        <img src="../asssets/images/Luz.jpg" alt="Barangay Luz Logo"
                             class="logo-image">
                         <!-- Updated Header Title with Barangay Toong text -->
                         <div class="header-title-container">
-                            <div class="barangay-text">Barangay Toong</div>
+                            <div class="barangay-text">Barangay Luz</div>
                             <a href="/community-health-tracker/" class="main-title">Health Center Staff Panel</a>
                         </div>
                     </div>
 
-                    <div class="flex items-center space-x-4">
-                        <span class="font-medium">Welcome, <?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
-                        <!-- Enhanced Logout Button - UPDATED FOR FULL ROUND -->
-                        <a href="/community-health-tracker/auth/logout.php"
-   class="logout-btn bg-white text-[#3C96E1] hover:bg-[#2B7CC9] hover:text-white">
-    <i class="fas fa-sign-out-alt"></i>
-    <span>Logout</span>
-</a>
+                    <div class="flex items-center space-x-10">
+                        <div class="flex items-center space-x-5">
+                            <div class="profile-avatar <?php echo $profile_picture ? 'has-image' : ''; ?>"
+                                 style="<?php echo $profile_picture ? 'background-image: url(\'' . $profile_picture . '\')' : ''; ?>"
+                                 onclick="openProfileModal('staff')">
+                                <?php if (!$profile_picture): ?>
+                                    <i class="fas fa-user-circle text-4xl text-white absolute inset-0 flex items-center justify-center"></i>
+                                <?php endif; ?>
+                            </div>
+                            <span class="font-medium">Welcome, <?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
+                        </div>
+                        <button type="button" onclick="showLogoutModal('staff')" class="logout-btn bg-white text-[#3C96E1] hover:bg-[#2B7CC9] hover:text-white">
+                            <span>Logout</span>
+                        </button>
                     </div>
                 </div>
 
@@ -657,19 +816,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="container mx-auto px-4 flex items-center justify-between staff-nav-container">
                         <div class="nav-tab-container">
                             <div class="nav-connection">
-                                <a href="/CAPSTONE-PROJECT-V1.0/staff/dashboard.php"
+                                <a href="/community-health-tracker/staff/dashboard.php"
                                     class="nav-tab <?= ($current_page == 'dashboard.php') ? 'active' : '' ?>">
                                     Dashboard
                                 </a>
                             </div>
                             <div class="nav-connection">
-                                <a href="/CAPSTONE-PROJECT-V1.0/staff/existing_info_patients.php"
+                                <a href="/community-health-tracker/staff/existing_info_patients.php"
                                     class="nav-tab <?= ($current_page == 'existing_info_patients.php') ? 'active' : '' ?>">
                                     Medical Records
                                 </a>
                             </div>
                             <div class="nav-connection">
-                                <a href="/CAPSTONE-PROJECT-V1.0/staff/announcements.php"
+                                <a href="/community-health-tracker/staff/announcements.php"
                                     class="nav-tab <?= ($current_page == 'announcements.php') ? 'active' : '' ?>">
                                     Announcements
                                 </a>
@@ -706,25 +865,30 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div class="flex items-center space-x-2">
                         <!-- Barangay Toong Logo -->
-                        <img src="../asssets/images/toong-logo.png" alt="Barangay Toong Logo"
+                        <img src="../asssets/images/Luz.jpg" alt="Barangay Luz Logo"
                             class="logo-image">
                         <!-- Updated Header Title with Barangay Toong text -->
                         <div class="header-title-container">
-                            <div class="barangay-text">Barangay Toong</div>
+                            <div class="barangay-text">Barangay Luz</div>
                             <a href="/community-health-tracker/" class="main-title">Resident Consultation Portal</a>
                         </div>
                     </div>
 
-                    <div class="flex items-center space-x-4">
-                        <div class="flex items-center space-x-2">
-                            <i class="fas fa-user-circle text-xl"></i>
+                    <div class="flex items-center space-x-10">
+                        <div class="flex items-center space-x-5">
+                            <div class="profile-avatar <?php echo $profile_picture ? 'has-image' : ''; ?>"
+                                 style="<?php echo $profile_picture ? 'background-image: url(\'' . $profile_picture . '\')' : ''; ?>"
+                                 onclick="openProfileModal('user')">
+                                <?php if (!$profile_picture): ?>
+                                    <i class="fas fa-user-circle text-4xl text-white absolute inset-0 flex items-center justify-center"></i>
+                                <?php endif; ?>
+                            </div>
                             <span class="font-medium"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
                         </div>
                         <!-- Enhanced Logout Button - UPDATED FOR FULL ROUND -->
-                        <a href="../auth/logout_user.php" class="logout-btn bg-white text-[#3C96E1] hover:bg-[#2B7CC9] hover:text-white">
-                            <i class="fas fa-sign-out-alt"></i>
+                        <button type="button" onclick="showLogoutModal('user')" class="logout-btn bg-white text-[#3C96E1] hover:bg-[#2B7CC9] hover:text-white">
                             <span>Logout</span>
-                        </a>
+                        </button>
                     </div>
                 </div>
 
@@ -776,7 +940,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </nav>
         <?php endif; ?>
     <?php else: ?>
-
         <!-- Public Header (Not logged in) -->
         <style>
             .mobile-menu {
@@ -830,10 +993,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="py-5 bg-[#FFFFFF] rounded-2xl flex shadow-2xl justify-between items-center">
                     <!-- Logo/Title with two-line text -->
                     <div class="flex items-center mx-8 sm:mx-16">
-                        <img src="asssets/images/toong-logo.png" alt="Barangay Toong Logo"
+                        <img src="./asssets/images/Luz.jpg" alt="Barangay Luz Logo"
                             class="circle-image mr-4">
                         <div class="logo-text">
-                            <div class="font-bold text-xl leading-tight">Barangay Toong</div>
+                            <div class="font-bold text-xl leading-tight">Barangay Luz</div>
                             <div class="text-lg text-gray-700">Monitoring and Tracking</div>
                         </div>
                     </div>
@@ -852,19 +1015,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <ul class="flex items-center space-x-8 font-semibold">
                             <li>
                                 <a href="#"
-                                    class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Home</a>
+                                    class="nav-link text-gray-700 hover:text-[#4A90E2] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Home</a>
                             </li>
                             <li>
                                 <a href="#"
-                                    class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">About</a>
+                                    class="nav-link text-gray-700 hover:text-[#4A90E2] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">About</a>
                             </li>
                             <li>
                                 <a href="#"
-                                    class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Services</a>
+                                    class="nav-link text-gray-700 hover:text-[#4A90E2] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Services</a>
                             </li>
                             <li>
                                 <a href="#"
-                                    class="nav-link text-gray-700 hover:text-[#FC566C] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Contact</a>
+                                    class="nav-link text-gray-700 hover:text-[#4A90E2] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Contact</a>
                             </li>
                         </ul>
                     </div>
@@ -949,13 +1112,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             <!-- Logo at the top - bigger and circular -->
             <div class="flex justify-center mb-4 mx-4">
-                <img src="./asssets/images/toong-logo.png" alt="Barangay Toong Logo" 
+                <img src="./asssets/images/Luz.jpg" alt="Barangay Luz Logo" 
                      class="w-20 h-20 rounded-full object-cover border-4 border-[#3C96E1] shadow-lg">
             </div>
 
             <!-- Main Title - Bigger -->
             <div class="text-center mb-2 mx-4">
-                <h1 class="text-2xl font-bold text-[#4A90E2]">Barangay Toong Cebu City</h1>
+                <h1 class="text-2xl font-bold text-[#4A90E2]">Barangay Luz Cebu City</h1>
             </div>
 
             <!-- Instruction Text - Smaller -->
@@ -967,7 +1130,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             <!-- Healthcare Image -->
             <div class="mb-6 mx-4">
-                <img src="./asssets/images/healthcare.png" alt="Healthcare illustration" 
+                <img src="./asssets/images/Dev.jpg" alt="Healthcare illustration" 
                      class="w-full h-48 object-cover rounded-lg shadow-md">
             </div>
 
@@ -998,7 +1161,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             <!-- Logo at the top - consistent with main modal -->
             <div class="flex justify-center mb-4 mx-4">
-                <img src="./asssets/images/toong-logo.png" alt="Barangay Toong Logo" 
+                <img src="./asssets/images/Luz.jpg" alt="Barangay Luz Logo" 
                      class="w-16 h-16 rounded-full object-cover border-4 border-[#3C96E1] shadow-lg">
             </div>
 
@@ -1033,13 +1196,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                     <!-- Forgot Password -->
                     <div class="text-right mt-4">
-                        <a href="#" class="text-sm text-[#3C96E1] hover:underline">Forgot your password?</a>
+                        <a href="#" class="text-sm text-[#3C96E2] hover:underline">Forgot your password?</a>
                     </div>
 
                     <!-- Login Button - consistent with main modal buttons -->
                     <div class="mt-6">
                         <button type="submit"
-                            class="complete-btn bg-[#4A90E2] w-full p-3 rounded-full text-white transition-all duration-200 font-medium shadow-md hover:shadow-lg text-lg h-14">
+                            class="complete-btn bg-[#3C96E1] w-full p-3 rounded-full text-white transition-all duration-200 font-medium shadow-md hover:shadow-lg text-lg h-14">
                             Login
                         </button>
                     </div>
@@ -1048,7 +1211,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="flex justify-center text-sm font-medium space-x-1 mt-4">
                         <p class="text-gray-600">Don't have an account?</p>
                         <button id="loginToRegister" type="button"
-                            class="text-[#4A90E2] hover:underline">Register</button>
+                            class="text-[#3C96E2] hover:underline">Register</button>
                     </div>
                 </div>
             </form>
@@ -1067,13 +1230,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             <!-- Logo at the top - consistent with main modal -->
             <div class="flex justify-center mb-4 mx-4">
-                <img src="./asssets/images/toong-logo.png" alt="Barangay Toong Logo" 
+                <img src="./asssets/images/Luz.jpg" alt="Barangay Luz Logo" 
                      class="w-16 h-16 rounded-full object-cover border-4 border-[#3C96E1] shadow-lg">
             </div>
 
             <!-- Main Title - consistent styling -->
             <div class="text-center mb-6 mx-4">
-                <h2 class="text-xl font-bold text-[#4A90E2]">Register Your Account</h2>
+                <h2 class="text-xl font-bold text-[#3C96E1]">Register Your Account</h2>
                 <p class="text-gray-600 mt-2 text-sm">Sign up to your resident account</p>
             </div>
 
@@ -1101,42 +1264,58 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             required />
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                            <label for="age" class="block text-sm font-medium text-gray-700 mb-2">Age <span class="text-red-500">*</span></label>
-                            <input type="number" id="age" name="age" placeholder="Age" min="1" max="120"
-                                value="<?php echo isset($_POST['age']) ? htmlspecialchars($_POST['age']) : ''; ?>"
-                                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
-                                required />
-                        </div>
-
-                        <div>
-                            <label for="gender" class="block text-sm font-medium text-gray-700 mb-2">Gender <span class="text-red-500">*</span></label>
-                            <select id="gender" name="gender"
-                                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
-                                required>
-                                <option value="" disabled selected>Select Gender</option>
-                                <option value="male" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'male') ? 'selected' : ''; ?>>Male</option>
-                                <option value="female" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'female') ? 'selected' : ''; ?>>Female</option>
-                                <option value="other" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'other') ? 'selected' : ''; ?>>Other</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="contact" class="block text-sm font-medium text-gray-700 mb-2">Contact Number <span class="text-red-500">*</span></label>
-                            <input type="tel" id="contact" name="contact" placeholder="Contact Number"
-                                value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>"
-                                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
-                                required />
-                        </div>
+                    <!-- Date of Birth Field - Updated with consistent styling -->
+                    <div>
+                        <label for="date_of_birth" class="block text-sm font-medium text-gray-700 mb-2">Date of Birth <span class="text-red-500">*</span></label>
+                        <input type="date" 
+                               id="date_of_birth" 
+                               name="date_of_birth" 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
+                               required
+                               max="<?= date('Y-m-d') ?>">
+                        <p class="text-xs text-gray-600 mt-2">Please enter your exact date of birth for accurate record keeping</p>
                     </div>
 
-                    <!-- Updated Address Field -->
+                    <!-- Age Field - Auto-calculated and read-only -->
+                    <div>
+                        <label for="age" class="block text-sm font-medium text-gray-700 mb-2">Age (Auto-calculated) <span class="text-red-500">*</span></label>
+                        <input type="number" 
+                               id="age" 
+                               name="age" 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input bg-gray-100 cursor-not-allowed"
+                               readonly
+                               required>
+                        <p class="text-xs text-gray-600 mt-2">Age is automatically calculated from your date of birth</p>
+                    </div>
+
+                    <!-- Gender Field -->
+                    <div>
+                        <label for="gender" class="block text-sm font-medium text-gray-700 mb-2">Gender <span class="text-red-500">*</span></label>
+                        <select id="gender" name="gender"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
+                            required>
+                            <option value="" disabled selected>Select Gender</option>
+                            <option value="male" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'male') ? 'selected' : ''; ?>>Male</option>
+                            <option value="female" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'female') ? 'selected' : ''; ?>>Female</option>
+                            <option value="other" <?php echo (isset($_POST['gender']) && $_POST['gender'] == 'other') ? 'selected' : ''; ?>>Other</option>
+                        </select>
+                    </div>
+
+                    <!-- Contact Number Field -->
+                    <div>
+                        <label for="contact" class="block text-sm font-medium text-gray-700 mb-2">Contact Number <span class="text-red-500">*</span></label>
+                        <input type="tel" id="contact" name="contact" placeholder="Contact Number"
+                            value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
+                            required />
+                    </div>
+
+                    <!-- Updated Address Field - Changed to Barangay Luz Cebu City -->
                     <div>
                         <label for="address" class="block text-sm font-medium text-gray-700 mb-2">Address <span class="text-red-500">*</span></label>
                         <div class="relative">
                             <input type="text" id="address" name="address" 
-                                value="Barangay Toong, Cebu City"
+                                value="Barangay Luz, Cebu City"
                                 readonly
                                 class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input bg-gray-100 cursor-not-allowed"
                                 required />
@@ -1148,34 +1327,25 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         </div>
                         <p class="text-xs text-gray-500 mt-2 flex items-center">
                             <i class="fas fa-info-circle text-[#3C96E1] mr-1"></i>
-                            Your address has been automatically set to Barangay Toong, Cebu City
+                            Your address has been automatically set to Barangay Luz, Cebu City
                         </p>
                     </div>
 
                     <!-- New Sitio Field -->
-<div>
-    <label for="sitio" class="block text-sm font-medium text-gray-700 mb-2">Sitio <span class="text-red-500">*</span></label>
-    <select id="sitio" name="sitio"
-        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
-        required>
-        <option value="" disabled selected>Select your Sitio</option>
-        <option value="Proper Toong">Proper Toong</option>
-        <option value="Lower Toong">Lower Toong</option>
-        <option value="Buacao">Buacao</option>
-        <option value="Angay-Angay">Angay-Angay</option>
-        <option value="Badiang">Badiang</option>
-        <option value="Candahat">Candahat</option>
-        <option value="NapNapan">NapNapan</option>
-        <option value="Buyo">Buyo</option>
-        <option value="Kalumboyan">Kalumboyan</option>
-        <option value="Bugna">Bugna</option>
-        <option value="Kaangking">Kaangking</option>
-        <option value="Caolong">Caolong</option>
-        <option value="Acasia">Acasia</option>
-        <option value="Buad">Buad</option>
-        <option value="Pangpang">Pangpang</option>
-    </select>
-</div>
+                    <div>
+                        <label for="sitio" class="block text-sm font-medium text-gray-700 mb-2">Sitio <span class="text-red-500">*</span></label>
+                        <select id="sitio" name="sitio"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] form-input"
+                            required>
+                            <option value="" disabled selected>Select your Sitio</option>
+                            <option value="Proper Luz">Proper Luz</option>
+                            <option value="Lower Luz">Lower Luz</option>
+                            <option value="Upper Luz">Upper Luz</option>
+                            <option value="Luz Proper">Luz Proper</option>
+                            <option value="Luz Heights">Luz Heights</option>
+                            <!-- Add more sitios as needed for Barangay Luz -->
+                        </select>
+                    </div>
 
                     <!-- Civil Status and Occupation -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1202,7 +1372,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <!-- Continue Button - consistent styling -->
                     <div class="mt-6">
                         <button type="button" id="openSecondRegister"
-                            class="continue-btn bg-[#4A90E2] w-full rounded-full text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98] text-lg h-14"
+                            class="continue-btn bg-[#3C96E1] w-full rounded-full text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98] text-lg h-14"
                             disabled>
                             Continue
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2" fill="none"
@@ -1217,7 +1387,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="flex flex-col sm:flex-row justify-center text-sm font-medium space-y-1 sm:space-y-0 sm:space-x-1 mt-4">
                         <p class="text-gray-600">Already have an account?</p>
                         <button id="registerToLogin" type="button"
-                            class="text-[#4A90E2] hover:underline">Login</button>
+                            class="text-[#3C96E1] hover:underline">Login</button>
                     </div>
                 </div>
             </form>
@@ -1248,13 +1418,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             <!-- Logo at the top - consistent with main modal -->
             <div class="flex justify-center mb-4 mx-4">
-                <img src="./asssets/images/toong-logo.png" alt="Barangay Toong Logo" 
+                <img src="./asssets/images/Luz.jpg" alt="Barangay Luz Logo" 
                      class="w-16 h-16 rounded-full object-cover border-4 border-[#3C96E1] shadow-lg">
             </div>
 
             <!-- Main Title - consistent styling -->
             <div class="text-center mb-6 mx-4">
-                <h2 class="text-xl font-bold text-[#FC566C]">Complete Your Registration</h2>
+                <h2 class="text-xl font-bold text-[#3C96E1]">Complete Your Registration</h2>
                 <p class="text-gray-600 mt-2 text-sm">Add your account credentials</p>
             </div>
 
@@ -1262,10 +1432,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="space-y-6 mx-4">
                     <!-- Hidden fields to pass data from first form -->
                     <input type="hidden" name="full_name" id="hidden_full_name" value="">
+                    <input type="hidden" name="date_of_birth" id="hidden_date_of_birth" value="">
                     <input type="hidden" name="age" id="hidden_age" value="">
                     <input type="hidden" name="gender" id="hidden_gender" value="">
                     <input type="hidden" name="contact" id="hidden_contact" value="">
-                    <input type="hidden" name="address" id="hidden_address" value="">
+                    <input type="hidden" name="address" id="hidden_address" value="Barangay Luz, Cebu City">
                     <input type="hidden" name="sitio" id="hidden_sitio" value="">
                     <input type="hidden" name="civil_status" id="hidden_civil_status" value="">
                     <input type="hidden" name="occupation" id="hidden_occupation" value="">
@@ -1380,7 +1551,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <!-- Complete Registration Button - consistent styling -->
                     <div class="mt-6">
                         <button type="submit" id="submitButton"
-                            class="complete-btn bg-[#4A90E2] w-full rounded-full text-white transition-all duration-200 font-medium shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-lg h-14">
+                            class="complete-btn bg-[#3C96E1] w-full rounded-full text-white transition-all duration-200 font-medium shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-lg h-14">
                             Complete Registration
                         </button>
                     </div>
@@ -1390,110 +1561,114 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </div>
 </div>
 
-<script>
-    // Sitio Field Validation - Add this to your existing script
-function validateFirstForm() {
-    const fullName = document.getElementById('full_name').value.trim();
-    const age = document.getElementById('age').value;
-    const gender = document.getElementById('gender').value;
-    const contact = document.getElementById('contact').value.trim();
-    const sitio = document.getElementById('sitio').value;
-    const continueBtn = document.getElementById('openSecondRegister');
-    
-    // Enable button only if all required fields are filled (including sitio)
-    if (fullName && age && gender && contact && sitio) {
-        continueBtn.disabled = false;
-    } else {
-        continueBtn.disabled = true;
-    }
-}
-
-// Add event listener for sitio field
-document.getElementById('sitio').addEventListener('change', validateFirstForm);
-
-// Transfer sitio data from first to second form
-document.getElementById('openSecondRegister').addEventListener('click', function() {
-    // Get values from first form
-    const fullName = document.getElementById('full_name').value;
-    const age = document.getElementById('age').value;
-    const gender = document.getElementById('gender').value;
-    const contact = document.getElementById('contact').value;
-    const address = document.getElementById('address').value;
-    const sitio = document.getElementById('sitio').value; // Get sitio value
-        const civilStatus = document.getElementById('civil_status') ? document.getElementById('civil_status').value : '';
-        const occupation = document.getElementById('occupation') ? document.getElementById('occupation').value : '';
-    
-    // Set values to hidden fields in second form
-    document.getElementById('hidden_full_name').value = fullName;
-    document.getElementById('hidden_age').value = age;
-    document.getElementById('hidden_gender').value = gender;
-    document.getElementById('hidden_contact').value = contact;
-    document.getElementById('hidden_address').value = address;
-    document.getElementById('hidden_sitio').value = sitio; // Set sitio value
-    document.getElementById('hidden_civil_status').value = civilStatus;
-    document.getElementById('hidden_occupation').value = occupation;
-    
-    // Show second form and hide first form
-    document.getElementById('registerFormModal').classList.add('hidden');
-    document.getElementById('secondRegisterFormModal').classList.remove('hidden');
-});
-</script>
-
-<script>
-// Address field auto-population
-document.addEventListener('DOMContentLoaded', function() {
-    const addressField = document.getElementById('address');
-    
-    // Auto-populate the address field when registration modal opens
-    document.getElementById('openRegister')?.addEventListener('click', function() {
-        setTimeout(() => {
-            if (addressField) {
-                addressField.value = 'Barangay Toong, Cebu City';
-                addressField.readOnly = true;
-                checkFirstFormCompletion(); // Update form validation
-            }
-        }, 100);
-    });
-    
-    // Also set address when the page loads if the field exists
-    if (addressField) {
-        addressField.value = 'Barangay Toong, Cebu City';
-        addressField.readOnly = true;
-        checkFirstFormCompletion(); // Update form validation
-    }
-});
-
-// Update the form validation function
-function checkFirstFormCompletion() {
-    const firstFormRequiredFields = document.querySelectorAll('#firstRegisterForm [required]');
-    let allFilled = true;
-
-    firstFormRequiredFields.forEach(field => {
-        if (!field.value.trim()) {
-            allFilled = false;
-        }
-    });
-
-    const openSecondRegister = document.getElementById('openSecondRegister');
-    if (openSecondRegister) {
-        openSecondRegister.disabled = !allFilled;
-    }
-}
-
-// Add event listeners to first form fields for validation
-document.addEventListener('DOMContentLoaded', function() {
-    const firstFormRequiredFields = document.querySelectorAll('#firstRegisterForm [required]');
-    
-    firstFormRequiredFields.forEach(field => {
-        field.addEventListener('input', checkFirstFormCompletion);
-        field.addEventListener('change', checkFirstFormCompletion);
-    });
-    
-    // Initial check
-    checkFirstFormCompletion();
-});
-</script>
         <?php endif; ?>
+
+        <!-- Profile Picture Upload Modal -->
+        <div id="profileModal" class="fixed inset-0 hidden z-[70] h-full w-full backdrop-blur-sm bg-black/30 flex justify-center items-center">
+            <div class="relative bg-white p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-md mx-auto modal-content profile-modal-content">
+                <!-- Close Button -->
+                <button onclick="closeProfileModal()"
+                    class="modal-close-btn absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+
+                <!-- Modal Title -->
+                <div class="text-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">Profile Picture</h3>
+                    <p class="text-gray-600 mt-2">Upload or change your profile picture</p>
+                </div>
+
+                <!-- Current Profile Picture Preview -->
+                <div class="mb-6">
+                    <img id="profilePreview" src="<?php echo $profile_picture ?: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEyIiBmaWxsPSIjZDFkNWRiIi8+PHBhdGggZD0iTTEyIDExYTIgMiAwIDEgMCAwLTQgMiAyIDAgMCAwIDAgNHoiIGZpbGw9IiM5Y2EzYWYiLz48cGF0aCBkPSJNMTIgMTVhNCA0IDAgMCAwLTQgNGg4YTQgNCAwIDAgMC00LTR6IiBmaWxsPSIjOWNhM2FmIi8+PC9zdmc+' ?>"
+                         alt="Profile Preview" class="profile-preview">
+                </div>
+
+                <!-- Upload Form -->
+                <form id="profileUploadForm" enctype="multipart/form-data" class="space-y-4">
+                    <input type="hidden" name="user_id" value="<?php echo isset($_SESSION['user']['id']) ? $_SESSION['user']['id'] : '' ?>">
+                    <input type="hidden" name="user_type" id="profileUserType" value="">
+                    
+                    <div>
+                        <label for="profile_image" class="block text-sm font-medium text-gray-700 mb-2">
+                            Choose Profile Picture
+                        </label>
+                        <input type="file" id="profile_image" name="profile_image" 
+                            accept=".jpg,.jpeg,.png,.gif"
+                            class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3C96E1] text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <p class="text-xs text-gray-500 mt-2">Max file size: 2MB (JPEG, PNG, GIF)</p>
+                        <div id="profileUploadError" class="text-xs text-red-500 mt-2 hidden"></div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3 mt-6">
+                        <button type="button" onclick="removeProfilePicture()" 
+                            class="profile-remove-btn flex-1 <?php echo !$profile_picture ? 'opacity-50 cursor-not-allowed' : '' ?>"
+                            <?php echo !$profile_picture ? 'disabled' : '' ?>>
+                            <i class="fas fa-trash-alt"></i>
+                            Remove
+                        </button>
+                        <button type="submit" class="profile-upload-btn flex-1">
+                            <i class="fas fa-upload"></i>
+                            Upload
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Loading Indicator -->
+                <div id="profileLoading" class="hidden mt-4 text-center">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#3C96E1]"></div>
+                    <p class="text-sm text-gray-600 mt-2">Uploading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logout Confirmation Modal -->
+        <div id="logoutModal" class="fixed inset-0 hidden z-[60] h-full w-full backdrop-blur-sm bg-black/30 flex justify-center items-center">
+            <div class="relative bg-white p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-md mx-auto modal-content logout-modal-content">
+                <!-- Close Button -->
+                <button onclick="closeLogoutModal()"
+                    class="modal-close-btn absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+
+                <!-- Warning Icon -->
+                <div class="flex justify-center mb-4">
+                    <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Modal Title -->
+                <div class="text-center mb-2">
+                    <h3 class="text-xl font-bold text-gray-800">Confirm Logout</h3>
+                </div>
+
+                <!-- Modal Message -->
+                <div class="text-center mb-6">
+                    <p class="text-gray-600">Are you sure you want to logout?</p>
+                    <p class="text-sm text-gray-500 mt-1">You will need to log in again to access your account.</p>
+                </div>
+
+                <!-- Modal Buttons -->
+                <div class="logout-modal-buttons">
+                    <button type="button" onclick="closeLogoutModal()" class="logout-cancel-btn">
+                        Cancel
+                    </button>
+                    <button type="button" id="confirmLogoutBtn" class="logout-confirm-btn">
+                        Yes, Logout
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <main class="container mx-auto mt-24"> <!-- Added mt-24 to account for the fixed header height -->
             <!-- Your main content here -->
@@ -1503,6 +1678,302 @@ document.addEventListener('DOMContentLoaded', function() {
         <div id="refreshIndicator" class="refresh-indicator"></div>
 
         <script>
+            // Global variable to store logout URL
+            let logoutUrl = '';
+
+            // Function to open profile picture modal
+            function openProfileModal(userType) {
+                const modal = document.getElementById("profileModal");
+                const modalContent = modal.querySelector('.modal-content');
+                const userTypeInput = document.getElementById('profileUserType');
+                
+                // Set user type for form submission
+                userTypeInput.value = userType;
+                
+                modal.classList.remove("hidden");
+                modal.classList.add("flex");
+                
+                // Trigger animation
+                setTimeout(() => {
+                    modalContent.classList.add('open');
+                }, 10);
+                
+                // Set focus to upload button for accessibility
+                setTimeout(() => {
+                    document.querySelector('.profile-upload-btn').focus();
+                }, 50);
+            }
+
+            // Function to close profile modal
+            function closeProfileModal() {
+                const modal = document.getElementById("profileModal");
+                const modalContent = modal.querySelector('.modal-content');
+                
+                modalContent.classList.remove('open');
+                
+                // Wait for animation to complete before hiding
+                setTimeout(() => {
+                    modal.classList.remove("flex");
+                    modal.classList.add("hidden");
+                }, 300);
+            }
+
+            // Function to show logout confirmation modal
+            function showLogoutModal(userType) {
+                // Set the logout URL based on user type
+                switch(userType) {
+                    case 'admin':
+                        logoutUrl = '../auth/logout.php';
+                        break;
+                    case 'staff':
+                        logoutUrl = '/community-health-tracker/auth/logout.php';
+                        break;
+                    case 'user':
+                        logoutUrl = '../auth/logout_user.php';
+                        break;
+                    default:
+                        logoutUrl = '../auth/logout.php';
+                }
+                
+                const modal = document.getElementById("logoutModal");
+                const modalContent = modal.querySelector('.modal-content');
+                
+                modal.classList.remove("hidden");
+                modal.classList.add("flex");
+                
+                // Trigger animation
+                setTimeout(() => {
+                    modalContent.classList.add('open');
+                }, 10);
+                
+                // Set focus to cancel button for accessibility
+                setTimeout(() => {
+                    document.querySelector('.logout-cancel-btn').focus();
+                }, 50);
+            }
+
+            // Function to close logout modal
+            function closeLogoutModal() {
+                const modal = document.getElementById("logoutModal");
+                const modalContent = modal.querySelector('.modal-content');
+                
+                modalContent.classList.remove('open');
+                
+                // Wait for animation to complete before hiding
+                setTimeout(() => {
+                    modal.classList.remove("flex");
+                    modal.classList.add("hidden");
+                }, 300);
+            }
+
+            // Handle logout confirmation
+            document.getElementById('confirmLogoutBtn').addEventListener('click', function() {
+                // Redirect to logout URL
+                window.location.href = logoutUrl;
+            });
+
+            // Profile picture upload functionality
+            document.addEventListener('DOMContentLoaded', function() {
+                const profileUploadForm = document.getElementById('profileUploadForm');
+                const profileImageInput = document.getElementById('profile_image');
+                const profilePreview = document.getElementById('profilePreview');
+                const profileUploadError = document.getElementById('profileUploadError');
+                const profileLoading = document.getElementById('profileLoading');
+                const removeProfileBtn = document.querySelector('.profile-remove-btn');
+
+                // Preview image when file is selected
+                profileImageInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        // Validate file size (2MB)
+                        if (file.size > 2 * 1024 * 1024) {
+                            profileUploadError.textContent = 'File size exceeds 2MB limit.';
+                            profileUploadError.classList.remove('hidden');
+                            this.value = '';
+                            return;
+                        }
+
+                        // Validate file type
+                        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                        if (!validTypes.includes(file.type)) {
+                            profileUploadError.textContent = 'Invalid file type. Please upload JPEG, PNG, or GIF images.';
+                            profileUploadError.classList.remove('hidden');
+                            this.value = '';
+                            return;
+                        }
+
+                        // Clear any previous errors
+                        profileUploadError.classList.add('hidden');
+
+                        // Create preview
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            profilePreview.src = e.target.result;
+                        }
+                        reader.readAsDataURL(file);
+                    }
+                });
+
+                // Handle form submission
+                profileUploadForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(this);
+                    const file = profileImageInput.files[0];
+                    
+                    if (!file) {
+                        profileUploadError.textContent = 'Please select a file to upload.';
+                        profileUploadError.classList.remove('hidden');
+                        return;
+                    }
+
+                    // Show loading indicator
+                    profileLoading.classList.remove('hidden');
+                    profileUploadForm.classList.add('opacity-50');
+                    
+                    // Submit via AJAX
+                    fetch('/community-health-tracker/auth/upload_profile.php', {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update profile picture in header
+                            updateProfilePicture(data.profile_url);
+                            
+                            // Show success message
+                            alert('Profile picture updated successfully!');
+                            
+                            // Close modal
+                            closeProfileModal();
+                        } else {
+                            // Show error
+                            profileUploadError.textContent = data.message || 'Upload failed. Please try again.';
+                            profileUploadError.classList.remove('hidden');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        profileUploadError.textContent = 'An error occurred. Please try again.';
+                        profileUploadError.classList.remove('hidden');
+                    })
+                    .finally(() => {
+                        // Hide loading indicator
+                        profileLoading.classList.add('hidden');
+                        profileUploadForm.classList.remove('opacity-50');
+                    });
+                });
+
+                // Remove profile picture
+                window.removeProfilePicture = function() {
+                    if (!confirm('Are you sure you want to remove your profile picture?')) {
+                        return;
+                    }
+
+                    const formData = new FormData();
+                    formData.append('user_id', document.querySelector('input[name="user_id"]').value);
+                    formData.append('user_type', document.getElementById('profileUserType').value);
+                    formData.append('remove', '1');
+
+                    // Show loading indicator
+                    profileLoading.classList.remove('hidden');
+                    profileUploadForm.classList.add('opacity-50');
+                    
+                    fetch('/community-health-tracker/auth/upload_profile.php', {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update profile picture in header
+                            updateProfilePicture(null);
+                            
+                            // Reset preview to default
+                            profilePreview.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEyIiBmaWxsPSIjZDFkNWRiIi8+PHBhdGggZD0iTTEyIDExYTIgMiAwIDEgMCAwLTQgMiAyIDAgMCAwIDAgNHoiIGZpbGw9IiM5Y2EzYWYiLz48cGF0aCBkPSJNMTIgMTVhNCA0IDAgMCAwLTQgNGg4YTQgNCAwIDAgMC00LTR6IiBmaWxsPSIjOWNhM2FmIi8+PC9zdmc+';
+                            
+                            // Disable remove button
+                            removeProfileBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                            removeProfileBtn.disabled = true;
+                            
+                            // Show success message
+                            alert('Profile picture removed successfully!');
+                        } else {
+                            alert(data.message || 'Failed to remove profile picture.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred. Please try again.');
+                    })
+                    .finally(() => {
+                        // Hide loading indicator
+                        profileLoading.classList.add('hidden');
+                        profileUploadForm.classList.remove('opacity-50');
+                    });
+                };
+
+                // Function to update profile picture in header
+                function updateProfilePicture(imageUrl) {
+                    const profileAvatars = document.querySelectorAll('.profile-avatar');
+                    profileAvatars.forEach(avatar => {
+                        if (imageUrl) {
+                            avatar.style.backgroundImage = `url('${imageUrl}')`;
+                            avatar.classList.add('has-image');
+                            // Remove the icon if it exists
+                            const icon = avatar.querySelector('i');
+                            if (icon) {
+                                icon.remove();
+                            }
+                        } else {
+                            avatar.style.backgroundImage = '';
+                            avatar.classList.remove('has-image');
+                            // Add the default icon
+                            if (!avatar.querySelector('i')) {
+                                const icon = document.createElement('i');
+                                icon.className = 'fas fa-user-circle text-4xl text-white absolute inset-0 flex items-center justify-center';
+                                avatar.appendChild(icon);
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Close modal when clicking outside
+            document.getElementById('profileModal')?.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeProfileModal();
+                }
+            });
+
+            document.getElementById('logoutModal')?.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeLogoutModal();
+                }
+            });
+
+            // Close modals with Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    const profileModal = document.getElementById('profileModal');
+                    const logoutModal = document.getElementById('logoutModal');
+                    
+                    if (!profileModal.classList.contains('hidden')) {
+                        closeProfileModal();
+                    } else if (!logoutModal.classList.contains('hidden')) {
+                        closeLogoutModal();
+                    }
+                }
+                
+                // Handle Enter key on confirm button
+                if (e.key === 'Enter' && document.activeElement.id === 'confirmLogoutBtn') {
+                    document.getElementById('confirmLogoutBtn').click();
+                }
+            });
+
             // Function to update Philippine time in real-time
             function updatePhilippineTime() {
                 const now = new Date();
@@ -1647,52 +2118,73 @@ document.addEventListener('DOMContentLoaded', function() {
                 const passwordMatchError = document.getElementById('passwordMatchError');
                 const submitButton = document.getElementById('submitButton');
 
-                // Get all required fields from first form
-                const firstFormRequiredFields = firstRegisterForm.querySelectorAll('[required]');
-
-                // Function to check if all required fields in first form are filled
-                function checkFirstFormCompletion() {
+                // Age auto-calculation functionality
+                const dateOfBirthInput = document.getElementById('date_of_birth');
+                const ageInput = document.getElementById('age');
+                
+                function calculateAge(birthDate) {
+                    if (!birthDate) return '';
+                    
+                    const today = new Date();
+                    const birthDateObj = new Date(birthDate);
+                    
+                    let age = today.getFullYear() - birthDateObj.getFullYear();
+                    const monthDiff = today.getMonth() - birthDateObj.getMonth();
+                    
+                    // If birthday hasn't occurred yet this year, subtract 1
+                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+                        age--;
+                    }
+                    
+                    return age;
+                }
+                
+                // Update age when date of birth changes
+                dateOfBirthInput.addEventListener('change', function() {
+                    const birthDate = this.value;
+                    const age = calculateAge(birthDate);
+                    
+                    if (age !== '' && age >= 0) {
+                        ageInput.value = age;
+                    } else {
+                        ageInput.value = '';
+                    }
+                    
+                    // Validate form completion
+                    validateFirstFormCompletion();
+                });
+                
+                // Validate first form completion
+                function validateFirstFormCompletion() {
+                    const requiredFields = firstRegisterForm.querySelectorAll('[required]');
                     let allFilled = true;
-
-                    firstFormRequiredFields.forEach(field => {
+                    
+                    requiredFields.forEach(field => {
                         if (!field.value.trim()) {
                             allFilled = false;
                         }
+                        
+                        // Special validation for age
+                        if (field.id === 'age' && field.value.trim()) {
+                            const ageValue = parseInt(field.value);
+                            if (isNaN(ageValue) || ageValue < 0 || ageValue > 120) {
+                                allFilled = false;
+                            }
+                        }
                     });
-
+                    
                     openSecondRegister.disabled = !allFilled;
+                    
+                    return allFilled;
                 }
-
+                
                 // Add event listeners to first form fields
-                firstFormRequiredFields.forEach(field => {
-                    field.addEventListener('input', checkFirstFormCompletion);
-                    field.addEventListener('change', checkFirstFormCompletion);
+                const firstFormFields = firstRegisterForm.querySelectorAll('input, select');
+                firstFormFields.forEach(field => {
+                    field.addEventListener('input', validateFirstFormCompletion);
+                    field.addEventListener('change', validateFirstFormCompletion);
                 });
-
-                // Initial check
-                checkFirstFormCompletion();
-
-                // Store form data when moving to second form
-                openSecondRegister.addEventListener('click', function (e) {
-                    e.preventDefault();
-
-                    // Transfer data to hidden fields in second form
-                    document.getElementById('hidden_full_name').value = document.getElementById('full_name').value;
-                    document.getElementById('hidden_age').value = document.getElementById('age').value;
-                    document.getElementById('hidden_gender').value = document.getElementById('gender').value;
-                    document.getElementById('hidden_contact').value = document.getElementById('contact').value;
-                    document.getElementById('hidden_address').value = document.getElementById('address').value;
-
-                    // Hide first modal, show second modal
-                    registerFormModal.classList.add('hidden');
-                    secondRegisterFormModal.classList.remove('hidden');
-
-                    // Scroll to top of second form on mobile
-                    if (window.innerWidth <= 768) {
-                        window.scrollTo(0, 0);
-                    }
-                });
-
+                
                 // Go back to first form
                 backToFirstRegister.addEventListener('click', function () {
                     secondRegisterFormModal.classList.add('hidden');
@@ -1867,6 +2359,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             document.getElementById('openSecondRegister').addEventListener('click', function (e) {
                 e.preventDefault(); // Prevent form submission
+                
+                // Collect data from first form and set to hidden fields
+                const firstFormData = new FormData(document.getElementById('firstRegisterForm'));
+                
+                // Set hidden field values
+                document.getElementById('hidden_full_name').value = firstFormData.get('full_name');
+                document.getElementById('hidden_date_of_birth').value = firstFormData.get('date_of_birth');
+                document.getElementById('hidden_age').value = firstFormData.get('age');
+                document.getElementById('hidden_gender').value = firstFormData.get('gender');
+                document.getElementById('hidden_contact').value = firstFormData.get('contact');
+                document.getElementById('hidden_sitio').value = firstFormData.get('sitio');
+                document.getElementById('hidden_civil_status').value = firstFormData.get('civil_status');
+                document.getElementById('hidden_occupation').value = firstFormData.get('occupation');
+                
                 switchModal(registerFormModal, secondRegisterFormModal);
             });
 
@@ -2094,9 +2600,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
-    // Initial validation
-    validateVerificationSection();
 
     // Form submission enhancement
     const secondRegisterForm = document.getElementById('secondRegisterForm');

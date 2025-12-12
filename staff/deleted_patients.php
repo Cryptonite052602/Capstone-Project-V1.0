@@ -105,9 +105,27 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deleted Patients - Community Health Tracker</title>
+    <title>Deleted Patients Archive - Barangay Luz Health Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3498db',
+                        secondary: '#2c3e50',
+                        success: '#2ecc71',
+                        danger: '#e74c3c',
+                        warning: '#f39c12',
+                        info: '#17a2b8',
+                        warmRed: '#fef2f2',
+                        warmBlue: '#f0f9ff'
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         .user-badge {
             background-color: #e0e7ff;
@@ -118,88 +136,289 @@ try {
             font-size: 0.75rem;
             font-weight: 600;
         }
+        
+        /* Main container styling */
+        .main-container {
+            background-color: white;
+            border: 1px solid #f0f9ff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+        }
+        
+        /* Section backgrounds */
+        .section-bg {
+            background-color: white;
+            border: 1px solid #f0f9ff;
+            border-radius: 12px;
+        }
+        
+        /* Success/Error message styling */
+        .alert-success {
+            background-color: #f0fdf4;
+            border: 2px solid #bbf7d0;
+            color: #065f46;
+            border-radius: 8px;
+        }
+        
+        .alert-error {
+            background-color: #fef2f2;
+            border: 2px solid #fecaca;
+            color: #b91c1c;
+            border-radius: 8px;
+        }
+        
+        /* Button Styles - UPDATED: Consistent borders always visible */
+        .btn-primary { 
+            background-color: white; 
+            color: #3498db; 
+            border: 2px solid #bae6fd; 
+            border-radius: 8px; 
+            padding: 12px 24px; 
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            min-height: 55px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            text-decoration: none;
+        }
+        .btn-primary:hover { 
+            background-color: #f0f9ff; 
+            border-color: #3498db;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+        }
+        
+        .btn-restore { 
+            background-color: white; 
+            color: #2ecc71; 
+            border: 2px solid #bbf7d0; 
+            border-radius: 8px; 
+            padding: 10px 20px; 
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            min-height: 45px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+        .btn-restore:hover { 
+            background-color: #f0fdf4; 
+            border-color: #2ecc71;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
+        }
+        
+        .btn-delete { 
+            background-color: white; 
+            color: #e74c3c; 
+            border: 2px solid #fecaca; 
+            border-radius: 8px; 
+            padding: 10px 20px; 
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            min-height: 45px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+        .btn-delete:hover { 
+            background-color: #fef2f2; 
+            border-color: #e74c3c;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
+        }
+        
+        /* Table styling */
+        .patient-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+        
+        .patient-table th, .patient-table td { 
+            padding: 12px 15px; 
+            text-align: left; 
+            border-bottom: 1px solid #e2e8f0; 
+        }
+        
+        .patient-table th { 
+            background-color: #f0f9ff; 
+            color: #2c3e50; 
+            border-bottom: 2px solid #e2e8f0;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .patient-table tr:hover { 
+            background-color: #f8fafc; 
+        }
+        
+        /* Patient ID styling */
+        .patient-id { 
+            font-weight: bold; 
+            color: #3498db; 
+        }
+        
+        /* Custom notification animation */
+        .custom-notification { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { 
+            from { transform: translateX(100%); opacity: 0; } 
+            to { transform: translateX(0); opacity: 1; } 
+        }
     </style>
 </head>
 <body class="bg-gray-50">
     <div class="container mx-auto px-4 py-8">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold text-gray-800">Deleted Patients Archive</h1>
-            <a href="existing_info_patients.php" 
-   class="bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 transition">
-    <i class="fas fa-arrow-left mr-2"></i>Back to Patients
-</a>
-
-        </div>
+        <h1 class="text-3xl font-bold mb-6 text-secondary">Deleted Patients Archive</h1>
         
         <?php if ($message): ?>
-            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                <i class="fas fa-check-circle mr-2"></i><?= htmlspecialchars($message) ?>
+            <div id="successMessage" class="alert-success px-4 py-3 rounded mb-4 flex items-center">
+                <i class="fas fa-check-circle mr-2"></i>
+                <?= htmlspecialchars($message) ?>
             </div>
         <?php endif; ?>
         
         <?php if ($error): ?>
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                <i class="fas fa-exclamation-circle mr-2"></i><?= htmlspecialchars($error) ?>
+            <div class="alert-error px-4 py-3 rounded mb-4 flex items-center">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                <?= htmlspecialchars($error) ?>
             </div>
         <?php endif; ?>
         
-        <?php if (empty($deletedPatients)): ?>
-            <div class="bg-white rounded-lg shadow p-6 text-center">
-                <i class="fas fa-archive text-4xl text-gray-400 mb-4"></i>
-                <h3 class="text-xl font-semibold text-gray-700">No deleted patients found</h3>
-                <p class="text-gray-500 mt-2">Patients you delete will appear here for restoration.</p>
+        <div class="main-container overflow-hidden mb-8">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-semibold text-secondary">Archived Patient Records</h2>
+                        <p class="text-sm text-gray-500 mt-1">Patient records that have been moved to archive</p>
+                    </div>
+                    <a href="existing_info_patients.php" class="btn-primary">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Patients
+                    </a>
+                </div>
             </div>
-        <?php else: ?>
-            <div class="bg-white rounded-lg shadow overflow-hidden">
+            
+            <?php if (empty($deletedPatients)): ?>
+                <div class="text-center py-12 bg-gray-50 rounded-lg">
+                    <div class="w-20 h-20 bg-white border-2 border-warmBlue rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-archive text-primary text-3xl"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900">Archive is Empty</h3>
+                    <p class="mt-1 text-sm text-gray-500">No deleted patient records found in archive.</p>
+                </div>
+            <?php else: ?>
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                    <table class="patient-table">
+                        <thead>
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deleted On</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                <th>Name</th>
+                                <th>Age</th>
+                                <th>Gender</th>
+                                <th>Type</th>
+                                <th>Contact</th>
+                                <th>Deleted On</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody>
                             <?php foreach ($deletedPatients as $patient): ?>
                                 <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($patient['full_name']) ?></div>
+                                    <td>
+                                        <div class="font-medium text-gray-900"><?= htmlspecialchars($patient['full_name']) ?></div>
                                         <div class="text-sm text-gray-500">ID: <?= $patient['original_id'] ?></div>
                                         <?php if (!empty($patient['user_email'])): ?>
-                                            <div class="text-sm text-gray-500">Email: <?= htmlspecialchars($patient['user_email']) ?></div>
+                                            <div class="text-sm text-gray-500"><?= htmlspecialchars($patient['user_email']) ?></div>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= $patient['age'] ?? 'N/A' ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= $patient['gender'] ?? 'N/A' ?></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <td><?= $patient['age'] ?? 'N/A' ?></td>
+                                    <td><?= htmlspecialchars($patient['gender'] ?? 'N/A') ?></td>
+                                    <td>
                                         <?php if (!empty($patient['user_id']) && $patient['is_registered_user']): ?>
                                             <span class="user-badge">Registered User</span>
                                         <?php else: ?>
                                             <span class="text-gray-500">Regular Patient</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <?= date('M j, Y g:i A', strtotime($patient['deleted_at'])) ?>
+                                    <td><?= htmlspecialchars($patient['contact'] ?? 'N/A') ?></td>
+                                    <td>
+                                        <?= date('M j, Y', strtotime($patient['deleted_at'])) ?>
+                                        <div class="text-sm text-gray-500">
+                                            <?= date('g:i A', strtotime($patient['deleted_at'])) ?>
+                                        </div>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <a href="?restore_patient=<?= $patient['id'] ?>" class="text-green-600 hover:text-green-900 mr-3" onclick="return confirm('Restore this patient record?')">
-                                            <i class="fas fa-undo mr-1"></i>Restore
-                                        </a>
-                                        <a href="?permanent_delete=<?= $patient['id'] ?>" class="text-red-600 hover:text-red-900" onclick="return confirm('Permanently delete this record? This cannot be undone.')">
-                                            <i class="fas fa-trash mr-1"></i>Delete Permanently
-                                        </a>
+                                    <td>
+                                        <div class="flex space-x-2">
+                                            <a href="?restore_patient=<?= $patient['id'] ?>" 
+                                               class="btn-restore" 
+                                               onclick="return confirm('Are you sure you want to restore this patient record?')">
+                                                <i class="fas fa-undo mr-1"></i>Restore
+                                            </a>
+                                            <a href="?permanent_delete=<?= $patient['id'] ?>" 
+                                               class="btn-delete" 
+                                               onclick="return confirm('Are you sure you want to permanently delete this record? This action cannot be undone.')">
+                                                <i class="fas fa-trash-alt mr-1"></i>Delete
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-            </div>
-        <?php endif; ?>
+            <?php endif; ?>
+        </div>
     </div>
+
+    <script>
+        // Auto-hide messages after 3 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                var successMessage = document.getElementById('successMessage');
+                var errorMessage = document.querySelector('.alert-error');
+                
+                if (successMessage) {
+                    successMessage.style.display = 'none';
+                }
+                
+                if (errorMessage) {
+                    errorMessage.style.display = 'none';
+                }
+            }, 3000);
+        });
+        
+        // Show notification function
+        function showNotification(type, message) {
+            const existingNotifications = document.querySelectorAll('.custom-notification');
+            existingNotifications.forEach(notification => notification.remove());
+            
+            const notification = document.createElement('div');
+            notification.className = `custom-notification fixed top-6 right-6 z-50 px-6 py-4 rounded-xl shadow-lg border-2 ${
+                type === 'error' ? 'alert-error' :
+                type === 'success' ? 'alert-success' :
+                'bg-blue-100 text-blue-800 border-blue-200'
+            }`;
+            
+            const icon = type === 'error' ? 'fa-exclamation-circle' :
+                       type === 'success' ? 'fa-check-circle' : 'fa-info-circle';
+            
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${icon} mr-3 text-xl"></i>
+                    <span class="font-semibold">${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 5000);
+        }
+    </script>
 </body>
 </html>

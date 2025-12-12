@@ -48,9 +48,9 @@ try {
     $stmt = $pdo->prepare("SHOW TABLES LIKE 'deleted_patients'");
     $stmt->execute();
     $deletedPatientsTableExists = $stmt->rowCount() > 0;
-    
+
     if (!$deletedPatientsTableExists) {
-        // Create deleted_patients table with dynamic columns
+        // Create deleted_patients table with ALL columns that might exist in sitio1_patients
         $createTableQuery = "CREATE TABLE deleted_patients (
             id INT AUTO_INCREMENT PRIMARY KEY,
             original_id INT NOT NULL,
@@ -63,22 +63,18 @@ try {
             last_checkup DATE,
             added_by INT,
             user_id INT,
-            deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             deleted_by INT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP";
-        
-        // Add optional columns if they exist in the main table
-        if ($sitioExists) {
-            $createTableQuery .= ", sitio VARCHAR(255)";
-        }
-        if ($civilStatusExists) {
-            $createTableQuery .= ", civil_status VARCHAR(100)";
-        }
-        if ($occupationExists) {
-            $createTableQuery .= ", occupation VARCHAR(255)";
-        }
-        
-        $createTableQuery .= ")";
+            -- Auto-generated timestamps
+            deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            -- Optional columns from sitio1_patients
+            sitio VARCHAR(255) NULL,
+            civil_status VARCHAR(100) NULL,
+            occupation VARCHAR(255) NULL,
+            consent_given TINYINT(1) DEFAULT 1,
+            consent_date TIMESTAMP NULL,
+            deleted_reason VARCHAR(500) NULL
+        )";
         
         $pdo->exec($createTableQuery);
     }
@@ -196,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_patient'])) {
     $sitio = trim($_POST['sitio']);
     $contact = trim($_POST['contact']);
     $lastCheckup = trim($_POST['last_checkup']);
-    $consent_given = isset($_POST['consent_given']) ? 1 : 0;
+    $consent_given = 1; // Always give consent since we removed the checkbox
     $userId = !empty($_POST['user_id']) ? intval($_POST['user_id']) : null;
     
     // Medical information
@@ -293,43 +289,47 @@ if (isset($_GET['delete_patient'])) {
         $patient = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($patient) {
-            // Build dynamic INSERT query for deleted_patients based on available columns
-            $columns = ["original_id", "full_name", "date_of_birth", "age", "gender", "address", "contact", "last_checkup", "added_by", "user_id", "deleted_at", "deleted_by"];
-            $placeholders = ["?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "NOW()", "?"];
-            $values = [
-                $patient['id'], 
-                $patient['full_name'], 
-                $patient['date_of_birth'],
-                $patient['age'], 
-                $patient['gender'], 
-                $patient['address'], 
-                $patient['contact'], 
-                $patient['last_checkup'], 
-                $patient['added_by'],
-                $patient['user_id'],
-                $_SESSION['user']['id']
-            ];
+            // Get column information from deleted_patients table
+            $stmt = $pdo->prepare("SHOW COLUMNS FROM deleted_patients");
+            $stmt->execute();
+            $deletedTableColumns = $stmt->fetchAll(PDO::FETCH_COLUMN);
             
-            // Add optional columns only if they exist in the source data
-            if ($sitioExists && isset($patient['sitio'])) {
-                $columns[] = "sitio";
-                $placeholders[] = "?";
-                $values[] = $patient['sitio'];
+            // Filter columns that exist in both source and destination
+            $columns = [];
+            $placeholders = [];
+            $values = [];
+            
+            foreach ($patient as $column => $value) {
+                // Skip id column as we want to use original_id instead
+                if ($column === 'id') {
+                    $columns[] = 'original_id';
+                    $placeholders[] = '?';
+                    $values[] = $value;
+                    continue;
+                }
+                
+                // Only include columns that exist in deleted_patients table
+                // and are not auto-generated
+                if (in_array($column, $deletedTableColumns) && 
+                    !in_array($column, ['id', 'deleted_at'])) { // Exclude auto columns
+                    $columns[] = $column;
+                    $placeholders[] = '?';
+                    $values[] = $value;
+                }
             }
             
-            if ($civilStatusExists && isset($patient['civil_status'])) {
-                $columns[] = "civil_status";
-                $placeholders[] = "?";
-                $values[] = $patient['civil_status'];
-            }
+            // Add deleted_by column
+            $columns[] = 'deleted_by';
+            $placeholders[] = '?';
+            $values[] = $_SESSION['user']['id'];
             
-            if ($occupationExists && isset($patient['occupation'])) {
-                $columns[] = "occupation";
-                $placeholders[] = "?";
-                $values[] = $patient['occupation'];
-            }
+            // Note: deleted_at is handled by DEFAULT CURRENT_TIMESTAMP
             
             $insertQuery = "INSERT INTO deleted_patients (" . implode(", ", $columns) . ") VALUES (" . implode(", ", $placeholders) . ")";
+            
+            // Debug: Uncomment to see the generated query
+            // error_log("Delete Query: " . $insertQuery);
+            // error_log("Values: " . implode(', ', $values));
             
             // Insert into deleted_patients table
             $stmt = $pdo->prepare($insertQuery);
@@ -371,42 +371,45 @@ if (isset($_GET['restore_patient'])) {
         $archivedPatient = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($archivedPatient) {
-            // Build dynamic INSERT query for restoration based on available columns
-            $columns = ["id", "full_name", "date_of_birth", "age", "gender", "address", "contact", "last_checkup", "added_by", "user_id", "created_at"];
-            $placeholders = ["?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "NOW()"];
-            $values = [
-                $archivedPatient['original_id'], 
-                $archivedPatient['full_name'], 
-                $archivedPatient['date_of_birth'],
-                $archivedPatient['age'], 
-                $archivedPatient['gender'], 
-                $archivedPatient['address'], 
-                $archivedPatient['contact'], 
-                $archivedPatient['last_checkup'], 
-                $archivedPatient['added_by'],
-                $archivedPatient['user_id']
-            ];
+            // Get column information from sitio1_patients table
+            $stmt = $pdo->prepare("SHOW COLUMNS FROM sitio1_patients");
+            $stmt->execute();
+            $mainTableColumns = $stmt->fetchAll(PDO::FETCH_COLUMN);
             
-            // Add optional columns only if they exist in the archived data
-            if ($sitioExists && isset($archivedPatient['sitio'])) {
-                $columns[] = "sitio";
-                $placeholders[] = "?";
-                $values[] = $archivedPatient['sitio'];
-            }
+            // Filter columns that exist in both source and destination
+            $columns = [];
+            $placeholders = [];
+            $values = [];
             
-            if ($civilStatusExists && isset($archivedPatient['civil_status'])) {
-                $columns[] = "civil_status";
+            foreach ($archivedPatient as $column => $value) {
+                // Skip columns that don't exist in sitio1_patients
+                if (!in_array($column, $mainTableColumns)) {
+                    continue;
+                }
+                
+                // Map original_id back to id
+                if ($column === 'original_id') {
+                    $columns[] = 'id';
+                    $placeholders[] = "?";
+                    $values[] = $value;
+                    continue;
+                }
+                
+                // Skip metadata columns from deleted_patients
+                if (in_array($column, ['deleted_by', 'deleted_at', 'id', 'created_at'])) {
+                    continue;
+                }
+                
+                $columns[] = $column;
                 $placeholders[] = "?";
-                $values[] = $archivedPatient['civil_status'];
-            }
-            
-            if ($occupationExists && isset($archivedPatient['occupation'])) {
-                $columns[] = "occupation";
-                $placeholders[] = "?";
-                $values[] = $archivedPatient['occupation'];
+                $values[] = $value;
             }
             
             $insertQuery = "INSERT INTO sitio1_patients (" . implode(", ", $columns) . ") VALUES (" . implode(", ", $placeholders) . ")";
+            
+            // Debug: Uncomment to see the generated query
+            // error_log("Restore Query: " . $insertQuery);
+            // error_log("Values: " . implode(', ', $values));
             
             // Restore to main patients table
             $stmt = $pdo->prepare($insertQuery);
@@ -459,6 +462,16 @@ if (isset($_GET['convert_to_patient'])) {
                 // Start transaction
                 $pdo->beginTransaction();
                 
+                // Get gender from user table
+                $userGender = '';
+                if (!empty($user['gender'])) {
+                    $userGender = $user['gender'];
+                    // Convert enum values to proper format
+                    if ($userGender === 'male') $userGender = 'Male';
+                    if ($userGender === 'female') $userGender = 'Female';
+                    if ($userGender === 'other') $userGender = 'Other';
+                }
+                
                 // Build dynamic INSERT query for conversion based on available columns
                 $columns = ["full_name", "date_of_birth", "age", "gender", "address", "contact", "added_by", "user_id", "consent_given", "consent_date"];
                 $placeholders = ["?", "?", "?", "?", "?", "?", "?", "?", "1", "NOW()"];
@@ -466,7 +479,7 @@ if (isset($_GET['convert_to_patient'])) {
                     $user['full_name'], 
                     $user['date_of_birth'],
                     $user['age'], 
-                    $user['gender'], 
+                    $userGender, 
                     $user['address'], 
                     $user['contact'],
                     $_SESSION['user']['id'], 
@@ -503,7 +516,7 @@ if (isset($_GET['convert_to_patient'])) {
                 $stmt = $pdo->prepare("INSERT INTO existing_info_patients 
                     (patient_id, gender, height, weight, blood_type) 
                     VALUES (?, ?, 0, 0, '')");
-                $stmt->execute([$patientId, $user['gender']]);
+                $stmt->execute([$patientId, $userGender]);
                 
                 $pdo->commit();
                 
@@ -598,13 +611,33 @@ try {
 
 // Get all patients with their medical info for the patient list with pagination or all records
 try {
-    // Build dynamic SELECT query based on available columns
-    $selectQuery = "SELECT p.id, p.full_name, p.date_of_birth, p.age, p.gender, p.address, p.contact, 
-              e.height, e.weight, e.temperature, e.blood_pressure, e.blood_type, 
-              e.allergies, e.immunization_record, e.chronic_conditions,
-              e.medical_history, e.current_medications, e.family_history,
-              u.unique_number, u.email as user_email, u.sitio as user_sitio";
+    // Build dynamic SELECT query - FIXED to properly handle registered user data
+    $selectQuery = "SELECT 
+                p.id,
+                p.full_name,
+                -- Use patient's date_of_birth if exists, otherwise use user's
+                COALESCE(p.date_of_birth, u.date_of_birth) as date_of_birth,
+                -- Use patient's age if exists, otherwise use user's
+                COALESCE(p.age, u.age) as age,
+                -- Use patient's gender if exists, otherwise use and convert user's gender
+                CASE 
+                    WHEN p.gender IS NOT NULL AND p.gender != '' THEN p.gender
+                    WHEN u.gender = 'male' THEN 'Male'
+                    WHEN u.gender = 'female' THEN 'Female'
+                    WHEN u.gender = 'other' THEN 'Other'
+                    ELSE p.gender
+                END as gender,
+                -- Use patient's address if exists, otherwise use user's
+                COALESCE(p.address, u.address) as address,
+                -- Use patient's contact if exists, otherwise use user's
+                COALESCE(p.contact, u.contact) as contact,
+                e.height, e.weight, e.temperature, e.blood_pressure, e.blood_type, 
+                e.allergies, e.immunization_record, e.chronic_conditions,
+                e.medical_history, e.current_medications, e.family_history,
+                u.unique_number, u.email as user_email, u.sitio as user_sitio,
+                u.id as user_id";
     
+    // Add patient-specific columns if they exist
     if ($sitioExists) {
         $selectQuery .= ", p.sitio";
     }
@@ -616,6 +649,10 @@ try {
     if ($occupationExists) {
         $selectQuery .= ", p.occupation";
     }
+    
+    // Get user-specific columns if patient is a registered user
+    $selectQuery .= ", u.civil_status as user_civil_status,
+                     u.occupation as user_occupation";
     
     $selectQuery .= " FROM sitio1_patients p
               LEFT JOIN existing_info_patients e ON p.id = e.patient_id
@@ -648,11 +685,25 @@ try {
 // Get existing health info if patient is selected
 if (!empty($selectedPatientId)) {
     try {
-        // Get basic patient info
-        $stmt = $pdo->prepare("SELECT p.*, u.unique_number, u.email as user_email, u.sitio as user_sitio
-                              FROM sitio1_patients p 
-                              LEFT JOIN sitio1_users u ON p.user_id = u.id
-                              WHERE p.id = ? AND p.added_by = ?");
+        // Get basic patient info - FIXED to include user data properly
+        $stmt = $pdo->prepare("SELECT 
+                p.*, 
+                u.unique_number, 
+                u.email as user_email, 
+                u.sitio as user_sitio,
+                u.date_of_birth as user_date_of_birth,
+                u.age as user_age,
+                CASE 
+                    WHEN u.gender = 'male' THEN 'Male'
+                    WHEN u.gender = 'female' THEN 'Female'
+                    WHEN u.gender = 'other' THEN 'Other'
+                    ELSE u.gender
+                END as user_gender,
+                u.civil_status as user_civil_status,
+                u.occupation as user_occupation
+              FROM sitio1_patients p 
+              LEFT JOIN sitio1_users u ON p.user_id = u.id
+              WHERE p.id = ? AND p.added_by = ?");
         $stmt->execute([$selectedPatientId, $_SESSION['user']['id']]);
         $patient_details = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -717,12 +768,220 @@ if (!empty($selectedPatientId)) {
         .patient-table tr:hover { background-color: #f1f5f9; }
         .patient-id { font-weight: bold; color: #3498db; }
         .user-badge { background-color: #e0e7ff; color: #3730a3; display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
-        .btn-view { background-color: #3498db; color: white; border-radius: 9999px; padding: 8px 16px; transition: all 0.3s ease; }
-        .btn-view:hover { background-color: #2980b9; transform: translateY(-2px); }
-        .btn-archive { background-color: #e74c3c; color: white; border-radius: 9999px; padding: 8px 16px; transition: all 0.3s ease; }
-        .btn-archive:hover { background-color: #c0392b; transform: translateY(-2px); }
-        .btn-add-patient { background-color: #2ecc71; color: white; border-radius: 9999px; padding: 8px 16px; transition: all 0.3s ease; }
-        .btn-add-patient:hover { background-color: #27ae60; transform: translateY(-2px); }
+        
+        /* UPDATED BUTTON STYLES - 100% opacity normally, 60% opacity on hover */
+        .btn-view { 
+            background-color: white; 
+            color: #3498db; 
+            border: 2px solid #3498db; 
+            opacity: 1;
+            border-radius: 8px; 
+            padding: 10px 20px; 
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            min-height: 45px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-view:hover { 
+            background-color: #f0f9ff; 
+            border-color: #3498db;
+            opacity: 0.6;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+        }
+        
+        .btn-archive { 
+            background-color: white; 
+            color: #e74c3c; 
+            border: 2px solid #e74c3c; 
+            opacity: 1;
+            border-radius: 8px; 
+            padding: 10px 20px; 
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            min-height: 45px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-archive:hover { 
+            background-color: #fef2f2; 
+            border-color: #e74c3c;
+            opacity: 0.6;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
+        }
+        
+        .btn-add-patient { 
+            background-color: white; 
+            color: #2ecc71; 
+            border: 2px solid #2ecc71; 
+            opacity: 1;
+            border-radius: 8px; 
+            padding: 10px 20px; 
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            min-height: 45px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-add-patient:hover { 
+            background-color: #f0fdf4; 
+            border-color: #2ecc71;
+            opacity: 0.6;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
+        }
+        
+        .btn-primary { 
+            background-color: white; 
+            color: #3498db; 
+            border: 2px solid #3498db; 
+            opacity: 1;
+            border-radius: 8px; 
+            padding: 12px 24px; 
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            min-height: 55px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .btn-primary:hover { 
+            background-color: #f0f9ff; 
+            border-color: #3498db;
+            opacity: 0.6;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+        }
+        
+        .btn-success { 
+            background-color: white; 
+            color: #2ecc71; 
+            border: 2px solid #2ecc71; 
+            opacity: 1;
+            border-radius: 8px; 
+            padding: 12px 24px; 
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            min-height: 55px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .btn-success:hover { 
+            background-color: #f0fdf4; 
+            border-color: #2ecc71;
+            opacity: 0.6;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
+        }
+        
+        .btn-gray { 
+            background-color: white; 
+            color: #6b7280; 
+            border: 2px solid #6b7280; 
+            opacity: 1;
+            border-radius: 8px; 
+            padding: 12px 24px; 
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            min-height: 55px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .btn-gray:hover { 
+            background-color: #f9fafb; 
+            border-color: #6b7280;
+            opacity: 0.6;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(107, 114, 128, 0.15);
+        }
+        
+        /* NEW: Print Button - Bigger and Readable */
+        .btn-print { 
+            background-color: white; 
+            color: #3498db; 
+            border: 2px solid #3498db; 
+            opacity: 1;
+            border-radius: 8px; 
+            padding: 14px 28px; 
+            transition: all 0.3s ease; 
+            font-weight: 600;
+            min-height: 60px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            width: 355px;
+            margin: 8px 0;
+        }
+        .btn-print:hover { 
+            background-color: #f0f9ff; 
+            border-color: #3498db;
+            opacity: 0.6;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+        }
+        
+        /* NEW: Edit Button */
+        .btn-edit { 
+            background-color: white; 
+            color: #f39c12; 
+            border: 2px solid #f39c12; 
+            opacity: 1;
+            border-radius: 8px; 
+            padding: 14px 28px; 
+            transition: all 0.3s ease; 
+            font-weight: 600;
+            min-height: 60px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            width: 355px;
+            margin: 8px 0;
+        }
+        .btn-edit:hover { 
+            background-color: #fef3c7; 
+            border-color: #f39c12;
+            opacity: 0.6;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(243, 156, 18, 0.15);
+        }
+        
+        /* NEW: Save Medical Information Button - UPDATED with warmBlue border */
+        .btn-save-medical { 
+            background-color: white; 
+            color: #3498db; 
+            border: 3px solid #60acdfff;  /* Changed to warmBlue */
+            opacity: 1;
+            border-radius: 8px; 
+            padding: 14px 28px; 
+            transition: all 0.3s ease; 
+            font-weight: 600;
+            min-height: 60px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            width: 355px;
+            margin: 8px 0;
+        }
+        .btn-save-medical:hover { 
+            background-color: #f0f9ff; 
+            border-color: #f0f9ff;  /* Changed to warmBlue */
+            opacity: 0.6;
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+        }
         
         #viewModal { backdrop-filter: blur(5px); transition: opacity 0.3s ease; }
         #viewModal > div { transform: scale(0.95); transition: transform 0.3s ease; }
@@ -776,9 +1035,10 @@ if (!empty($selectedPatientId)) {
             justify-content: center;
             width: 2.5rem;
             height: 2.5rem;
-            border-radius: 9999px;
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: white;
+            border: 1px solid #3498db;
+            opacity: 1;
             color: #4b5563;
             font-weight: 500;
             transition: all 0.3s ease;
@@ -786,14 +1046,18 @@ if (!empty($selectedPatientId)) {
         }
         
         .pagination-btn:hover {
-            background-color: #e2e8f0;
+            background-color: #f0f9ff;
+            border-color: #3498db;
+            opacity: 0.6;
             color: #374151;
         }
         
         .pagination-btn.active {
-            background-color: #3498db;
-            color: white;
-            border-color: #3498db;
+            background-color: white;
+            color: #3498db;
+            border: 2px solid #3498db;
+            opacity: 1;
+            font-weight: 600;
         }
         
         .pagination-btn.disabled {
@@ -802,8 +1066,10 @@ if (!empty($selectedPatientId)) {
         }
         
         .pagination-btn.disabled:hover {
-            background-color: #f8fafc;
+            background-color: white;
             color: #4b5563;
+            border-color: #3498db;
+            opacity: 0.5;
         }
         
         .pagination-actions {
@@ -813,38 +1079,52 @@ if (!empty($selectedPatientId)) {
         }
         
         .btn-view-all {
-            background-color: #2ecc71;
-            color: white;
-            border-radius: 9999px;
-            padding: 8px 16px;
+            background-color: white;
+            color: #3498db;
+            border: 2px solid #3498db;
+            opacity: 1;
+            border-radius: 8px;
+            padding: 12px 24px;
             transition: all 0.3s ease;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             font-weight: 500;
+            min-height: 55px;
+            font-size: 16px;
         }
         
         .btn-view-all:hover {
-            background-color: #27ae60;
+            background-color: #f0f9ff;
+            border-color: #3498db;
+            opacity: 0.6;
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
         }
         
         .btn-back-to-pagination {
-            background-color: #3498db;
-            color: white;
-            border-radius: 9999px;
-            padding: 8px 16px;
+            background-color: white;
+            color: #3498db;
+            border: 2px solid #3498db;
+            opacity: 1;
+            border-radius: 8px;
+            padding: 12px 24px;
             transition: all 0.3s ease;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             font-weight: 500;
+            min-height: 55px;
+            font-size: 16px;
             margin-bottom: 1rem;
         }
         
         .btn-back-to-pagination:hover {
-            background-color: #2980b9;
+            background-color: #f0f9ff;
+            border-color: #3498db;
+            opacity: 0.6;
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
         }
         
         /* Scrollable table for all records */
@@ -863,111 +1143,476 @@ if (!empty($selectedPatientId)) {
         /* Form validation styles */
         .field-empty { background-color: #fef2f2 !important; border-color: #fecaca !important; }
         .field-filled { background-color: #f0f9ff !important; border-color: #bae6fd !important; }
-        .btn-disabled { background-color: #9ca3af !important; cursor: not-allowed !important; transform: none !important; }
-        .btn-disabled:hover { background-color: #9ca3af !important; transform: none !important; }
-        .consent-not-checked { border-color: #fecaca !important; background-color: #fef2f2 !important; }
-        .consent-checked { border-color: #bbf7d0 !important; background-color: #f0fdf4 !important; }
+        .btn-disabled { 
+            background-color: #f9fafb !important; 
+            color: #9ca3af !important; 
+            border-color: #e5e7eb !important;
+            opacity: 1;
+            cursor: not-allowed !important; 
+            transform: none !important; 
+            box-shadow: none !important;
+        }
+        .btn-disabled:hover { 
+            background-color: #f9fafb !important; 
+            color: #9ca3af !important;
+            border-color: #e5e7eb !important;
+            opacity: 1;
+            transform: none !important; 
+            box-shadow: none !important;
+        }
         
-        /* Enhanced Form Input Styles for Add Patient Tab */
-        .form-input-rounded {
-            border-radius: 9999px !important;
-            padding: 12px 20px !important;
-            border: 1px solid #d1d5db !important;
+        /* Enhanced Form Input Styles for Add Patient Modal - WITH STROKE EFFECT */
+        .form-input-modal {
+            border-radius: 8px !important;
+            padding: 16px 20px !important;
+            border: 2px solid #e2e8f0 !important;
             transition: all 0.3s ease;
             width: 100%;
             font-size: 16px;
+            min-height: 52px;
+            background-color: white;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
         }
         
-        .form-select-rounded {
-            border-radius: 9999px !important;
-            padding: 12px 20px !important;
-            border: 1px solid #d1d5db !important;
+        .form-input-modal:focus {
+            outline: none;
+            border-color: #3498db !important;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+            background-color: white;
+        }
+        
+        .form-select-modal {
+            border-radius: 8px !important;
+            padding: 16px 20px !important;
+            border: 2px solid #e2e8f0 !important;
             transition: all 0.3s ease;
             width: 100%;
             font-size: 16px;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 16px center;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 20px center;
             background-repeat: no-repeat;
             background-size: 1.5em 1.5em;
             padding-right: 50px;
+            min-height: 52px;
+            background-color: white;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
         }
         
-        .form-textarea-rounded {
-            border-radius: 20px !important;
+        .form-select-modal:focus {
+            outline: none;
+            border-color: #3498db !important;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+            background-color: white;
+        }
+        
+        .form-textarea-modal {
+            border-radius: 8px !important;
             padding: 16px 20px !important;
-            border: 1px solid #d1d5db !important;
+            border: 2px solid #e2e8f0 !important;
             transition: all 0.3s ease;
             width: 100%;
             font-size: 16px;
             resize: vertical;
             min-height: 120px;
+            background-color: white;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
         }
         
-        .form-input-rounded:focus,
-        .form-select-rounded:focus,
-        .form-textarea-rounded:focus {
+        .form-textarea-modal:focus {
             outline: none;
             border-color: #3498db !important;
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+            background-color: white;
         }
         
-        .form-label {
+        .form-label-modal {
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
             color: #374151;
+            font-size: 14px;
         }
         
-        .form-section-title {
+        /* UPDATED: Changed form section title icons */
+        .form-section-title-modal {
             font-size: 1.25rem;
             font-weight: 700;
             color: #3498db;
             margin-bottom: 1.5rem;
             padding-bottom: 0.75rem;
-            border-bottom: 2px solid #e5e7eb;
+            border-bottom: 2px solid #f0f9ff;
             display: flex;
             align-items: center;
         }
         
-        .form-section-title i {
+        .form-section-title-modal i {
             margin-right: 10px;
             font-size: 1.1em;
+            color: #3498db;
         }
         
-        .form-checkbox-rounded {
-            border-radius: 50% !important;
+        .form-checkbox-modal {
             width: 20px;
             height: 20px;
+            border-radius: 4px;
+            border: 2px solid #e2e8f0;
         }
         
-        .consent-container-rounded {
-            border-radius: 20px !important;
-            padding: 20px !important;
+        /* Add Patient Modal Specific Styles */
+        #addPatientModal { backdrop-filter: blur(5px); transition: opacity 0.3s ease; }
+        #addPatientModal > div { transform: scale(0.95); transition: transform 0.3s ease; }
+        #addPatientModal[style*="display: flex"] > div { transform: scale(1); }
+        
+        .modal-header {
+            background-color: white;
+            border-bottom: 2px solid #f0f9ff;
         }
+        
+        .modal-grid-gap {
+            gap: 1.25rem !important;
+        }
+        
+        .modal-field-spacing {
+            margin-bottom: 1.25rem;
+        }
+        
+        /* Active Tab Styling */
+        .tab-btn {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-btn.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+            background-color: #f0f9ff;
+        }
+        
+        .tab-btn:hover:not(.active) {
+            color: #3498db;
+            background-color: #f8fafc;
+        }
+        
+        /* UPDATED Search box styling - Consistent height and width with warmBlue border */
+        .search-input {
+            border: 2px solid #badff8ff !important;
+            background-color: white !important;
+            transition: all 0.3s ease;
+            border-radius: 8px !important;
+            padding: 16px 20px 16px 55px !important;
+            min-height: 55px !important;
+            font-size: 16px;
+            width: 355px !important;
+            box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+        
+        .search-input:focus {
+            border-color: #84c0e9ff !important;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .search-select {
+            border: 2px solid #badff8ff !important;
+            background-color: white !important;
+            transition: all 0.3s ease;
+            border-radius: 8px !important;
+            padding: 16px 20px !important;
+            min-height: 55px !important;
+            font-size: 16px;
+            width: 355px !important;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233498db' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 20px center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 50px;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .search-select:focus {
+            border-color: #f0f9ff !important;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        
+        /* Search icon position */
+        .search-icon-container {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .search-icon {
+            color: #3498db;
+            font-size: 18px;
+        }
+        
+        /* Table styling */
+        .patient-table th {
+            background-color: #f0f9ff;
+            color: #2c3e50;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .patient-table tr:hover {
+            background-color: #f8fafc;
+        }
+        
+        /* Main container styling */
+        .main-container {
+            background-color: white;
+            border: 1px solid #f0f9ff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        
+        /* Section backgrounds */
+        .section-bg {
+            background-color: white;
+            border: 1px solid #f0f9ff;
+            border-radius: 12px;
+        }
+        
+        /* Success/Error message styling */
+        .alert-success {
+            background-color: #f0fdf4;
+            border: 2px solid #bbf7d0;
+            color: #065f46;
+        }
+        
+        .alert-error {
+            background-color: #fef2f2;
+            border: 2px solid #fecaca;
+            color: #b91c1c;
+        }
+        
+        /* Search form layout */
+        .search-form-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            width: 100%;
+        }
+        
+        .search-field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            width: 100%;
+        }
+        
+        @media (min-width: 768px) {
+            .search-form-container {
+                flex-direction: row;
+                align-items: flex-end;
+                gap: 1.5rem;
+            }
+            
+            .search-field-group {
+                width: auto;
+            }
+        }
+        
+        /* Ensure opacity is visible */
+        * {
+            --tw-border-opacity: 1 !important;
+        }
+        
+        /* Fix for browsers that don't support opacity */
+        .btn-view, .btn-archive, .btn-add-patient, .btn-primary, .btn-success, .btn-gray, 
+        .btn-print, .btn-edit, .btn-save-medical, .btn-view-all, .btn-back-to-pagination, .pagination-btn,
+        .search-input, .search-select {
+            border-style: solid !important;
+        }
+        
+        /* Hover state opacity */
+        .btn-view:hover, .btn-archive:hover, .btn-add-patient:hover, .btn-primary:hover, 
+        .btn-success:hover, .btn-gray:hover, .btn-print:hover, .btn-edit:hover, 
+        .btn-save-medical:hover, .btn-view-all:hover, .btn-back-to-pagination:hover, .pagination-btn:hover,
+        .search-input:focus, .search-select:focus {
+            border-color: inherit !important;
+        }
+        
+        /* Add these styles to your existing CSS in existing_info_patients.php */
+
+/* Success modal specific styles */
+.success-modal-bg {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+}
+
+/* Gradient backgrounds */
+.bg-gradient-success {
+    background: linear-gradient(135deg, #d4edda 0%, #f0fdf4 100%);
+}
+
+.bg-gradient-blue {
+    background: linear-gradient(135deg, #dbeafe 0%, #f0f9ff 100%);
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.animate-scaleIn {
+    animation: scaleIn 0.3s ease-out;
+}
+
+.pulse-animation {
+    animation: pulse 2s ease-in-out;
+}
+
+.shake-animation {
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Success Modal Button Styles */
+#successModal .btn-print {
+    background-color: white;
+    color: #3498db;
+    border: 2px solid #3498db;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 10px 20px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+#successModal .btn-print:hover {
+    background-color: #f0f9ff;
+    border-color: #3498db;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+#successModal .btn-primary {
+    background-color: white;
+    color: #2ecc71;
+    border: 2px solid #2ecc71;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 10px 24px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+#successModal .btn-primary:hover {
+    background-color: #f0fdf4;
+    border-color: #2ecc71;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
+}
+
+/* Ensure z-index for modal */
+#successModal {
+    z-index: 9999;
+}
+
+/* Smooth transitions for all modals */
+.modal-transition {
+    transition: all 0.3s ease;
+}
+
+/* UPDATED: Added opacity support for borders */
+.btn-view, .btn-archive, .btn-add-patient, .btn-primary, .btn-success, .btn-gray,
+.btn-print, .btn-edit, .btn-save-medical, .btn-view-all, .btn-back-to-pagination, .pagination-btn {
+    position: relative;
+}
+
+.btn-view::after, .btn-archive::after, .btn-add-patient::after, .btn-primary::after,
+.btn-success::after, .btn-gray::after, .btn-print::after, .btn-edit::after,
+.btn-save-medical::after, .btn-view-all::after, .btn-back-to-pagination::after, .pagination-btn::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 8px;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.btn-view::after { border: 2px solid #3498db; opacity: 1; }
+.btn-archive::after { border: 2px solid #e74c3c; opacity: 1; }
+.btn-add-patient::after { border: 2px solid #2ecc71; opacity: 1; }
+.btn-primary::after { border: 2px solid #3498db; opacity: 1; }
+.btn-success::after { border: 2px solid #2ecc71; opacity: 1; }
+.btn-gray::after { border: 2px solid #6b7280; opacity: 1; }
+.btn-print::after { border: 2px solid #3498db; opacity: 1; }
+.btn-edit::after { border: 2px solid #f39c12; opacity: 1; }
+.btn-save-medical::after { border: 2px solid #f0f9ff; opacity: 1; } /* Changed to warmBlue */
+.btn-view-all::after { border: 2px solid #3498db; opacity: 1; }
+.btn-back-to-pagination::after { border: 2px solid #3498db; opacity: 1; }
+.pagination-btn::after { border: 1px solid #3498db; opacity: 1; }
+
+.btn-view:hover::after, .btn-archive:hover::after, .btn-add-patient:hover::after,
+.btn-primary:hover::after, .btn-success:hover::after, .btn-gray:hover::after,
+.btn-print:hover::after, .btn-edit:hover::after, .btn-save-medical:hover::after,
+.btn-view-all:hover::after, .btn-back-to-pagination:hover::after, .pagination-btn:hover::after {
+    opacity: 0.6;
+}
     </style>
 </head>
 <body class="bg-gray-50">
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-6 text-secondary">Barangay Luz Health Center - Patient Records</h1>
+        <h1 class="text-3xl font-bold mb-6 text-secondary">Resident Patient Records</h1>
         
         <?php if ($message): ?>
-            <div id="successMessage" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 flex items-center">
+            <div id="successMessage" class="alert-success px-4 py-3 rounded mb-4 flex items-center">
                 <i class="fas fa-check-circle mr-2"></i>
                 <?= htmlspecialchars($message) ?>
             </div>
         <?php endif; ?>
         
         <?php if ($error): ?>
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">
+            <div class="alert-error px-4 py-3 rounded mb-4 flex items-center">
                 <i class="fas fa-exclamation-circle mr-2"></i>
                 <?= htmlspecialchars($error) ?>
             </div>
         <?php endif; ?>
         
         <!-- Tabs Navigation -->
-        <div class="bg-white rounded-lg shadow mb-8">
-            <div class="flex border-b">
+        <div class="main-container rounded-lg shadow-sm mb-8">
+            <div class="flex border-b border-gray-200">
                 <button class="tab-btn py-4 px-6 font-medium text-gray-600 hover:text-primary border-b-2 border-transparent hover:border-primary transition" data-tab="patients-tab">
                     <i class="fas fa-list mr-2"></i>Patient Records
                 </button>
@@ -980,51 +1625,57 @@ if (!empty($selectedPatientId)) {
             <div id="patients-tab" class="tab-content p-6 active">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-xl font-semibold text-secondary">Patient Records</h2>
-                    <a href="deleted_patients.php" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-full hover:bg-gray-700 transition">
+                    <a href="deleted_patients.php" class="btn-gray inline-flex items-center">
                         <i class="fas fa-archive mr-2"></i>View Archive
                     </a>
                 </div>
                 
-                <!-- Search Form -->
-                <form method="get" action="" class="mb-6 bg-gray-50 p-4 rounded-lg">
+                <!-- UPDATED Search Form with warmBlue border and separated icon -->
+                <form method="get" action="" class="mb-6 section-bg p-6">
                     <input type="hidden" name="tab" value="patients-tab">
                     <?php if ($viewAll): ?>
                         <input type="hidden" name="view_all" value="true">
                     <?php endif; ?>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
+                    
+                    <div class="search-form-container">
+                        <!-- Search By Field -->
+                        <div class="search-field-group">
                             <label for="search_by" class="block text-gray-700 mb-2 font-medium">Search By</label>
-                            <select id="search_by" name="search_by" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
-                                <option value="name" <?= $searchBy === 'name' ? 'selected' : '' ?>>Name</option>
-                                <option value="unique_number" <?= $searchBy === 'unique_number' ? 'selected' : '' ?>>Unique Number</option>
-                            </select>
-                        </div>
-                        <div class="md:col-span-2">
-                            <label for="search" class="block text-gray-700 mb-2 font-medium">Search Term</label>
-                            <div class="flex items-center">
-                                <div class="relative flex-grow">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <i class="fas fa-search text-gray-400"></i>
-                                    </div>
-                                    <input type="text" id="search" name="search" value="<?= htmlspecialchars($searchTerm) ?>" 
-                                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" 
-                                        placeholder="<?= $searchBy === 'unique_number' ? 'Enter unique number...' : 'Search patients by name...' ?>">
-                                </div>
-                                <button type="submit" class="ml-3 inline-flex items-center px-4 py-2 bg-primary text-white rounded-full hover:bg-blue-700 transition">
-                                    <i class="fas fa-search mr-2"></i> Search
-                                </button>
-                                <?php if (!empty($searchTerm)): ?>
-                                    <a href="existing_info_patients.php" class="ml-3 inline-flex items-center px-4 py-2 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition">
-                                        <i class="fas fa-times mr-2"></i> Clear
-                                    </a>
-                                <?php endif; ?>
+                            <div class="relative">
+                                <select id="search_by" name="search_by" class="search-select">
+                                    <option value="name" <?= $searchBy === 'name' ? 'selected' : '' ?>>Name</option>
+                                    <option value="unique_number" <?= $searchBy === 'unique_number' ? 'selected' : '' ?>>Unique Number</option>
+                                </select>
                             </div>
+                        </div>
+                        
+                        <!-- Search Term Field with separated icon -->
+                        <div class="search-field-group flex-grow">
+                            <label for="search" class="block text-gray-700 mb-2 font-medium">Search Term</label>
+                            <div class="relative">
+                                
+                                <input type="text" id="search" name="search" value="<?= htmlspecialchars($searchTerm) ?>" 
+                                    class="search-input" 
+                                    placeholder="<?= $searchBy === 'unique_number' ? 'Enter unique number...' : 'Search patients by name...' ?>">
+                            </div>
+                        </div>
+                        
+                        <!-- Search Buttons -->
+                        <div class="search-field-group flex flex-col sm:flex-row gap-2 mt-2 sm:mt-0">
+                            <button type="submit" class="btn-primary min-w-[120px]">
+                                <i class="fas fa-search mr-2"></i> Search
+                            </button>
+                            <?php if (!empty($searchTerm)): ?>
+                                <a href="existing_info_patients.php" class="btn-gray min-w-[120px] text-center">
+                                    <i class="fas fa-times mr-2"></i> Clear
+                                </a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </form>
                 
                 <?php if (!empty($searchTerm)): ?>
-                    <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+                    <div class="section-bg overflow-hidden mb-6">
                         <div class="px-6 py-4 border-b border-gray-200">
                             <h3 class="text-lg font-medium text-secondary">Search Results for "<?= htmlspecialchars($searchTerm) ?>"</h3>
                         </div>
@@ -1067,9 +1718,29 @@ if (!empty($selectedPatientId)) {
                                                     <tr>
                                                         <td class="patient-id"><?= $index + 1 ?></td>
                                                         <td><?= htmlspecialchars($patient['full_name']) ?></td>
-                                                        <td><?= $patient['date_of_birth'] ? date('M d, Y', strtotime($patient['date_of_birth'])) : 'N/A' ?></td>
+                                                        <td>
+                                                            <?php 
+                                                            // Display date of birth properly
+                                                            if (!empty($patient['date_of_birth'])) {
+                                                                echo date('M d, Y', strtotime($patient['date_of_birth']));
+                                                            } else {
+                                                                echo 'N/A';
+                                                            }
+                                                            ?>
+                                                        </td>
                                                         <td><?= $patient['age'] ?? 'N/A' ?></td>
-                                                        <td><?= isset($patient['gender']) && $patient['gender'] ? htmlspecialchars($patient['gender']) : 'N/A' ?></td>
+                                                        <td>
+                                                            <?php 
+                                                            // Display gender properly
+                                                            if (!empty($patient['gender'])) {
+                                                                if ($patient['gender'] === 'male') echo 'Male';
+                                                                elseif ($patient['gender'] === 'female') echo 'Female';
+                                                                else echo htmlspecialchars($patient['gender']);
+                                                            } else {
+                                                                echo 'N/A';
+                                                            }
+                                                            ?>
+                                                        </td>
                                                         <?php if ($sitioExists): ?>
                                                         <td><?= htmlspecialchars($patient['sitio'] ?? 'N/A') ?></td>
                                                         <?php endif; ?>
@@ -1126,9 +1797,29 @@ if (!empty($selectedPatientId)) {
                                                         <td class="patient-id"><?= $index + 1 ?></td>
                                                         <td><?= htmlspecialchars($user['full_name']) ?></td>
                                                         <td><?= htmlspecialchars($user['email']) ?></td>
-                                                        <td><?= $user['date_of_birth'] ? date('M d, Y', strtotime($user['date_of_birth'])) : 'N/A' ?></td>
+                                                        <td>
+                                                            <?php 
+                                                            // Display date of birth from user table
+                                                            if (!empty($user['date_of_birth'])) {
+                                                                echo date('M d, Y', strtotime($user['date_of_birth']));
+                                                            } else {
+                                                                echo 'N/A';
+                                                            }
+                                                            ?>
+                                                        </td>
                                                         <td><?= $user['age'] ?? 'N/A' ?></td>
-                                                        <td><?= htmlspecialchars($user['gender'] ?? 'N/A') ?></td>
+                                                        <td>
+                                                            <?php 
+                                                            // Display gender properly from user table
+                                                            if (!empty($user['gender'])) {
+                                                                if ($user['gender'] === 'male') echo 'Male';
+                                                                elseif ($user['gender'] === 'female') echo 'Female';
+                                                                else echo htmlspecialchars($user['gender']);
+                                                            } else {
+                                                                echo 'N/A';
+                                                            }
+                                                            ?>
+                                                        </td>
                                                         <td><?= htmlspecialchars($user['occupation'] ?? 'N/A') ?></td>
                                                         <td><?= htmlspecialchars($user['sitio'] ?? 'N/A') ?></td>
                                                         <td><?= htmlspecialchars($user['contact'] ?? 'N/A') ?></td>
@@ -1150,7 +1841,7 @@ if (!empty($selectedPatientId)) {
                 <?php endif; ?>
                 
                 <?php if (empty($searchTerm)): ?>
-                <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="section-bg overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-200">
                         <h3 class="text-lg font-medium text-secondary">
                             <?= $viewAll ? 'All Patient Records' : 'Patient Records' ?>
@@ -1170,7 +1861,7 @@ if (!empty($selectedPatientId)) {
                             <h3 class="text-lg font-medium text-gray-900">No patients found</h3>
                             <p class="mt-1 text-sm text-gray-500">Get started by adding a new patient.</p>
                             <div class="mt-6">
-                                <button data-tab="add-tab" class="tab-trigger inline-flex items-center px-4 py-2 bg-primary text-white rounded-full hover:bg-blue-700 transition">
+                                <button data-tab="add-tab" class="tab-trigger btn-primary inline-flex items-center">
                                     <i class="fas fa-plus-circle mr-2"></i>Add Patient
                                 </button>
                             </div>
@@ -1209,17 +1900,68 @@ if (!empty($selectedPatientId)) {
                                                 <tr>
                                                     <td class="patient-id"><?= $index + 1 ?></td>
                                                     <td><?= htmlspecialchars($patient['full_name']) ?></td>
-                                                    <td><?= $patient['date_of_birth'] ? date('M d, Y', strtotime($patient['date_of_birth'])) : 'N/A' ?></td>
+                                                    <td>
+                                                        <?php 
+                                                        // Display date of birth properly - for registered users, it comes from user table
+                                                        if (!empty($patient['date_of_birth'])) {
+                                                            echo date('M d, Y', strtotime($patient['date_of_birth']));
+                                                        } else {
+                                                            echo 'N/A';
+                                                        }
+                                                        ?>
+                                                    </td>
                                                     <td><?= $patient['age'] ?? 'N/A' ?></td>
-                                                    <td><?= isset($patient['gender']) && $patient['gender'] ? htmlspecialchars($patient['gender']) : 'N/A' ?></td>
+                                                    <td>
+                                                        <?php 
+                                                        // Display gender properly
+                                                        if (!empty($patient['gender'])) {
+                                                            echo htmlspecialchars($patient['gender']);
+                                                        } else {
+                                                            echo 'N/A';
+                                                        }
+                                                        ?>
+                                                    </td>
                                                     <?php if ($sitioExists): ?>
-                                                    <td><?= htmlspecialchars($patient['sitio'] ?? 'N/A') ?></td>
+                                                    <td>
+                                                        <?php 
+                                                        // Show sitio from patient table if exists, otherwise from user table
+                                                        if (!empty($patient['sitio'])) {
+                                                            echo htmlspecialchars($patient['sitio']);
+                                                        } elseif (!empty($patient['user_sitio'])) {
+                                                            echo htmlspecialchars($patient['user_sitio']);
+                                                        } else {
+                                                            echo 'N/A';
+                                                        }
+                                                        ?>
+                                                    </td>
                                                     <?php endif; ?>
                                                     <?php if ($civilStatusExists): ?>
-                                                    <td><?= htmlspecialchars($patient['civil_status'] ?? 'N/A') ?></td>
+                                                    <td>
+                                                        <?php 
+                                                        // Show civil status from patient table if exists, otherwise from user table
+                                                        if (!empty($patient['civil_status'])) {
+                                                            echo htmlspecialchars($patient['civil_status']);
+                                                        } elseif (!empty($patient['user_civil_status'])) {
+                                                            echo htmlspecialchars($patient['user_civil_status']);
+                                                        } else {
+                                                            echo 'N/A';
+                                                        }
+                                                        ?>
+                                                    </td>
                                                     <?php endif; ?>
                                                     <?php if ($occupationExists): ?>
-                                                    <td><?= htmlspecialchars($patient['occupation'] ?? 'N/A') ?></td>
+                                                    <td>
+                                                        <?php 
+                                                        // Show occupation from patient table if exists, otherwise from user table
+                                                        if (!empty($patient['occupation'])) {
+                                                            echo htmlspecialchars($patient['occupation']);
+                                                        } elseif (!empty($patient['user_occupation'])) {
+                                                            echo htmlspecialchars($patient['user_occupation']);
+                                                        } else {
+                                                            echo 'N/A';
+                                                        }
+                                                        ?>
+                                                    </td>
                                                     <?php endif; ?>
                                                     <td class="font-semibold text-primary"><?= htmlspecialchars($patient['blood_type'] ?? 'N/A') ?></td>
                                                     <td>
@@ -1275,17 +2017,68 @@ if (!empty($selectedPatientId)) {
                                             <tr>
                                                 <td class="patient-id"><?= $offset + $index + 1 ?></td>
                                                 <td><?= htmlspecialchars($patient['full_name']) ?></td>
-                                                <td><?= $patient['date_of_birth'] ? date('M d, Y', strtotime($patient['date_of_birth'])) : 'N/A' ?></td>
+                                                <td>
+                                                    <?php 
+                                                    // Display date of birth properly - for registered users, it comes from user table
+                                                    if (!empty($patient['date_of_birth'])) {
+                                                        echo date('M d, Y', strtotime($patient['date_of_birth']));
+                                                    } else {
+                                                        echo 'N/A';
+                                                    }
+                                                    ?>
+                                                </td>
                                                 <td><?= $patient['age'] ?? 'N/A' ?></td>
-                                                <td><?= isset($patient['gender']) && $patient['gender'] ? htmlspecialchars($patient['gender']) : 'N/A' ?></td>
+                                                <td>
+                                                    <?php 
+                                                    // Display gender properly
+                                                    if (!empty($patient['gender'])) {
+                                                        echo htmlspecialchars($patient['gender']);
+                                                    } else {
+                                                        echo 'N/A';
+                                                    }
+                                                    ?>
+                                                </td>
                                                 <?php if ($sitioExists): ?>
-                                                <td><?= htmlspecialchars($patient['sitio'] ?? 'N/A') ?></td>
+                                                <td>
+                                                    <?php 
+                                                    // Show sitio from patient table if exists, otherwise from user table
+                                                    if (!empty($patient['sitio'])) {
+                                                        echo htmlspecialchars($patient['sitio']);
+                                                    } elseif (!empty($patient['user_sitio'])) {
+                                                        echo htmlspecialchars($patient['user_sitio']);
+                                                    } else {
+                                                        echo 'N/A';
+                                                    }
+                                                    ?>
+                                                </td>
                                                 <?php endif; ?>
                                                 <?php if ($civilStatusExists): ?>
-                                                <td><?= htmlspecialchars($patient['civil_status'] ?? 'N/A') ?></td>
+                                                <td>
+                                                    <?php 
+                                                    // Show civil status from patient table if exists, otherwise from user table
+                                                    if (!empty($patient['civil_status'])) {
+                                                        echo htmlspecialchars($patient['civil_status']);
+                                                    } elseif (!empty($patient['user_civil_status'])) {
+                                                        echo htmlspecialchars($patient['user_civil_status']);
+                                                    } else {
+                                                        echo 'N/A';
+                                                    }
+                                                    ?>
+                                                </td>
                                                 <?php endif; ?>
                                                 <?php if ($occupationExists): ?>
-                                                <td><?= htmlspecialchars($patient['occupation'] ?? 'N/A') ?></td>
+                                                <td>
+                                                    <?php 
+                                                    // Show occupation from patient table if exists, otherwise from user table
+                                                    if (!empty($patient['occupation'])) {
+                                                        echo htmlspecialchars($patient['occupation']);
+                                                    } elseif (!empty($patient['user_occupation'])) {
+                                                        echo htmlspecialchars($patient['user_occupation']);
+                                                    } else {
+                                                        echo 'N/A';
+                                                    }
+                                                    ?>
+                                                </td>
                                                 <?php endif; ?>
                                                 <td class="font-semibold text-primary"><?= htmlspecialchars($patient['blood_type'] ?? 'N/A') ?></td>
                                                 <td>
@@ -1338,11 +2131,9 @@ if (!empty($selectedPatientId)) {
                                 </div>
                                 
                                 <div class="pagination-actions">
-                                    <a href="?tab=patients-tab&view_all=true" 
-   class="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700 transition flex items-center justify-center w-fit">
-    <i class="fas fa-list mr-2"></i>View All Patients
-</a>
-
+                                    <a href="?tab=patients-tab&view_all=true" class="btn-view-all">
+                                        <i class="fas fa-list mr-2"></i>View All Patients
+                                    </a>
                                 </div>
                             </div>
                         <?php endif; ?>
@@ -1351,36 +2142,123 @@ if (!empty($selectedPatientId)) {
                 <?php endif; ?>
             </div>
             
-            <!-- Add Patient Tab -->
+            <!-- Add Patient Tab - UPDATED: Now only shows a button to open modal -->
             <div id="add-tab" class="tab-content p-6">
-                <h2 class="text-xl font-semibold mb-6 text-secondary">Register New Patient</h2>
-                
-                <form method="POST" action="" class="bg-gray-50 p-6 rounded-lg" id="patientForm" enctype="multipart/form-data">
-                    <!-- Personal Information Section -->
-                    <div class="mb-8">
-                        <h3 class="form-section-title">
-                            <i class="fas fa-user"></i>Personal Information
+                <div class="text-center py-12">
+                    <div class="max-w-md mx-auto">
+                        <div class="section-bg p-8 mb-8">
+                            <div class="w-20 h-20 bg-white border-2 border-primary rounded-full flex items-center justify-center mx-auto mb-6">
+                                <i class="fas fa-user-plus text-primary text-3xl"></i>
+                            </div>
+                            <h2 class="text-2xl font-bold text-secondary mb-4">Register New Patient</h2>
+                            <p class="text-gray-600 mb-8">
+                                Add a new patient record to the system. Fill out all required information including personal details and medical history.
+                            </p>
+                            <button onclick="openAddPatientModal()" class="btn-primary px-8 py-4 text-lg font-semibold">
+                                <i class="fas fa-plus-circle mr-3"></i>Add New Patient
+                            </button>
+                        </div>
+                        <div class="text-sm text-gray-500 mt-6">
+                            <p class="flex items-center justify-center mb-2">
+                                <i class="fas fa-info-circle mr-2 text-primary"></i>
+                                All patient records are kept confidential and secure
+                            </p>
+                            <p class="flex items-center justify-center">
+                                <i class="fas fa-shield-alt mr-2 text-primary"></i>
+                                Compliant with Data Privacy Act of 2012 (RA 10173)
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Enhanced Wider Modal for Viewing Patient Info -->
+    <div id="viewModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 modal" style="display: none;">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col border-2 border-primary">
+            <!-- Sticky Header -->
+            <div class="p-8 border-b border-primary flex justify-between items-center bg-white rounded-t-2xl sticky top-0 z-10">
+                <h3 class="text-2xl font-bold flex items-center text-secondary">
+                    <i class="fas fa-user-injured mr-3 text-primary"></i>Patient Health Information
+                </h3>
+                <button onclick="closeViewModal()" class="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full w-10 h-10 flex items-center justify-center transition duration-200">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- Scrollable Content -->
+            <div class="p-8 bg-gray-50 flex-1 overflow-y-auto">
+                <div id="modalContent" class="min-h-[500px]">
+                    <!-- Content will be loaded via AJAX -->
+                    <div class="flex justify-center items-center py-20">
+                        <div class="text-center">
+                            <i class="fas fa-spinner fa-spin text-5xl text-primary mb-4"></i>
+                            <p class="text-lg text-gray-600 font-medium">Loading patient data...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sticky Footer - UPDATED: Added Edit Button -->
+            <div class="p-8 border-t border-gray-200 bg-white rounded-b-2xl sticky bottom-0">
+                <div class="flex flex-wrap justify-center items-center gap-6">
+                    <div class="flex flex-col items-center">
+                        <button onclick="printPatientRecord()" class="btn-print">
+                            <i class="fas fa-print mr-3"></i>Print Patient Record
+                        </button>
+                        
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                            <i class="fas fa-info-circle mr-1"></i>View and edit patient information
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- NEW: Add Patient Modal -->
+    <div id="addPatientModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 modal" style="display: none;">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col border-2 border-primary">
+            <!-- Sticky Header -->
+            <div class="modal-header p-8 flex justify-between items-center text-secondary rounded-t-2xl sticky top-0 z-10">
+                <h3 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-user-plus mr-3 text-primary"></i>Register New Patient
+                </h3>
+                <button onclick="closeAddPatientModal()" class="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full w-10 h-10 flex items-center justify-center transition duration-200">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- Scrollable Content with Form -->
+            <div class="p-8 bg-gray-50 flex-1 overflow-y-auto">
+                <form method="POST" action="" id="patientForm" enctype="multipart/form-data" class="space-y-8">
+                    <!-- Personal Information Section - UPDATED ICON -->
+                    <div class="section-bg p-8">
+                        <h3 class="form-section-title-modal mb-6">
+                            <i class="fas fa-id-card mr-2"></i>Personal Information
                         </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div>
-                                <label for="full_name" class="form-label required-field">Full Name</label>
-                                <input type="text" id="full_name" name="full_name" class="form-input-rounded form-field" required>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 modal-grid-gap">
+                            <div class="modal-field-spacing">
+                                <label for="modal_full_name" class="form-label-modal required-field">Full Name</label>
+                                <input type="text" id="modal_full_name" name="full_name" class="form-input-modal modal-form-field" required>
                             </div>
                             
-                            <!-- ADDED DATE OF BIRTH FIELD -->
-                            <div>
-                                <label for="date_of_birth" class="form-label required-field">Date of Birth</label>
-                                <input type="date" id="date_of_birth" name="date_of_birth" class="form-input-rounded form-field" required max="<?= date('Y-m-d') ?>">
+                            <div class="modal-field-spacing">
+                                <label for="modal_date_of_birth" class="form-label-modal required-field">Date of Birth</label>
+                                <input type="date" id="modal_date_of_birth" name="date_of_birth" class="form-input-modal modal-form-field" required max="<?= date('Y-m-d') ?>">
                             </div>
                             
-                            <div>
-                                <label for="age" class="form-label">Age (Auto-calculated)</label>
-                                <input type="number" id="age" name="age" min="0" max="120" class="form-input-rounded form-field" readonly>
+                            <div class="modal-field-spacing">
+                                <label for="modal_age" class="form-label-modal">Age (Auto-calculated)</label>
+                                <input type="number" id="modal_age" name="age" min="0" max="120" class="form-input-modal modal-form-field readonly-field" readonly>
                             </div>
                             
-                            <div>
-                                <label for="gender" class="form-label required-field">Gender</label>
-                                <select id="gender" name="gender" class="form-select-rounded form-field" required>
+                            <div class="modal-field-spacing">
+                                <label for="modal_gender" class="form-label-modal required-field">Gender</label>
+                                <select id="modal_gender" name="gender" class="form-select-modal modal-form-field" required>
                                     <option value="">Select Gender</option>
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
@@ -1389,9 +2267,9 @@ if (!empty($selectedPatientId)) {
                             </div>
                             
                             <?php if ($civilStatusExists): ?>
-                            <div>
-                                <label for="civil_status" class="form-label">Civil Status</label>
-                                <select id="civil_status" name="civil_status" class="form-select-rounded form-field">
+                            <div class="modal-field-spacing">
+                                <label for="modal_civil_status" class="form-label-modal">Civil Status</label>
+                                <select id="modal_civil_status" name="civil_status" class="form-select-modal modal-form-field">
                                     <option value="">Select Status</option>
                                     <option value="Single">Single</option>
                                     <option value="Married">Married</option>
@@ -1403,16 +2281,16 @@ if (!empty($selectedPatientId)) {
                             <?php endif; ?>
                             
                             <?php if ($occupationExists): ?>
-                            <div>
-                                <label for="occupation" class="form-label">Occupation</label>
-                                <input type="text" id="occupation" name="occupation" class="form-input-rounded form-field" placeholder="Current occupation">
+                            <div class="modal-field-spacing">
+                                <label for="modal_occupation" class="form-label-modal">Occupation</label>
+                                <input type="text" id="modal_occupation" name="occupation" class="form-input-modal modal-form-field" placeholder="Current occupation">
                             </div>
                             <?php endif; ?>
                             
                             <?php if ($sitioExists): ?>
-                            <div>
-                                <label for="sitio" class="form-label">Sitio</label>
-                                <select id="sitio" name="sitio" class="form-select-rounded form-field">
+                            <div class="modal-field-spacing">
+                                <label for="modal_sitio" class="form-label-modal">Sitio</label>
+                                <select id="modal_sitio" name="sitio" class="form-select-modal modal-form-field">
                                     <option value="">Select Sitio</option>
                                     <option value="Proper Toong">Proper Toong</option>
                                     <option value="Lower Toong">Lower Toong</option>
@@ -1433,47 +2311,47 @@ if (!empty($selectedPatientId)) {
                             </div>
                             <?php endif; ?>
                             
-                            <div class="md:col-span-2">
-                                <label for="address" class="form-label">Complete Address</label>
-                                <input type="text" id="address" name="address" class="form-input-rounded form-field" placeholder="House #, Street, Barangay">
+                            <div class="md:col-span-2 modal-field-spacing">
+                                <label for="modal_address" class="form-label-modal">Complete Address</label>
+                                <input type="text" id="modal_address" name="address" class="form-input-modal modal-form-field" placeholder="House #, Street, Barangay">
                             </div>
                             
-                            <div>
-                                <label for="contact" class="form-label">Contact Number</label>
-                                <input type="text" id="contact" name="contact" class="form-input-rounded form-field" placeholder="09XXXXXXXXX">
+                            <div class="modal-field-spacing">
+                                <label for="modal_contact" class="form-label-modal">Contact Number</label>
+                                <input type="text" id="modal_contact" name="contact" class="form-input-modal modal-form-field" placeholder="09XXXXXXXXX">
                             </div>
                         </div>
                     </div>
 
-                    <!-- Medical Information Section -->
-                    <div class="mb-8">
-                        <h3 class="form-section-title">
-                            <i class="fas fa-heartbeat"></i>Medical Information
+                    <!-- Medical Information Section - UPDATED ICON -->
+                    <div class="section-bg p-8">
+                        <h3 class="form-section-title-modal mb-6">
+                            <i class="fas fa-stethoscope mr-2"></i>Medical Information
                         </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div>
-                                <label for="height" class="form-label required-field">Height (cm)</label>
-                                <input type="number" id="height" name="height" step="0.1" min="0" class="form-input-rounded form-field" required>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 modal-grid-gap">
+                            <div class="modal-field-spacing">
+                                <label for="modal_height" class="form-label-modal required-field">Height (cm)</label>
+                                <input type="number" id="modal_height" name="height" step="0.1" min="0" class="form-input-modal modal-form-field" required>
                             </div>
                             
-                            <div>
-                                <label for="weight" class="form-label required-field">Weight (kg)</label>
-                                <input type="number" id="weight" name="weight" step="0.1" min="0" class="form-input-rounded form-field" required>
+                            <div class="modal-field-spacing">
+                                <label for="modal_weight" class="form-label-modal required-field">Weight (kg)</label>
+                                <input type="number" id="modal_weight" name="weight" step="0.1" min="0" class="form-input-modal modal-form-field" required>
                             </div>
                             
-                            <div>
-                                <label for="temperature" class="form-label">Temperature (°C)</label>
-                                <input type="number" id="temperature" name="temperature" step="0.1" min="0" max="45" class="form-input-rounded form-field">
+                            <div class="modal-field-spacing">
+                                <label for="modal_temperature" class="form-label-modal">Temperature (°C)</label>
+                                <input type="number" id="modal_temperature" name="temperature" step="0.1" min="0" max="45" class="form-input-modal modal-form-field">
                             </div>
                             
-                            <div>
-                                <label for="blood_pressure" class="form-label">Blood Pressure</label>
-                                <input type="text" id="blood_pressure" name="blood_pressure" class="form-input-rounded form-field" placeholder="120/80">
+                            <div class="modal-field-spacing">
+                                <label for="modal_blood_pressure" class="form-label-modal">Blood Pressure</label>
+                                <input type="text" id="modal_blood_pressure" name="blood_pressure" class="form-input-modal modal-form-field" placeholder="120/80">
                             </div>
                             
-                            <div>
-                                <label for="blood_type" class="form-label required-field">Blood Type</label>
-                                <select id="blood_type" name="blood_type" class="form-select-rounded form-field" required>
+                            <div class="modal-field-spacing">
+                                <label for="modal_blood_type" class="form-label-modal required-field">Blood Type</label>
+                                <select id="modal_blood_type" name="blood_type" class="form-select-modal modal-form-field" required>
                                     <option value="">Select Blood Type</option>
                                     <option value="A+">A+</option>
                                     <option value="A-">A-</option>
@@ -1487,200 +2365,156 @@ if (!empty($selectedPatientId)) {
                                 </select>
                             </div>
                             
-                            <div>
-                                <label for="last_checkup" class="form-label">Last Check-up Date</label>
-                                <input type="date" id="last_checkup" name="last_checkup" class="form-input-rounded form-field">
+                            <div class="modal-field-spacing">
+                                <label for="modal_last_checkup" class="form-label-modal">Last Check-up Date</label>
+                                <input type="date" id="modal_last_checkup" name="last_checkup" class="form-input-modal modal-form-field">
                             </div>
                         </div>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                            <div>
-                                <label for="allergies" class="form-label">Allergies</label>
-                                <textarea id="allergies" name="allergies" rows="3" class="form-textarea-rounded form-field" placeholder="Food, drug, environmental allergies..."></textarea>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                            <div class="modal-field-spacing">
+                                <label for="modal_allergies" class="form-label-modal">Allergies</label>
+                                <textarea id="modal_allergies" name="allergies" rows="3" class="form-textarea-modal modal-form-field" placeholder="Food, drug, environmental allergies..."></textarea>
                             </div>
                             
-                            <div>
-                                <label for="current_medications" class="form-label">Current Medications</label>
-                                <textarea id="current_medications" name="current_medications" rows="3" class="form-textarea-rounded form-field" placeholder="Medications with dosage and frequency..."></textarea>
+                            <div class="modal-field-spacing">
+                                <label for="modal_current_medications" class="form-label-modal">Current Medications</label>
+                                <textarea id="modal_current_medications" name="current_medications" rows="3" class="form-textarea-modal modal-form-field" placeholder="Medications with dosage and frequency..."></textarea>
                             </div>
                             
-                            <div>
-                                <label for="immunization_record" class="form-label">Immunization Record</label>
-                                <textarea id="immunization_record" name="immunization_record" rows="3" class="form-textarea-rounded form-field" placeholder="Vaccinations received with dates..."></textarea>
+                            <div class="modal-field-spacing">
+                                <label for="modal_immunization_record" class="form-label-modal">Immunization Record</label>
+                                <textarea id="modal_immunization_record" name="immunization_record" rows="3" class="form-textarea-modal modal-form-field" placeholder="Vaccinations received with dates..."></textarea>
                             </div>
                             
-                            <div>
-                                <label for="chronic_conditions" class="form-label">Chronic Conditions</label>
-                                <textarea id="chronic_conditions" name="chronic_conditions" rows="3" class="form-textarea-rounded form-field" placeholder="Hypertension, diabetes, asthma, etc..."></textarea>
+                            <div class="modal-field-spacing">
+                                <label for="modal_chronic_conditions" class="form-label-modal">Chronic Conditions</label>
+                                <textarea id="modal_chronic_conditions" name="chronic_conditions" rows="3" class="form-textarea-modal modal-form-field" placeholder="Hypertension, diabetes, asthma, etc..."></textarea>
                             </div>
                         </div>
                         
-                        <div class="mt-4">
-                            <label for="medical_history" class="form-label">Medical History</label>
-                            <textarea id="medical_history" name="medical_history" rows="4" class="form-textarea-rounded form-field" placeholder="Past illnesses, surgeries, hospitalizations, chronic conditions..."></textarea>
+                        <div class="mt-6 modal-field-spacing">
+                            <label for="modal_medical_history" class="form-label-modal">Medical History</label>
+                            <textarea id="modal_medical_history" name="medical_history" rows="4" class="form-textarea-modal modal-form-field" placeholder="Past illnesses, surgeries, hospitalizations, chronic conditions..."></textarea>
                         </div>
                         
-                        <div class="mt-4">
-                            <label for="family_history" class="form-label">Family Medical History</label>
-                            <textarea id="family_history" name="family_history" rows="4" class="form-textarea-rounded form-field" placeholder="Family history of diseases (parents, siblings)..."></textarea>
+                        <div class="mt-6 modal-field-spacing">
+                            <label for="modal_family_history" class="form-label-modal">Family Medical History</label>
+                            <textarea id="modal_family_history" name="family_history" rows="4" class="form-textarea-modal modal-form-field" placeholder="Family history of diseases (parents, siblings)..."></textarea>
                         </div>
                     </div>
 
-                    <!-- Data Privacy Consent -->
-                    <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200 consent-container consent-container-rounded">
-                        <div class="flex items-start">
-                            <input type="checkbox" id="consent_given" name="consent_given" class="mt-1 mr-3 consent-checkbox form-checkbox-rounded" required>
-                            <label for="consent_given" class="text-gray-700">
-                                <span class="font-medium text-blue-800">Data Privacy Consent</span>
-                                <p class="text-sm text-blue-600 mt-1">
-                                    I hereby give my consent to the Barangay Luz Health Center to collect, process, 
-                                    and store my personal and health information in accordance with the 
-                                    <strong>Data Privacy Act of 2012 (RA 10173)</strong>. I understand that my 
-                                    information will be kept confidential and used only for healthcare purposes.
-                                </p>
-                            </label>
-                        </div>
-                    </div>
+                    <!-- REMOVED: Data Privacy Consent section -->
                     
-                    <div class="mt-6 flex justify-end space-x-4">
-                        <button type="reset" class="bg-gray-500 text-white py-3 px-8 rounded-full hover:bg-gray-600 transition" id="clearFormBtn">
+                    <input type="hidden" name="add_patient" value="1">
+                    <input type="hidden" name="consent_given" value="1">
+                </form>
+            </div>
+            
+            <!-- Sticky Footer -->
+            <div class="p-8 border-t border-gray-200 bg-white rounded-b-2xl sticky bottom-0">
+                <div class="flex flex-wrap justify-between items-center gap-4">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                            <i class="fas fa-info-circle mr-1"></i>All fields marked with * are required
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button type="button" onclick="clearAddPatientForm()" class="btn-gray px-6 py-3">
                             <i class="fas fa-times mr-2"></i>Clear Form
                         </button>
-                        <button type="submit" name="add_patient" class="bg-primary text-white py-3 px-8 rounded-full hover:bg-blue-700 transition" id="registerPatientBtn" disabled>
+                        <button type="submit" name="add_patient" form="patientForm" class="btn-success px-8 py-3" id="modalRegisterPatientBtn">
                             <i class="fas fa-save mr-2"></i>Register Patient
                         </button>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Enhanced Wider Modal with Sticky Header -->
-<div id="viewModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 modal" style="display: none;">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col">
-        <!-- Sticky Header -->
-        <div class="p-8 border-b border-blue-500 flex justify-between items-center bg-gradient-to-r from-primary to-blue-600 text-white rounded-t-2xl sticky top-0 z-10">
-            <h3 class="text-2xl font-bold flex items-center">
-                <i class="fas fa-user-injured mr-3 text-white"></i>Patient Health Information
-            </h3>
-            <button onclick="closeViewModal()" class="text-white hover:text-gray-200 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full w-10 h-10 flex items-center justify-center transition duration-200">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-        </div>
-        
-        <!-- Scrollable Content -->
-        <div class="p-8 bg-gray-50 flex-1 overflow-y-auto">
-            <div id="modalContent" class="min-h-[500px]">
-                <!-- Content will be loaded via AJAX -->
-                <div class="flex justify-center items-center py-20">
-                    <div class="text-center">
-                        <i class="fas fa-spinner fa-spin text-5xl text-primary mb-4"></i>
-                        <p class="text-lg text-gray-600 font-medium">Loading patient data...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Sticky Footer -->
-        <div class="p-8 border-t border-gray-200 bg-white rounded-b-2xl sticky bottom-0">
-            <div class="flex flex-wrap justify-between items-center gap-4">
-                <div class="flex items-center space-x-3">
-                    <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                        <i class="fas fa-info-circle mr-1"></i>View and edit patient information
-                    </span>
-                </div>
-                <div class="flex flex-wrap gap-3">
-    
-                    <button onclick="printPatientRecord()" class="px-6 py-3 bg-blue-100 text-primary rounded-full hover:bg-blue-200 transition font-semibold shadow-sm hover:shadow-md flex items-center">
-                        <i class="fas fa-print mr-2"></i>Print
-                    </button>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
     <script>
-        // Form validation functionality
+        // Form validation functionality for modal
         document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('patientForm');
-            const formFields = document.querySelectorAll('.form-field');
-            const consentCheckbox = document.querySelector('.consent-checkbox');
-            const consentContainer = document.querySelector('.consent-container');
-            const registerBtn = document.getElementById('registerPatientBtn');
-            const clearBtn = document.getElementById('clearFormBtn');
+            const modalFormFields = document.querySelectorAll('.modal-form-field');
+            const modalRegisterBtn = document.getElementById('modalRegisterPatientBtn');
+            const modalDateOfBirth = document.getElementById('modal_date_of_birth');
+            const modalAge = document.getElementById('modal_age');
 
-            // Initialize field validation
-            formFields.forEach(field => {
+            // Initialize modal field validation
+            modalFormFields.forEach(field => {
                 // Set initial state
-                updateFieldState(field);
+                updateModalFieldState(field);
                 
                 // Add event listeners
                 field.addEventListener('input', function() {
-                    updateFieldState(this);
-                    checkFormValidity();
+                    updateModalFieldState(this);
+                    checkModalFormValidity();
                 });
                 
                 field.addEventListener('change', function() {
-                    updateFieldState(this);
-                    checkFormValidity();
+                    updateModalFieldState(this);
+                    checkModalFormValidity();
                 });
                 
                 field.addEventListener('blur', function() {
-                    updateFieldState(this);
+                    updateModalFieldState(this);
                 });
             });
 
-            // Consent checkbox event listener
-            consentCheckbox.addEventListener('change', function() {
-                updateConsentState();
-                checkFormValidity();
-            });
+            // Age calculation from date of birth in modal
+            if (modalDateOfBirth && modalAge) {
+                modalDateOfBirth.addEventListener('change', function() {
+                    calculateModalAge(this.value);
+                });
+            }
 
-            // Clear form button
-            clearBtn.addEventListener('click', function() {
-                setTimeout(() => {
-                    formFields.forEach(field => updateFieldState(field));
-                    updateConsentState();
-                    checkFormValidity();
-                }, 100);
-            });
-
-            // Update field background color based on content
-            function updateFieldState(field) {
-                const value = field.type === 'checkbox' ? field.checked : field.value.trim();
+            // Calculate age function for modal
+            function calculateModalAge(dateOfBirth) {
+                if (!dateOfBirth) return;
                 
-                if (field.hasAttribute('required') && !value) {
-                    // Required field is empty - warm red
+                const birthDate = new Date(dateOfBirth);
+                const today = new Date();
+                
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const monthDiff = today.getMonth() - birthDate.getMonth();
+                
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+                
+                modalAge.value = age;
+                
+                // Update form validation state
+                updateModalFieldState(modalAge);
+                checkModalFormValidity();
+            }
+
+            // Update modal field background color
+            function updateModalFieldState(field) {
+                if (!field) return;
+                
+                const value = field.type === 'checkbox' ? field.checked : field.value.trim();
+                const isRequired = field.hasAttribute('required');
+                
+                if (isRequired && !value) {
                     field.classList.add('field-empty');
                     field.classList.remove('field-filled');
                 } else if (value) {
-                    // Field has content - warm blue
                     field.classList.add('field-filled');
                     field.classList.remove('field-empty');
                 } else {
-                    // Optional field is empty - default
                     field.classList.remove('field-filled', 'field-empty');
                 }
             }
 
-            // Update consent container state
-            function updateConsentState() {
-                if (consentCheckbox.checked) {
-                    consentContainer.classList.add('consent-checked');
-                    consentContainer.classList.remove('consent-not-checked');
-                } else {
-                    consentContainer.classList.add('consent-not-checked');
-                    consentContainer.classList.remove('consent-checked');
-                }
-            }
-
-            // Check if all required fields are filled and consent is given
-            function checkFormValidity() {
+            // Check if all required modal fields are filled
+            function checkModalFormValidity() {
+                if (!modalRegisterBtn) return;
+                
                 let allRequiredFilled = true;
                 
                 // Check required form fields
-                formFields.forEach(field => {
+                modalFormFields.forEach(field => {
                     if (field.hasAttribute('required')) {
                         const value = field.type === 'checkbox' ? field.checked : field.value.trim();
                         if (!value) {
@@ -1689,27 +2523,61 @@ if (!empty($selectedPatientId)) {
                     }
                 });
 
-                // Check consent
-                const consentGiven = consentCheckbox.checked;
-                
                 // Enable/disable register button
-                if (allRequiredFilled && consentGiven) {
-                    registerBtn.disabled = false;
-                    registerBtn.classList.remove('btn-disabled');
+                if (allRequiredFilled) {
+                    modalRegisterBtn.disabled = false;
+                    modalRegisterBtn.classList.remove('btn-disabled');
                 } else {
-                    registerBtn.disabled = true;
-                    registerBtn.classList.add('btn-disabled');
+                    modalRegisterBtn.disabled = true;
+                    modalRegisterBtn.classList.add('btn-disabled');
                 }
             }
 
-            // Initialize form state
-            updateConsentState();
-            checkFormValidity();
+            // Initialize modal form state
+            checkModalFormValidity();
         });
 
-        // Enhanced modal functions
+        // Modal functions
+        function openAddPatientModal() {
+            const modal = document.getElementById('addPatientModal');
+            modal.style.display = 'flex';
+            modal.style.opacity = '0';
+            
+            setTimeout(() => {
+                modal.style.opacity = '1';
+                modal.style.transition = 'opacity 0.3s ease';
+            }, 10);
+        }
+        
+        function closeAddPatientModal() {
+            const modal = document.getElementById('addPatientModal');
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+        
+        function clearAddPatientForm() {
+            const form = document.getElementById('patientForm');
+            if (form) {
+                form.reset();
+                
+                // Reset all form field states
+                const modalFormFields = document.querySelectorAll('.modal-form-field');
+                modalFormFields.forEach(field => {
+                    field.classList.remove('field-filled', 'field-empty');
+                });
+                
+                // Re-check form validity
+                setTimeout(() => {
+                    checkModalFormValidity();
+                }, 100);
+            }
+        }
+
+        // Enhanced modal functions for viewing patient info
         function openViewModal(patientId) {
-            // Show loading state with better styling
+            // Show loading state
             document.getElementById('modalContent').innerHTML = `
                 <div class="flex justify-center items-center py-20">
                     <div class="text-center">
@@ -1757,6 +2625,9 @@ if (!empty($selectedPatientId)) {
                             }
                         });
                     });
+                    
+                    // Set up the Save Medical Information button
+                    setupMedicalForm();
                 })
                 .catch(error => {
                     document.getElementById('modalContent').innerHTML = `
@@ -1764,7 +2635,7 @@ if (!empty($selectedPatientId)) {
                             <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-4"></i>
                             <h3 class="text-xl font-semibold text-red-700 mb-2">Error Loading Patient Data</h3>
                             <p class="text-red-600 mb-4">Unable to load patient information. Please try again.</p>
-                            <button onclick="openViewModal(${patientId})" class="px-6 py-3 bg-primary text-white rounded-full hover:bg-blue-700 transition font-semibold">
+                            <button onclick="openViewModal(${patientId})" class="btn-primary px-6 py-3">
                                 <i class="fas fa-redo mr-2"></i>Retry
                             </button>
                         </div>
@@ -1772,7 +2643,6 @@ if (!empty($selectedPatientId)) {
                 });
         }
         
-        // Enhanced close modal function
         function closeViewModal() {
             const modal = document.getElementById('viewModal');
             modal.style.opacity = '0';
@@ -1781,40 +2651,86 @@ if (!empty($selectedPatientId)) {
             }, 300);
         }
         
-        // Enhanced export functions
+        // Function to set up medical form when modal content loads
+        function setupMedicalForm() {
+            const healthInfoForm = document.getElementById('healthInfoForm');
+            
+            if (healthInfoForm) {
+                // Find the Save Medical Information button and update its class
+                const saveBtn = healthInfoForm.querySelector('button[name="save_health_info"]');
+                if (saveBtn) {
+                    saveBtn.classList.remove('btn-primary', 'bg-primary', 'text-white');
+                    saveBtn.classList.add('btn-save-medical');
+                    saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i> Save Medical Information';
+                }
+                
+                // Set up form submission
+                healthInfoForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    // Show loading state
+                    const submitBtn = this.querySelector('button[name="save_health_info"]');
+                    const originalBtnText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+                    submitBtn.disabled = true;
+                    
+                    try {
+                        const formData = new FormData(this);
+                        const response = await fetch(this.action, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (response.ok) {
+                            // Show success message
+                            showNotification('success', 'Medical information saved successfully!');
+                            
+                            // Reload the modal content to show updated data
+                            const patientId = formData.get('patient_id');
+                            if (patientId) {
+                                setTimeout(() => {
+                                    openViewModal(patientId);
+                                }, 1500);
+                            }
+                        } else {
+                            showNotification('error', 'Error saving medical information');
+                        }
+                        
+                    } catch (error) {
+                        showNotification('error', 'Network error: ' + error.message);
+                        console.error('Form submission error:', error);
+                    } finally {
+                        // Restore button
+                        submitBtn.innerHTML = originalBtnText;
+                        submitBtn.disabled = false;
+                    }
+                });
+            }
+        }
+        
+        // NEW: Print Patient Record Function
         function printPatientRecord() {
             const patientId = getPatientId();
             if (patientId) {
+                // Open the print patient page in a new window
                 const printWindow = window.open(`/community-health-tracker/api/print_patient.php?id=${patientId}`, '_blank', 'width=1200,height=800');
                 if (printWindow) {
                     printWindow.focus();
+                    // Listen for the window to load and trigger print
+                    printWindow.onload = function() {
+                        // Give a small delay for everything to load
+                        setTimeout(() => {
+                            printWindow.print();
+                        }, 1000);
+                    };
+                } else {
+                    showNotification('error', 'Please allow pop-ups for this site to print');
                 }
             } else {
                 showNotification('error', 'No patient selected for printing');
             }
         }
 
-        function exportToExcel() {
-            const patientId = getPatientId();
-            if (patientId) {
-                showNotification('info', 'Preparing Excel export...');
-                window.location.href = `/community-health-tracker/api/export_patient.php?id=${patientId}&format=excel`;
-            } else {
-                showNotification('error', 'No patient selected for export');
-            }
-        }
-
-        function exportToPDF() {
-            const patientId = getPatientId();
-            if (patientId) {
-                showNotification('info', 'Generating PDF document...');
-                window.location.href = `/community-health-tracker/api/export_patient.php?id=${patientId}&format=pdf`;
-            } else {
-                showNotification('error', 'No patient selected for export');
-            }
-        }
-
-        // Enhanced patient ID detection
         function getPatientId() {
             const selectors = [
                 '#healthInfoForm input[name="patient_id"]',
@@ -1831,7 +2747,6 @@ if (!empty($selectedPatientId)) {
                 }
             }
             
-            // Try to get from URL if modal is open
             const modalContent = document.getElementById('modalContent');
             if (modalContent) {
                 const hiddenInputs = modalContent.querySelectorAll('input[type="hidden"]');
@@ -1845,16 +2760,14 @@ if (!empty($selectedPatientId)) {
             return null;
         }
 
-        // Notification function
         function showNotification(type, message) {
-            // Remove existing notifications
             const existingNotifications = document.querySelectorAll('.custom-notification');
             existingNotifications.forEach(notification => notification.remove());
             
             const notification = document.createElement('div');
             notification.className = `custom-notification fixed top-6 right-6 z-50 px-6 py-4 rounded-xl shadow-lg border-2 ${
-                type === 'error' ? 'bg-red-100 text-red-800 border-red-200' :
-                type === 'success' ? 'bg-green-100 text-green-800 border-green-200' :
+                type === 'error' ? 'alert-error' :
+                type === 'success' ? 'alert-success' :
                 'bg-blue-100 text-blue-800 border-blue-200'
             }`;
             
@@ -1870,7 +2783,6 @@ if (!empty($selectedPatientId)) {
             
             document.body.appendChild(notification);
             
-            // Auto remove after 5 seconds
             setTimeout(() => {
                 if (notification.parentNode) {
                     notification.parentNode.removeChild(notification);
@@ -1880,24 +2792,30 @@ if (!empty($selectedPatientId)) {
 
         // Enhanced modal close on outside click
         window.onclick = function(event) {
-            const modal = document.getElementById('viewModal');
-            if (event.target === modal) {
+            const viewModal = document.getElementById('viewModal');
+            const addPatientModal = document.getElementById('addPatientModal');
+            
+            if (event.target === viewModal) {
                 closeViewModal();
+            }
+            if (event.target === addPatientModal) {
+                closeAddPatientModal();
             }
         };
 
-        // Add keyboard support for modal
+        // Add keyboard support for modals
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 closeViewModal();
+                closeAddPatientModal();
             }
         });
 
         // Auto-hide messages after 3 seconds
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(function() {
-                var successMessage = document.querySelector('.bg-green-100');
-                var errorMessage = document.querySelector('.bg-red-100');
+                var successMessage = document.getElementById('successMessage');
+                var errorMessage = document.querySelector('.alert-error');
                 
                 if (successMessage) {
                     successMessage.style.display = 'none';
@@ -1921,8 +2839,8 @@ if (!empty($selectedPatientId)) {
                     const tabId = button.getAttribute('data-tab');
                     
                     // Update active tab button
-                    tabButtons.forEach(btn => btn.classList.remove('border-primary', 'text-primary'));
-                    button.classList.add('border-primary', 'text-primary');
+                    tabButtons.forEach(btn => btn.classList.remove('border-primary', 'text-primary', 'active'));
+                    button.classList.add('border-primary', 'text-primary', 'active');
                     
                     // Show active tab content
                     tabContents.forEach(content => content.classList.remove('active'));
@@ -1943,9 +2861,9 @@ if (!empty($selectedPatientId)) {
                     // Update active tab button
                     tabButtons.forEach(btn => {
                         if (btn.getAttribute('data-tab') === tabId) {
-                            btn.classList.add('border-primary', 'text-primary');
+                            btn.classList.add('border-primary', 'text-primary', 'active');
                         } else {
-                            btn.classList.remove('border-primary', 'text-primary');
+                            btn.classList.remove('border-primary', 'text-primary', 'active');
                         }
                     });
                     
@@ -1973,43 +2891,400 @@ if (!empty($selectedPatientId)) {
         if (window.history.replaceState && !window.location.search.includes('search=')) {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
-
-        // ADDED: Age calculation from date of birth
+        
+        // Ensure buttons have proper opacity styling
         document.addEventListener('DOMContentLoaded', function() {
-            const dateOfBirthInput = document.getElementById('date_of_birth');
-            const ageInput = document.getElementById('age');
+            const buttons = document.querySelectorAll('.btn-view, .btn-archive, .btn-add-patient, .btn-primary, .btn-success, .btn-gray, .btn-print, .btn-edit, .btn-save-medical, .btn-view-all, .btn-back-to-pagination, .pagination-btn');
+            buttons.forEach(button => {
+                button.style.borderStyle = 'solid';
+            });
+        });
+    </script>
+
+    <script>
+        // Enhanced form submission with success modal
+        document.addEventListener('DOMContentLoaded', function() {
+            const healthInfoForm = document.getElementById('healthInfoForm');
+            const viewModal = document.getElementById('viewModal');
             
-            if (dateOfBirthInput && ageInput) {
-                dateOfBirthInput.addEventListener('change', function() {
-                    calculateAge(this.value);
+            if (healthInfoForm) {
+                healthInfoForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    // Show loading state
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    const originalBtnText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+                    submitBtn.disabled = true;
+                    
+                    try {
+                        const formData = new FormData(this);
+                        const response = await fetch(this.action, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // Close the view modal
+                            if (viewModal) {
+                                closeViewModal();
+                            }
+                            
+                            // Show success modal with beautiful design
+                            showSuccessModal(result.formatted_data || result.data);
+                            
+                            // Optional: Refresh the patient list after a delay
+                            setTimeout(() => {
+                                if (window.location.search.includes('tab=patients-tab')) {
+                                    window.location.reload();
+                                }
+                            }, 3000);
+                            
+                        } else {
+                            showNotification('error', result.message || 'Error saving patient information');
+                        }
+                        
+                    } catch (error) {
+                        showNotification('error', 'Network error: ' + error.message);
+                        console.error('Form submission error:', error);
+                    } finally {
+                        // Restore button
+                        submitBtn.innerHTML = originalBtnText;
+                        submitBtn.disabled = false;
+                    }
                 });
-                
-                // Calculate age on page load if date of birth is already set
-                if (dateOfBirthInput.value) {
-                    calculateAge(dateOfBirthInput.value);
-                }
+            }
+        });
+
+        // Function to show success modal
+        function showSuccessModal(data) {
+            // Remove existing success modal if any
+            const existingModal = document.getElementById('successModal');
+            if (existingModal) {
+                existingModal.remove();
             }
             
-            function calculateAge(dateOfBirth) {
-                if (!dateOfBirth) return;
-                
-                const birthDate = new Date(dateOfBirth);
-                const today = new Date();
-                
-                let age = today.getFullYear() - birthDate.getFullYear();
-                const monthDiff = today.getMonth() - birthDate.getMonth();
-                
-                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-                    age--;
+            // Create modal HTML
+            const modalHTML = `
+                <div id="successModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-[9999] animate-fadeIn">
+                    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border-2 border-success animate-scaleIn">
+                        <!-- Modal Header -->
+                        <div class="p-8 bg-gradient-to-r from-success/10 to-success/5 border-b border-success/20">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-16 h-16 bg-success/20 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-check-circle text-3xl text-success"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-2xl font-bold text-secondary">Successfully Saved!</h3>
+                                        <p class="text-gray-600">Patient information has been updated successfully.</p>
+                                    </div>
+                                </div>
+                                <button onclick="closeSuccessModal()" class="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full w-10 h-10 flex items-center justify-center transition duration-200">
+                                    <i class="fas fa-times text-xl"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Modal Body -->
+                        <div class="p-8 max-h-[60vh] overflow-y-auto">
+                            <!-- Patient Summary Card -->
+                            <div class="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h4 class="text-lg font-bold text-secondary mb-1">${data.patient_name || 'Patient'}</h4>
+                                        <p class="text-sm text-gray-600">Patient ID: <span class="font-semibold text-primary">${data.patient_id || 'N/A'}</span></p>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="inline-block px-3 py-1 rounded-full text-sm font-medium ${data.patient_type && data.patient_type.includes('Registered') ? 'bg-success/20 text-success' : 'bg-info/20 text-info'}">
+                                            ${data.patient_type ? data.patient_type.replace(/<[^>]*>/g, '') : 'Patient Type'}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4 text-sm">
+                                    <div class="space-y-1">
+                                        <p class="text-gray-500">Date of Birth</p>
+                                        <p class="font-medium">${data.date_of_birth || 'Not specified'}</p>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <p class="text-gray-500">Age</p>
+                                        <p class="font-medium">${data.age || 'Not specified'}</p>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <p class="text-gray-500">Gender</p>
+                                        <p class="font-medium">${data.gender || 'Not specified'}</p>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <p class="text-gray-500">Last Check-up</p>
+                                        <p class="font-medium">${data.last_checkup || 'Not scheduled'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Medical Information Grid -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <!-- Vital Signs -->
+                                <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                                    <h5 class="text-lg font-bold text-secondary mb-4 flex items-center">
+                                        <i class="fas fa-heartbeat mr-2 text-danger"></i>Vital Signs
+                                    </h5>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-600">Height</span>
+                                            <span class="font-bold text-lg ${data.height !== 'Not provided' ? 'text-primary' : 'text-gray-400'}">
+                                                ${data.height || 'Not provided'}
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-600">Weight</span>
+                                            <span class="font-bold text-lg ${data.weight !== 'Not provided' ? 'text-primary' : 'text-gray-400'}">
+                                                ${data.weight || 'Not provided'}
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-600">Blood Pressure</span>
+                                            <span class="font-bold text-lg ${data.blood_pressure !== 'Not provided' ? 'text-warning' : 'text-gray-400'}">
+                                                ${data.blood_pressure || 'Not provided'}
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-600">Temperature</span>
+                                            <span class="font-bold text-lg ${data.temperature !== 'Not provided' ? 'text-danger' : 'text-gray-400'}">
+                                                ${data.temperature || 'Not provided'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Medical Details -->
+                                <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                                    <h5 class="text-lg font-bold text-secondary mb-4 flex items-center">
+                                        <i class="fas fa-stethoscope mr-2 text-primary"></i>Medical Details
+                                    </h5>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-600">Blood Type</span>
+                                            <span class="font-bold text-lg text-primary">
+                                                ${data.blood_type ? data.blood_type.replace(/<[^>]*>/g, '') : 'Not provided'}
+                                            </span>
+                                        </div>
+                                        <div class="text-center py-4">
+                                            <div class="inline-flex items-center justify-center w-24 h-24 rounded-full ${data.blood_type && data.blood_type !== 'Not provided' ? 'bg-red-50 border-2 border-red-200' : 'bg-gray-50 border-2 border-gray-200'}">
+                                                <span class="text-2xl font-bold ${data.blood_type && data.blood_type !== 'Not provided' ? 'text-danger' : 'text-gray-400'}">
+                                                    ${data.blood_type && data.blood_type !== 'Not provided' ? data.blood_type.replace(/<[^>]*>/g, '') : 'N/A'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Success Message -->
+                            <div class="bg-gradient-to-r from-success/5 to-success/10 rounded-xl p-6 border border-success/20">
+                                <div class="flex items-start space-x-3">
+                                    <i class="fas fa-info-circle text-xl text-success mt-1"></i>
+                                    <div>
+                                        <p class="text-sm text-gray-700 mb-2">
+                                            <strong>✓ Record Updated:</strong> Patient information has been securely saved to the database.
+                                        </p>
+                                        <div class="flex items-center justify-between text-xs text-gray-500">
+                                            <span>Saved by: <strong>${data.saved_by || 'Medical Staff'}</strong></span>
+                                            <span>${data.timestamp || 'Just now'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Modal Footer -->
+                        <div class="p-6 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+                            <div class="text-sm text-gray-500">
+                                <i class="fas fa-shield-alt mr-1 text-primary"></i>
+                                Data is protected under RA 10173
+                            </div>
+                            <div class="flex space-x-3">
+                                <button onclick="printPatientRecordFromSuccess(${data.patient_id})" class="btn-print inline-flex items-center px-4 py-2">
+                                    <i class="fas fa-print mr-2"></i>Print Record
+                                </button>
+                                <button onclick="closeSuccessModal()" class="btn-primary inline-flex items-center px-6 py-2">
+                                    <i class="fas fa-check mr-2"></i>Done
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            
+            // Auto-close modal after 8 seconds
+            setTimeout(() => {
+                closeSuccessModal();
+            }, 8000);
+        }
+
+        // Function to close success modal
+        function closeSuccessModal() {
+            const modal = document.getElementById('successModal');
+            if (modal) {
+                modal.style.opacity = '0';
+                modal.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => {
+                    modal.remove();
+                }, 300);
+            }
+        }
+
+        // Function to print patient record from success modal
+        function printPatientRecordFromSuccess(patientId) {
+            if (patientId) {
+                // Open the print patient page in a new window
+                const printWindow = window.open(`/community-health-tracker/api/print_patient.php?id=${patientId}`, '_blank', 'width=1200,height=800');
+                if (printWindow) {
+                    printWindow.focus();
+                    // Listen for the window to load and trigger print
+                    printWindow.onload = function() {
+                        // Give a small delay for everything to load
+                        setTimeout(() => {
+                            printWindow.print();
+                        }, 1000);
+                    };
+                } else {
+                    showNotification('error', 'Please allow pop-ups for this site to print');
+                }
+            } else {
+                showNotification('error', 'No patient selected for printing');
+            }
+        }
+
+        // Add CSS animations for modal (run once)
+        if (!document.getElementById('successModalStyles')) {
+            const style = document.createElement('style');
+            style.id = 'successModalStyles';
+            style.textContent = `
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
                 }
                 
-                ageInput.value = age;
-                
-                // Update form validation state
-                if (ageInput.classList.contains('form-field')) {
-                    updateFieldState(ageInput);
-                    checkFormValidity();
+                @keyframes scaleIn {
+                    from { transform: scale(0.95); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
                 }
+                
+                .animate-fadeIn {
+                    animation: fadeIn 0.3s ease-out;
+                }
+                
+                .animate-scaleIn {
+                    animation: scaleIn 0.3s ease-out;
+                }
+                
+                /* Success Modal Specific Styles */
+                #successModal .btn-print {
+                    background-color: white;
+                    color: #3498db;
+                    border: 2px solid #3498db;
+                    opacity: 1;
+                    border-radius: 8px;
+                    padding: 10px 20px;
+                    transition: all 0.3s ease;
+                    font-weight: 500;
+                    min-height: 44px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 14px;
+                }
+                
+                #successModal .btn-print:hover {
+                    background-color: #f0f9ff;
+                    border-color: #3498db;
+                    opacity: 0.6;
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+                }
+                
+                #successModal .btn-primary {
+                    background-color: white;
+                    color: #2ecc71;
+                    border: 2px solid #2ecc71;
+                    opacity: 1;
+                    border-radius: 8px;
+                    padding: 10px 24px;
+                    transition: all 0.3s ease;
+                    font-weight: 500;
+                    min-height: 44px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 14px;
+                }
+                
+                #successModal .btn-primary:hover {
+                    background-color: #f0fdf4;
+                    border-color: #2ecc71;
+                    opacity: 0.6;
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
+                }
+                
+                /* Additional animation styles */
+                .success-modal-bg {
+                    background: rgba(0, 0, 0, 0.7);
+                    backdrop-filter: blur(5px);
+                }
+                
+                /* Gradient backgrounds */
+                .bg-gradient-success {
+                    background: linear-gradient(135deg, #d4edda 0%, #f0fdf4 100%);
+                }
+                
+                .bg-gradient-blue {
+                    background: linear-gradient(135deg, #dbeafe 0%, #f0f9ff 100%);
+                }
+                
+                /* Pulse animation for important elements */
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                    100% { transform: scale(1); }
+                }
+                
+                .pulse-animation {
+                    animation: pulse 2s ease-in-out;
+                }
+                
+                /* Shake animation for error */
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    25% { transform: translateX(-5px); }
+                    75% { transform: translateX(5px); }
+                }
+                
+                .shake-animation {
+                    animation: shake 0.5s ease-in-out;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Keyboard support for success modal
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeSuccessModal();
+            }
+        });
+
+        // Click outside to close
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('successModal');
+            if (modal && event.target === modal) {
+                closeSuccessModal();
             }
         });
     </script>
