@@ -344,10 +344,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
             exit();
         }
 
-        // Check if slot end time has passed (booking allowed until end_time - 1 minute)
+        // MODIFIED: Check if slot end time has passed (booking allowed until 1 minute before end_time)
+        // For example: 8:00-9:00 slot allows booking until 8:59
         $currentDateTime = date('Y-m-d H:i:s');
         $stmt = $pdo->prepare("
-            SELECT a.date, a.end_time 
+            SELECT a.date, a.start_time, a.end_time 
             FROM sitio1_appointments a 
             WHERE a.id = ?
         ");
@@ -355,22 +356,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
         $slotInfo = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($slotInfo) {
-            $slotDateTime = $slotInfo['date'] . ' ' . $slotInfo['end_time'];
-            $slotEndTime = date('Y-m-d H:i:s', strtotime($slotDateTime . ' -1 minute')); // Allow until 1 minute before end time
+            $slotDate = $slotInfo['date'];
+            $slotStartTime = $slotInfo['start_time'];
+            $slotEndTime = $slotInfo['end_time'];
             
-            if ($currentDateTime > $slotEndTime) {
-                $_SESSION['notification'] = [
-                    'type' => 'error',
-                    'title' => 'Booking Closed',
-                    'message' => 'This appointment time slot has already closed. Please select another time slot.',
-                    'icon' => 'fas fa-clock',
-                    'details' => [
-                        'Time Slot' => date('h:i A', strtotime($slotInfo['end_time'])),
-                        'Status' => 'Already Closed'
-                    ]
-                ];
-                header('Location: ' . $_SERVER['HTTP_REFERER']);
-                exit();
+            // Create DateTime objects for comparison
+            $slotStartDateTime = new DateTime($slotDate . ' ' . $slotStartTime);
+            $slotEndDateTime = new DateTime($slotDate . ' ' . $slotEndTime);
+            $currentDateTimeObj = new DateTime();
+            
+            // For today's slots: booking is allowed from start_time until 1 minute before end_time
+            if ($slotDate === date('Y-m-d')) {
+                // Calculate cutoff time (1 minute before end_time)
+                $cutoffTime = (clone $slotEndDateTime)->modify('-1 minute');
+                
+                if ($currentDateTimeObj > $cutoffTime) {
+                    $_SESSION['notification'] = [
+                        'type' => 'error',
+                        'title' => 'Booking Closed',
+                        'message' => 'This appointment time slot has already closed. Please select another time slot.',
+                        'icon' => 'fas fa-clock',
+                        'details' => [
+                            'Time Slot' => date('h:i A', strtotime($slotStartTime)) . ' - ' . date('h:i A', strtotime($slotEndTime)),
+                            'Booking Window' => 'Until ' . $cutoffTime->format('h:i A'),
+                            'Status' => 'Already Closed'
+                        ]
+                    ];
+                    header('Location: ' . $_SERVER['HTTP_REFERER']);
+                    exit();
+                }
+                
+                // Also check if current time is before start time (for slots that haven't started yet)
+                if ($currentDateTimeObj < $slotStartDateTime) {
+                    // Slot hasn't started yet - booking allowed
+                    // No action needed
+                }
+            }
+            
+            // For future dates, booking is always allowed
+            if ($slotDate > date('Y-m-d')) {
+                // Future date - booking allowed
+                // No action needed
             }
         }
 
@@ -394,6 +420,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
             ':consent'         => $consentGiven
         ]);
 
+        // Get the inserted appointment ID
+        $userAppointmentId = $pdo->lastInsertId();
+
+        // MODIFIED: Generate priority number based on booking order for this specific time slot
+        try {
+            // Count how many approved appointments already exist for this time slot
+            $priorityStmt = $pdo->prepare("
+                SELECT COUNT(*) as priority_count 
+                FROM user_appointments ua
+                JOIN sitio1_appointments a ON ua.appointment_id = a.id
+                WHERE ua.appointment_id = ? 
+                AND ua.status IN ('approved', 'pending')
+                AND ua.id != ?
+            ");
+            $priorityStmt->execute([$appointmentId, $userAppointmentId]);
+            $priorityResult = $priorityStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Priority number is count + 1 (first booking gets priority 1, second gets 2, etc.)
+            $priorityNumber = ($priorityResult['priority_count'] ?? 0) + 1;
+            
+            // Update the new appointment with priority number
+            $updateStmt = $pdo->prepare("
+                UPDATE user_appointments 
+                SET priority_number = ? 
+                WHERE id = ?
+            ");
+            $updateStmt->execute([$priorityNumber, $userAppointmentId]);
+            
+        } catch (PDOException $e) {
+            // Log error but don't interrupt booking process
+            error_log("Error setting priority number: " . $e->getMessage());
+        }
+
         // Get the selected slot info for notification
         $stmt = $pdo->prepare("
             SELECT a.date, a.start_time, a.end_time 
@@ -403,7 +462,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
         $stmt->execute([$appointmentId]);
         $selectedSlot = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // In the booking success notification
+        // MODIFIED: Booking success notification with priority number
         $_SESSION['notification'] = [
             'type' => 'success',
             'title' => 'Appointment Booked Successfully!',
@@ -413,7 +472,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
                 'Date' => date('F j, Y', strtotime($selectedDate)),
                 'Time Slot' => date('g:i A', strtotime($selectedSlot['start_time'])) . ' - ' . date('g:i A', strtotime($selectedSlot['end_time'])),
                 'Status' => 'Pending Approval',
-                'Health Concerns' => $healthConcernsStr
+                'Health Concerns' => $healthConcernsStr,
+                'Priority Number' => $priorityNumber ?? 'Will be assigned after approval'
             ]
         ];
         
@@ -582,10 +642,10 @@ try {
     $stmt->execute([$userId]);
     $userAppointmentDates = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
-    // ============================ MODIFIED: FILTER OUT PAST DATES ============================
-    // Get current date and time
+    // MODIFIED: Get current date and time for real-time validation
     $currentDate = date('Y-m-d');
     $currentTime = date('H:i:s');
+    $currentDateTime = new DateTime();
     
     // Then get available slots with appointment booking rules
     $stmt = $pdo->prepare("
@@ -606,26 +666,33 @@ try {
                 AND ua2.user_id = ? 
                 AND ua2.status IN ('pending', 'approved', 'completed')
             ) as user_has_booked,
-            -- Check if the appointment time is in the past
+            -- Check if the appointment time is in the past (based on end_time)
             (a.date < CURDATE() OR (a.date = CURDATE() AND a.end_time < TIME(NOW()))) as is_past,
             -- Check if slot is fully booked (considering all statuses except cancelled)
             (COUNT(ua.id) >= a.max_slots) as is_fully_booked,
-            -- MODIFIED: Allow booking until 1 minute before end time
+            -- MODIFIED: Real-time booking window check
             CASE 
                 -- Future dates are always allowed
                 WHEN a.date > CURDATE() THEN 1
-                -- Today's appointments: allow booking until 1 minute before end time
-                WHEN a.date = CURDATE() AND TIME(NOW()) < a.end_time THEN 1
+                -- Today's appointments: allow booking until 1 minute before end_time
+                WHEN a.date = CURDATE() AND TIME(NOW()) < TIME(DATE_SUB(a.end_time, INTERVAL 1 MINUTE)) THEN 1
                 -- Otherwise, booking not allowed
                 ELSE 0
-            END as booking_allowed
+            END as booking_allowed,
+            -- MODIFIED: Check if slot has already started
+            (a.date = CURDATE() AND a.start_time <= TIME(NOW())) as has_started,
+            -- MODIFIED: Calculate minutes until booking closes
+            CASE 
+                WHEN a.date = CURDATE() THEN 
+                    TIMESTAMPDIFF(MINUTE, NOW(), CONCAT(a.date, ' ', DATE_SUB(a.end_time, INTERVAL 1 MINUTE)))
+                ELSE NULL
+            END as minutes_until_close
         FROM sitio1_appointments a
         JOIN sitio1_staff s ON a.staff_id = s.id
         LEFT JOIN user_appointments ua ON ua.appointment_id = a.id AND ua.status IN ('pending', 'approved', 'completed')
-        WHERE a.date >= CURDATE()  -- Only future dates
-        AND NOT (a.date = CURDATE() AND a.end_time < TIME(NOW()))  -- Exclude past slots for today
+        WHERE a.date >= CURDATE()  -- Only future or today dates
         GROUP BY a.id
-        HAVING available_slots > 0 AND is_past = 0 AND is_fully_booked = 0 AND booking_allowed = 1
+        HAVING available_slots > 0 AND is_fully_booked = 0
         ORDER BY a.date, a.start_time
     ");
     $stmt->execute([$userId]);
@@ -639,15 +706,43 @@ try {
                 'slots' => [],
                 'total_slots' => 0,
                 'available_slots' => 0,
-                'user_has_appointment' => in_array($date, $userAppointmentDates)
+                'user_has_appointment' => in_array($date, $userAppointmentDates),
+                'has_available_slots_today' => false // Initialize
             ];
         }
-        $availableDates[$date]['slots'][] = $slot;
-        $availableDates[$date]['total_slots'] += $slot['max_slots'];
-        $availableDates[$date]['available_slots'] += $slot['available_slots'];
+        
+        // MODIFIED: Additional real-time validation
+        $slotDateTime = new DateTime($slot['date'] . ' ' . $slot['end_time']);
+        $cutoffTime = (clone $slotDateTime)->modify('-1 minute');
+        
+        // Determine slot availability in real-time
+        $isAvailableToday = false;
+        if ($slot['date'] === $currentDate) {
+            // For today's slots, check real-time availability
+            if ($currentDateTime < $cutoffTime) {
+                $isAvailableToday = true;
+            }
+        } else {
+            // For future dates, slots are available
+            $isAvailableToday = true;
+        }
+        
+        // Only add slot if it's available based on real-time rules
+        if ($isAvailableToday && $slot['available_slots'] > 0 && $slot['booking_allowed'] == 1) {
+            $availableDates[$date]['slots'][] = $slot;
+            $availableDates[$date]['total_slots'] += $slot['max_slots'];
+            $availableDates[$date]['available_slots'] += $slot['available_slots'];
+            $availableDates[$date]['has_available_slots_today'] = true;
+        }
     }
+    
+    // Remove dates with no available slots
+    $availableDates = array_filter($availableDates, function($dateInfo) {
+        return !empty($dateInfo['slots']) && $dateInfo['has_available_slots_today'];
+    });
+    
     $availableDates = array_values($availableDates);
-    // =========================================================================================
+    
 } catch (PDOException $e) {
     $error = 'Error fetching available dates: ' . $e->getMessage();
 }
@@ -1791,6 +1886,58 @@ try {
             transform: translateY(-2px) !important;
             box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4) !important;
         }
+        
+        /* NEW: Real-time slot status indicator */
+        .slot-time-label.real-time-closed {
+            background-color: #f8fafc;
+            border-color: #e5e7eb;
+            color: #9ca3af;
+        }
+        
+        .slot-time-label.real-time-closed:hover {
+            border-color: #e5e7eb;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .real-time-status {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-top: 4px;
+            display: inline-block;
+        }
+        
+        .real-time-available {
+            background-color: #10b981;
+            color: white;
+        }
+        
+        .real-time-closing-soon {
+            background-color: #f59e0b;
+            color: white;
+        }
+        
+        .real-time-closed {
+            background-color: #ef4444;
+            color: white;
+        }
+        
+        /* NEW: Priority number display */
+        .priority-number-display {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -2518,28 +2665,48 @@ try {
                                                     // Hide slots that user has already booked
                                                     if ($userHasBooked) continue;
                                                     
-                                                    // Determine slot status based on appointment booking rules
-                                                    $currentTime = date('H:i:s');
+                                                    // MODIFIED: Determine real-time availability for today's slots
+                                                    $currentDateTime = new DateTime();
                                                     $slotStartTime = $slot['start_time'];
                                                     $slotEndTime = $slot['end_time'];
                                                     $slotDate = $slot['date'];
+                                                    $slotDateTime = new DateTime($slotDate . ' ' . $slotEndTime);
+                                                    $cutoffTime = (clone $slotDateTime)->modify('-1 minute');
                                                     
                                                     $slotStatus = 'available';
                                                     $statusText = 'Available';
                                                     $availabilityClass = 'slot-availability';
+                                                    $realTimeClass = '';
+                                                    $realTimeStatus = '';
                                                     
+                                                    // Check real-time availability for today's slots
                                                     if ($slotDate === date('Y-m-d')) {
-                                                        // Today's slot - check if current time is before end time
-                                                        $currentDateTime = date('Y-m-d H:i:s');
-                                                        $slotDateTime = $slotDate . ' ' . $slotEndTime;
-                                                        $slotEndTimeMinusOne = date('Y-m-d H:i:s', strtotime($slotDateTime . ' -1 minute'));
-                                                        
-                                                        if ($currentDateTime > $slotEndTimeMinusOne) {
+                                                        if ($currentDateTime > $cutoffTime) {
+                                                            // Slot has closed (past the 1-minute cutoff)
                                                             $slotStatus = 'unavailable';
                                                             $statusText = 'Already Closed';
                                                             $availabilityClass = 'slot-availability unavailable';
+                                                            $realTimeClass = 'real-time-closed';
+                                                            $realTimeStatus = '<span class="real-time-status real-time-closed">Closed</span>';
                                                             $isAvailable = false;
+                                                        } elseif ($currentDateTime > (clone $slotDateTime)->modify('-5 minutes')) {
+                                                            // Slot closing soon (last 5 minutes)
+                                                            $slotStatus = 'closing-soon';
+                                                            $statusText = 'Closing Soon';
+                                                            $availabilityClass = 'slot-availability closing-soon';
+                                                            $realTimeClass = 'real-time-closing-soon';
+                                                            $realTimeStatus = '<span class="real-time-status real-time-closing-soon">Closing Soon</span>';
+                                                        } else {
+                                                            // Slot available
+                                                            $realTimeClass = 'real-time-available';
+                                                            $minutesLeft = $currentDateTime->diff($cutoffTime)->i;
+                                                            $realTimeStatus = '<span class="real-time-status real-time-available">Open for ' . $minutesLeft . ' more minutes</span>';
                                                         }
+                                                    }
+                                                    
+                                                    // For future dates, slots are always available
+                                                    if ($slotDate > date('Y-m-d')) {
+                                                        $realTimeStatus = '<span class="real-time-status real-time-available">Available</span>';
                                                     }
                                                 ?>
                                                     <div class="relative">
@@ -2550,7 +2717,7 @@ try {
                                                                class="slot-time-radio"
                                                                <?= !$isAvailable || $slotStatus === 'unavailable' ? 'disabled' : '' ?>
                                                                required>
-                                                        <label for="slot_<?= $slot['slot_id'] ?>" class="slot-time-label">
+                                                        <label for="slot_<?= $slot['slot_id'] ?>" class="slot-time-label <?= $realTimeClass ?>">
                                                             <div class="slot-time-text">
                                                                 <?= date('h:i A', strtotime($slot['start_time'])) ?> - <?= date('h:i A', strtotime($slot['end_time'])) ?>
                                                             </div>
@@ -2568,6 +2735,9 @@ try {
                                                                 <div class="<?= $availabilityClass ?>">
                                                                     <?= "{$slot['available_slots']} slot" . ($slot['available_slots'] > 1 ? 's' : '') . " available" ?>
                                                                 </div>
+                                                                <?php if ($realTimeStatus): ?>
+                                                                    <?= $realTimeStatus ?>
+                                                                <?php endif; ?>
                                                             <?php endif; ?>
                                                         </label>
                                                     </div>
@@ -2616,16 +2786,16 @@ try {
                             }
                             
                             if ($selectedSlot && !$selectedSlot['user_has_booked']): 
-                                // Check if booking is still allowed based on appointment rules
-                                $currentDateTime = date('Y-m-d H:i:s');
-                                $slotDateTime = $selectedSlot['date'] . ' ' . $selectedSlot['end_time'];
-                                $slotEndTimeMinusOne = date('Y-m-d H:i:s', strtotime($slotDateTime . ' -1 minute'));
+                                // MODIFIED: Check real-time booking availability
+                                $currentDateTime = new DateTime();
+                                $slotDateTime = new DateTime($selectedSlot['date'] . ' ' . $selectedSlot['end_time']);
+                                $cutoffTime = (clone $slotDateTime)->modify('-1 minute');
                                 
                                 $bookingAllowed = true;
                                 $bookingMessage = '';
                                 
                                 if ($selectedSlot['date'] === date('Y-m-d')) {
-                                    if ($currentDateTime > $slotEndTimeMinusOne) {
+                                    if ($currentDateTime > $cutoffTime) {
                                         $bookingAllowed = false;
                                         $bookingMessage = 'This appointment time slot has already closed. Please select another time slot.';
                                     }
@@ -2820,6 +2990,7 @@ try {
                                                 ?>
                                             </span>
                                         </div>
+                                    
                                         
                                         <!-- Health Concerns - Always Visible -->
                                         <div class="mt-3 pl-7">
@@ -3893,6 +4064,90 @@ try {
             console.error('Failed to copy text: ', err);
         });
     }
+    
+    // NEW: Function to update real-time slot status
+    function updateRealTimeSlotStatus() {
+        const now = new Date();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        const currentDate = now.toISOString().split('T')[0];
+        
+        // Find all today's slots and update their status
+        const todaySlots = document.querySelectorAll('.slot-time-label');
+        
+        todaySlots.forEach(slot => {
+            const slotTimeText = slot.querySelector('.slot-time-text').textContent;
+            const [startTimeStr, endTimeStr] = slotTimeText.split(' - ');
+            
+            // Parse times
+            const startTime = parseTime(startTimeStr);
+            const endTime = parseTime(endTimeStr);
+            
+            // Calculate cutoff time (1 minute before end time)
+            const endDateTime = new Date(currentDate + ' ' + endTime);
+            const cutoffDateTime = new Date(endDateTime.getTime() - 60000); // 1 minute before
+            
+            // Update status
+            if (now > cutoffDateTime) {
+                // Slot is closed
+                slot.classList.add('real-time-closed');
+                slot.classList.remove('real-time-available', 'real-time-closing-soon');
+                
+                // Disable radio button
+                const radioId = slot.getAttribute('for');
+                if (radioId) {
+                    const radio = document.getElementById(radioId);
+                    if (radio) {
+                        radio.disabled = true;
+                    }
+                }
+                
+                // Update status text
+                const statusElement = slot.querySelector('.real-time-status') || document.createElement('span');
+                statusElement.className = 'real-time-status real-time-closed';
+                statusElement.textContent = 'Closed';
+                
+                if (!slot.querySelector('.real-time-status')) {
+                    slot.appendChild(statusElement);
+                }
+            } else if (now > new Date(endDateTime.getTime() - 300000)) { // 5 minutes before
+                // Slot closing soon
+                slot.classList.add('real-time-closing-soon');
+                slot.classList.remove('real-time-available', 'real-time-closed');
+                
+                // Update status text
+                const statusElement = slot.querySelector('.real-time-status') || document.createElement('span');
+                statusElement.className = 'real-time-status real-time-closing-soon';
+                const minutesLeft = Math.floor((cutoffDateTime - now) / 60000);
+                statusElement.textContent = 'Closing in ' + minutesLeft + ' minutes';
+                
+                if (!slot.querySelector('.real-time-status')) {
+                    slot.appendChild(statusElement);
+                }
+            }
+        });
+    }
+    
+    // Helper function to parse time string
+    function parseTime(timeStr) {
+        const [time, modifier] = timeStr.trim().split(' ');
+        let [hours, minutes] = time.split(':');
+        
+        hours = parseInt(hours);
+        if (modifier === 'PM' && hours < 12) {
+            hours += 12;
+        }
+        if (modifier === 'AM' && hours === 12) {
+            hours = 0;
+        }
+        
+        return hours.toString().padStart(2, '0') + ':' + minutes;
+    }
+    
+    // Update slot status every minute
+    setInterval(updateRealTimeSlotStatus, 60000);
+    
+    // Initial update
+    updateRealTimeSlotStatus();
     </script>
 
 </body>
