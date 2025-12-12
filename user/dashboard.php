@@ -885,17 +885,14 @@ try {
 
         /* FULLY ROUNDED BUTTON STYLES */
         .action-button {
-            border-radius: 9999px !important;
             padding: 12px 24px !important;
             font-weight: 600 !important;
             font-size: 16px !important;
             transition: all 0.3s ease !important;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
         }
 
         .action-button:hover {
             transform: translateY(-3px) !important;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
         }
 
         .action-button:active {
@@ -2269,62 +2266,117 @@ try {
                 User Dashboard
             </h1>
             <!-- Help Button -->
-            <button onclick="openHelpModal()" class="help-icon bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300 transition action-button">
-                <i class="fas fa-question-circle text-xl"></i>
+            <button onclick="openHelpModal()" class="help-icon text-blue-600 p-8 rounded-full hover:text-blue-500 transition action-button">
+                <i class="fas fa-question-circle text-3xl"></i>
             </button>
         </div>
 
         <!-- Help/Guide Modal -->
-        <div id="helpModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-            <div class="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
-                <div class="mt-3">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-2xl leading-6 font-medium text-gray-900">User Dashboard Guide</h3>
-                        <button onclick="closeHelpModal()" class="text-gray-500 hover:text-gray-700">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
+<div id="helpModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-8 mx-auto p-0 border w-full max-w-2xl shadow-xl rounded-xl bg-white overflow-hidden">
+        <!-- Modal Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="text-2xl font-bold text-white mb-1">Dashboard User Guide</h3>
+                    <p class="text-blue-100 text-sm">Everything you need to know as a patient</p>
+                </div>
+                <button onclick="closeHelpModal()" class="text-white hover:text-blue-200 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Welcome Banner -->
+        <div class="px-8 pt-6">
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg p-5 mb-2">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 mt-0.5">
+                        <i class="fas fa-hands-helping text-blue-500 text-lg"></i>
                     </div>
-                    
-                    <div class="bg-blue-50 p-4 rounded-lg mb-6">
-                        <p class="text-blue-800"><strong>Welcome to the Community Health Tracker User Dashboard!</strong> This guide will help you understand how to use all the features available to you as a patient.</p>
-                    </div>
-                    
-                    <!-- Guide content -->
-                    <div class="space-y-4">
-                        <div class="border-l-4 border-blue-500 pl-4">
-                            <h4 class="font-semibold text-lg text-gray-800">Appointment Management</h4>
-                            <p class="text-gray-600">Book new appointments, view your upcoming appointments, and manage your scheduled visits.</p>
-                        </div>
-                        
-                        <div class="border-l-4 border-green-500 pl-4">
-                            <h4 class="font-semibold text-lg text-gray-800">Appointment Status</h4>
-                            <p class="text-gray-600">Track your appointment status: Pending, Approved, Completed, Cancelled, or Missed.</p>
-                        </div>
-
-                        <div class="border-l-4 border-purple-500 pl-4">
-                            <h4 class="font-semibold text-lg text-gray-800">Cancellation Policy</h4>
-                            <p class="text-gray-600">You can cancel pending appointments online. Approved appointments require contacting support.</p>
-                        </div>
-
-                        <div class="border-l-4 border-orange-500 pl-4">
-                            <h4 class="font-semibold text-lg text-gray-800">Missed Appointments</h4>
-                            <p class="text-gray-600">If you miss an appointment, you can book another date for your new appointment.</p>
-                        </div>
-
-                        <div class="border-l-4 border-pink-500 pl-4">
-                            <h4 class="font-semibold text-lg text-gray-800">Profile Management</h4>
-                            <p class="text-gray-600">Update your profile photo and personal information to help staff recognize you.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="flex justify-end mt-6">
-                        <button type="button" onclick="closeHelpModal()" class="px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition font-medium modal-button">
-                            Got it, thanks!
-                        </button>
+                    <div class="ml-4">
+                        <h4 class="font-semibold text-blue-800 text-lg mb-1">Welcome to Barangay Health Monitoring and Tracking Platform</h4>
+                        <p class="text-blue-700">This guide will help you navigate all the features available to you as a patient. Each section below explains key functionalities.</p>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- Guide Content -->
+        <div class="px-8 py-4">
+            <div class="space-y-6">
+                <!-- Appointment Management -->
+                <div class="flex items-start group hover:bg-gray-50 p-4 rounded-lg transition-all">
+                    <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200 transition-colors">
+                        <i class="fas fa-calendar-alt text-blue-600"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-800 text-lg mb-2">Appointment Management</h4>
+                        <p class="text-gray-600">Book new appointments, view upcoming visits, and manage your scheduled consultations with healthcare providers.</p>
+                    </div>
+                </div>
+
+                <!-- Appointment Status -->
+                <div class="flex items-start group hover:bg-gray-50 p-4 rounded-lg transition-all">
+                    <div class="flex-shrink-0 w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-green-200 transition-colors">
+                        <i class="fas fa-clipboard-check text-green-600"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-800 text-lg mb-2">Appointment Status</h4>
+                        <p class="text-gray-600">Track your appointment status in real-time: <span class="font-medium">Pending, Approved, Completed, Cancelled, or Missed</span>.</p>
+                    </div>
+                </div>
+
+                <!-- Cancellation Policy -->
+                <div class="flex items-start group hover:bg-gray-50 p-4 rounded-lg transition-all">
+                    <div class="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-purple-200 transition-colors">
+                        <i class="fas fa-ban text-purple-600"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-800 text-lg mb-2">Cancellation Policy</h4>
+                        <p class="text-gray-600">Cancel pending appointments directly online. For approved appointments, please contact our support team for assistance.</p>
+                    </div>
+                </div>
+
+                <!-- Missed Appointments -->
+                <div class="flex items-start group hover:bg-gray-50 p-4 rounded-lg transition-all">
+                    <div class="flex-shrink-0 w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-orange-200 transition-colors">
+                        <i class="fas fa-exclamation-triangle text-orange-600"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-800 text-lg mb-2">Missed Appointments</h4>
+                        <p class="text-gray-600">If you miss an appointment, you can easily book a new date for your rescheduled visit through the dashboard.</p>
+                    </div>
+                </div>
+
+                <!-- Profile Management -->
+                <div class="flex items-start group hover:bg-gray-50 p-4 rounded-lg transition-all">
+                    <div class="flex-shrink-0 w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-pink-200 transition-colors">
+                        <i class="fas fa-user-circle text-pink-600"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-800 text-lg mb-2">Profile Management</h4>
+                        <p class="text-gray-600">Update your profile photo and personal information to help our staff recognize you and provide personalized care.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="px-8 py-6 bg-gray-50 border-t border-gray-200">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center text-gray-500 text-sm">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <span>Need more help? Contact our support team.</span>
+                </div>
+                <button type="button" onclick="closeHelpModal()" class="px-7 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg flex items-center">
+                    <i class="fas fa-check mr-2"></i>
+                    Got it, thanks!
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
         <?php if ($error): ?>
             <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center">

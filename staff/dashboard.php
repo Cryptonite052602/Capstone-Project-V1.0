@@ -1309,7 +1309,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_cancelled_appo
         
         $_SESSION['success_message'] = 'Cancelled appointment deleted successfully.';
         
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?tab=appointments&appointment_tab=cancelled');
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?tab=appointment-management&appointment_tab=cancelled');
         exit();
         
     } catch (Exception $e) {
