@@ -54,7 +54,7 @@ function checkAndAddAppointmentColumns($pdo) {
         
         if ($statusColumn) {
             $currentType = $statusColumn['Type'];
-            $requiredValues = ['pending', 'approved', 'completed', 'cancelled', 'rejected', 'rescheduled'];
+            $requiredValues = ['pending', 'approved', 'completed', 'cancelled', 'rejected', 'rescheduled', 'missed'];
             
             $missingValues = [];
             foreach ($requiredValues as $value) {
@@ -65,7 +65,7 @@ function checkAndAddAppointmentColumns($pdo) {
             
             if (!empty($missingValues)) {
                 // Update the enum to include missing values
-                $newEnum = "ENUM('pending', 'approved', 'completed', 'cancelled', 'rejected', 'rescheduled') NOT NULL DEFAULT 'pending'";
+                $newEnum = "ENUM('pending', 'approved', 'completed', 'cancelled', 'rejected', 'rescheduled', 'missed') NOT NULL DEFAULT 'pending'";
                 $pdo->exec("ALTER TABLE user_appointments MODIFY status $newEnum");
                 error_log("Updated status enum to include all required values");
             }
@@ -1341,7 +1341,21 @@ try {
     $stmt = $pdo->query("SELECT COUNT(*) FROM sitio1_consultations WHERE status = 'pending'");
     $stats['pending_consultations'] = $stmt->fetchColumn();
 
-    $stmt = $pdo->query("SELECT COUNT(*) FROM user_appointments WHERE status = 'pending'");
+    // Check for missed appointments and update status
+    $currentDateTime = date('Y-m-d H:i:s');
+    $stmt = $pdo->prepare("
+        UPDATE user_appointments ua
+        JOIN sitio1_appointments a ON ua.appointment_id = a.id
+        SET ua.status = 'missed'
+        WHERE a.staff_id = ? 
+        AND ua.status IN ('pending', 'approved')
+        AND CONCAT(a.date, ' ', a.end_time) < ?
+        AND CONCAT(a.date, ' ', a.start_time) <= ?
+    ");
+    $stmt->execute([$staffId, $currentDateTime, $currentDateTime]);
+
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM user_appointments ua JOIN sitio1_appointments a ON ua.appointment_id = a.id WHERE a.staff_id = ? AND ua.status = 'pending'");
+    $stmt->execute([$staffId]);
     $stats['pending_appointments'] = $stmt->fetchColumn();
 
     $stmt = $pdo->query("SELECT COUNT(*) FROM sitio1_users WHERE approved = FALSE AND (status IS NULL OR status != 'declined')");
@@ -1371,24 +1385,29 @@ try {
     $analytics['regular_patients'] = count($regularPatientsResult);
     
     // Appointment status distribution
-    $stmt = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT status, COUNT(*) as count 
-        FROM user_appointments 
+        FROM user_appointments ua
+        JOIN sitio1_appointments a ON ua.appointment_id = a.id
+        WHERE a.staff_id = ?
         GROUP BY status
     ");
+    $stmt->execute([$staffId]);
     $appointmentStatusData = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $analytics['appointment_status'] = $appointmentStatusData;
     
     // Monthly appointments trend (last 6 months)
-    $stmt = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT 
-            DATE_FORMAT(created_at, '%Y-%m') as month,
+            DATE_FORMAT(ua.created_at, '%Y-%m') as month,
             COUNT(*) as count
-        FROM user_appointments 
-        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-        GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+        FROM user_appointments ua
+        JOIN sitio1_appointments a ON ua.appointment_id = a.id
+        WHERE a.staff_id = ? AND ua.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+        GROUP BY DATE_FORMAT(ua.created_at, '%Y-%m')
         ORDER BY month
     ");
+    $stmt->execute([$staffId]);
     $analytics['monthly_trend'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Patient registration trend (last 6 months)
@@ -1409,7 +1428,9 @@ try {
             a.*, 
             COUNT(ua.id) as booked_count,
             -- Check if the appointment time is in the past
-            (a.date < CURDATE() OR (a.date = CURDATE() AND a.end_time < TIME(NOW()))) as is_past
+            (a.date < CURDATE() OR (a.date = CURDATE() AND a.end_time < TIME(NOW()))) as is_past,
+            -- Check if current time is within the slot time
+            (a.date = CURDATE() AND TIME(NOW()) >= a.start_time AND TIME(NOW()) <= a.end_time) as is_current_slot
         FROM sitio1_appointments a 
         LEFT JOIN user_appointments ua ON a.id = ua.appointment_id AND ua.status IN ('pending', 'approved', 'completed')
         WHERE a.staff_id = ? 
@@ -1420,31 +1441,33 @@ try {
     $stmt->execute([$staffId]);
     $availableSlots = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get pending appointments
+    // Get pending appointments (only future appointments)
     $stmt = $pdo->prepare("
-        SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time
+        SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time,
+               (CONCAT(a.date, ' ', a.end_time) < ?) as is_past
         FROM user_appointments ua 
         JOIN sitio1_users u ON ua.user_id = u.id 
         JOIN sitio1_appointments a ON ua.appointment_id = a.id 
-        WHERE a.staff_id = ? AND ua.status = 'pending' 
+        WHERE a.staff_id = ? AND ua.status = 'pending'
         AND (a.date > CURDATE() OR (a.date = CURDATE() AND a.end_time > TIME(NOW())))
         ORDER BY a.date, a.start_time
     ");
-    $stmt->execute([$staffId]);
+    $stmt->execute([$currentDateTime, $staffId]);
     $pendingAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Get upcoming appointments (approved but not completed)
     $stmt = $pdo->prepare("
         SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time,
-               ua.priority_number, ua.invoice_number
+               ua.priority_number, ua.invoice_number,
+               (CONCAT(a.date, ' ', a.end_time) < ?) as is_past
         FROM user_appointments ua 
         JOIN sitio1_users u ON ua.user_id = u.id 
         JOIN sitio1_appointments a ON ua.appointment_id = a.id 
-        WHERE a.staff_id = ? AND ua.status = 'approved' 
+        WHERE a.staff_id = ? AND ua.status = 'approved'
         AND (a.date >= CURDATE())
         ORDER BY a.date, a.start_time
     ");
-    $stmt->execute([$staffId]);
+    $stmt->execute([$currentDateTime, $staffId]);
     $upcomingAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Get cancelled appointments (including those cancelled by users)
@@ -1464,7 +1487,22 @@ try {
     $stmt->execute([$staffId]);
     $cancelledAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get all appointments with filters - UPDATED: Include approved, completed, cancelled, rejected
+    // Get missed appointments
+    $stmt = $pdo->prepare("
+        SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time,
+               s.full_name as staff_name, s.specialization,
+               ua.created_at as appointment_created_at
+        FROM user_appointments ua 
+        JOIN sitio1_users u ON ua.user_id = u.id 
+        JOIN sitio1_appointments a ON ua.appointment_id = a.id 
+        JOIN sitio1_users s ON a.staff_id = s.id 
+        WHERE a.staff_id = ? AND ua.status = 'missed'
+        ORDER BY a.date DESC, a.start_time DESC
+    ");
+    $stmt->execute([$staffId]);
+    $missedAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get all appointments with filters - UPDATED: Include approved, completed, cancelled, rejected, missed
     $query = "
     SELECT ua.*, u.full_name, u.email, u.contact, u.unique_number, a.date, a.start_time, a.end_time,
            s.full_name as staff_name, s.specialization,
@@ -1474,7 +1512,7 @@ try {
     JOIN sitio1_appointments a ON ua.appointment_id = a.id 
     JOIN sitio1_users s ON a.staff_id = s.id 
     WHERE a.staff_id = ? 
-    AND ua.status IN ('approved', 'completed', 'cancelled', 'rejected')
+    AND ua.status IN ('approved', 'completed', 'cancelled', 'rejected', 'missed')
 ";
 
 $params = [$staffId];
@@ -1591,7 +1629,8 @@ $stmt = $pdo->prepare("
         a.end_time,
         a.max_slots,
         COUNT(ua.id) as booked_count,
-        GROUP_CONCAT(CONCAT(a.start_time, '-', a.end_time) SEPARATOR ',') as time_slots
+        GROUP_CONCAT(CONCAT(a.start_time, '-', a.end_time) SEPARATOR ',') as time_slots,
+        (a.date = CURDATE() AND TIME(NOW()) >= a.start_time AND TIME(NOW()) <= a.end_time) as is_current_slot
     FROM sitio1_appointments a 
     LEFT JOIN user_appointments ua ON a.id = ua.appointment_id AND ua.status IN ('pending', 'approved', 'completed')
     WHERE a.staff_id = ? AND a.date >= CURDATE()
@@ -1639,6 +1678,45 @@ foreach ($occupiedSlots as $slot) {
     }
     $occupiedSlotsByDate[$date][] = $slot['start_time'] . ' - ' . $slot['end_time'];
 }
+
+// Pagination configuration
+$recordsPerPage = 5;
+
+// Available Slots Pagination
+$availableSlotsPage = isset($_GET['available_page']) ? max(1, intval($_GET['available_page'])) : 1;
+$totalAvailableSlots = count($availableSlots);
+$totalAvailablePages = ceil($totalAvailableSlots / $recordsPerPage);
+$availableSlotsPaginated = array_slice($availableSlots, ($availableSlotsPage - 1) * $recordsPerPage, $recordsPerPage);
+
+// Pending Appointments Pagination
+$pendingPage = isset($_GET['pending_page']) ? max(1, intval($_GET['pending_page'])) : 1;
+$totalPending = count($pendingAppointments);
+$totalPendingPages = ceil($totalPending / $recordsPerPage);
+$pendingAppointmentsPaginated = array_slice($pendingAppointments, ($pendingPage - 1) * $recordsPerPage, $recordsPerPage);
+
+// Upcoming Appointments Pagination
+$upcomingPage = isset($_GET['upcoming_page']) ? max(1, intval($_GET['upcoming_page'])) : 1;
+$totalUpcoming = count($upcomingAppointments);
+$totalUpcomingPages = ceil($totalUpcoming / $recordsPerPage);
+$upcomingAppointmentsPaginated = array_slice($upcomingAppointments, ($upcomingPage - 1) * $recordsPerPage, $recordsPerPage);
+
+// Cancelled Appointments Pagination
+$cancelledPage = isset($_GET['cancelled_page']) ? max(1, intval($_GET['cancelled_page'])) : 1;
+$totalCancelled = count($cancelledAppointments);
+$totalCancelledPages = ceil($totalCancelled / $recordsPerPage);
+$cancelledAppointmentsPaginated = array_slice($cancelledAppointments, ($cancelledPage - 1) * $recordsPerPage, $recordsPerPage);
+
+// All Appointments Pagination
+$allPage = isset($_GET['all_page']) ? max(1, intval($_GET['all_page'])) : 1;
+$totalAll = count($allAppointments);
+$totalAllPages = ceil($totalAll / $recordsPerPage);
+$allAppointmentsPaginated = array_slice($allAppointments, ($allPage - 1) * $recordsPerPage, $recordsPerPage);
+
+// Missed Appointments Pagination
+$missedPage = isset($_GET['missed_page']) ? max(1, intval($_GET['missed_page'])) : 1;
+$totalMissed = count($missedAppointments);
+$totalMissedPages = ceil($totalMissed / $recordsPerPage);
+$missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1) * $recordsPerPage, $recordsPerPage);
 ?>
 
 <!DOCTYPE html>
@@ -1813,6 +1891,10 @@ foreach ($occupiedSlots as $slot) {
             background-color: #f0fdf4;
             color: #16a34a;
         }
+        .slot-occupied {
+            background-color: #ffedd5;
+            color: #ea580c;
+        }
         
         /* Enhanced Calendar Styles - Blue Theme */
         .calendar-day {
@@ -1950,16 +2032,30 @@ foreach ($occupiedSlots as $slot) {
         
         /* Time slot status */
         .time-slot.occupied {
-            background: #fff3cd !important;
-            border-color: #ffc107 !important;
-            color: #856404 !important;
+            background: #ffedd5 !important;
+            border-color: #ea580c !important;
+            color: #9a3412 !important;
             cursor: not-allowed !important;
         }
         
         .time-slot.occupied .slot-status {
             font-size: 12px;
             font-weight: bold;
-            color: #856404;
+            color: #9a3412;
+            margin-top: 4px;
+        }
+        
+        .time-slot.current-time {
+            background: #fee2e2 !important;
+            border-color: #dc2626 !important;
+            color: #7f1d1d !important;
+            cursor: not-allowed !important;
+        }
+        
+        .time-slot.current-time .slot-status {
+            font-size: 12px;
+            font-weight: bold;
+            color: #7f1d1d;
             margin-top: 4px;
         }
         
@@ -1996,7 +2092,7 @@ foreach ($occupiedSlots as $slot) {
             background: #eff6ff;
         }
 
-        .time-slot:not(.disabled):not(.selected):not(.occupied):hover {
+        .time-slot:not(.disabled):not(.selected):not(.occupied):not(.current-time):hover {
             border-color: #3C96E1;
             background: #eff6ff;
         }
@@ -2602,6 +2698,62 @@ foreach ($occupiedSlots as $slot) {
             height: auto;
             object-fit: contain;
         }
+        
+        /* Missed appointment status */
+        .status-missed {
+            background: #fef3c7 !important;
+            color: #92400e !important;
+        }
+        
+        /* Desktop-sized modal styles */
+        .modal-desktop {
+            max-width: 800px !important;
+            width: 95% !important;
+        }
+        
+        .modal-wide-desktop {
+            max-width: 900px !important;
+            width: 95% !important;
+        }
+        
+        /* Choose time slot modal desktop size */
+        .modal-time-slot-desktop {
+            max-width: 800px !important;
+            width: 95% !important;
+        }
+        
+        /* Time slot container for desktop modal */
+        .time-slots-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+        
+        @media (max-width: 768px) {
+            .time-slots-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        /* Table row status colors */
+        .status-row-missed {
+            background-color: #fef3c7 !important;
+        }
+        
+        .status-row-missed:hover {
+            background-color: #fde68a !important;
+        }
+        
+        /* Disabled appointment actions */
+        .disabled-action {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+        }
+        
+        .disabled-action:hover {
+            transform: none !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -2785,6 +2937,13 @@ foreach ($occupiedSlots as $slot) {
                         <span class="count-badge"><?= count($cancelledAppointments) ?></span>
                     </button>
                     
+                    <button class="appointment-tab-button <?= $activeAppointmentTab === 'missed' ? 'active' : '' ?>" 
+                            id="missed-tab" data-tabs-target="#missed" type="button" role="tab" aria-controls="missed" aria-selected="<?= $activeAppointmentTab === 'missed' ? 'true' : 'false' ?>">
+                        <i class="fas fa-user-clock"></i>
+                        Missed
+                        <span class="count-badge"><?= count($missedAppointments) ?></span>
+                    </button>
+                    
                     <button class="appointment-tab-button <?= $activeAppointmentTab === 'all' ? 'active' : '' ?>" 
                             id="all-tab" data-tabs-target="#all" type="button" role="tab" aria-controls="all" aria-selected="<?= $activeAppointmentTab === 'all' ? 'true' : 'false' ?>">
                         <i class="fas fa-history"></i>
@@ -2889,8 +3048,8 @@ foreach ($occupiedSlots as $slot) {
                         $totalBookedSlots = 0;
                         $totalMaxSlots = 0;
                         
-                        if (!empty($availableSlots)) {
-                            foreach ($availableSlots as $slot) {
+                        if (!empty($availableSlotsPaginated)) {
+                            foreach ($availableSlotsPaginated as $slot) {
                                 $bookedCount = $slot['booked_count'] ?? 0;
                                 $maxSlots = $slot['max_slots'];
                                 $available = max(0, $maxSlots - $bookedCount);
@@ -2905,7 +3064,7 @@ foreach ($occupiedSlots as $slot) {
                         </span>
                     </div>
                     
-                    <?php if (empty($availableSlots)): ?>
+                    <?php if (empty($availableSlotsPaginated)): ?>
                         <div class="bg-blue-50 p-4 rounded-lg text-center">
                             <p class="text-gray-600">No available slots found.</p>
                             <button onclick="switchAppointmentTab('add-slot')" class="btn-blue mt-2">
@@ -2927,12 +3086,13 @@ foreach ($occupiedSlots as $slot) {
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    <?php foreach ($availableSlots as $slot): 
+                                    <?php foreach ($availableSlotsPaginated as $slot): 
                                         $currentDate = date('Y-m-d');
                                         $currentTime = date('H:i:s');
                                         $isPast = $slot['date'] < $currentDate || 
                                                  ($slot['date'] == $currentDate && $slot['end_time'] < $currentTime);
                                         $isToday = $slot['date'] == $currentDate;
+                                        $isCurrentSlot = $slot['is_current_slot'] ?? false;
                                         $bookedCount = $slot['booked_count'] ?? 0;
                                         $maxSlots = $slot['max_slots'];
                                         $availableSlotsCount = max(0, $maxSlots - $bookedCount);
@@ -2942,7 +3102,10 @@ foreach ($occupiedSlots as $slot) {
                                         $statusClass = 'slot-available';
                                         $statusText = 'Available';
                                         
-                                        if ($isPast) {
+                                        if ($isCurrentSlot) {
+                                            $statusClass = 'slot-occupied';
+                                            $statusText = 'Ongoing';
+                                        } elseif ($isPast) {
                                             $statusClass = 'slot-past';
                                             $statusText = 'Past';
                                         } elseif ($availableSlotsCount === 0) {
@@ -2982,7 +3145,7 @@ foreach ($occupiedSlots as $slot) {
                                                 </span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <?php if (!$isPast): ?>
+                                                <?php if (!$isPast && !$isCurrentSlot): ?>
                                                     <button onclick="openEditModal(<?= htmlspecialchars(json_encode($slot)) ?>, '<?= $slot['start_time'] ?> - <?= $slot['end_time'] ?>')" 
                                                             class="btn-blue mr-2">
                                                         <i class="fas fa-edit mr-1"></i> Edit
@@ -2995,6 +3158,8 @@ foreach ($occupiedSlots as $slot) {
                                                             <i class="fas fa-trash mr-1"></i> Delete
                                                         </button>
                                                     </form>
+                                                <?php elseif ($isCurrentSlot): ?>
+                                                    <span class="text-orange-600 font-medium">Slot in progress</span>
                                                 <?php else: ?>
                                                     <span class="text-gray-400">No actions available</span>
                                                 <?php endif; ?>
@@ -3004,6 +3169,42 @@ foreach ($occupiedSlots as $slot) {
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <!-- Pagination for Available Slots -->
+                        <?php if ($totalAvailablePages > 1): ?>
+                            <div class="pagination mt-4">
+                                <!-- Previous Button -->
+                                <?php if ($availableSlotsPage > 1): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=available-slots&available_page=<?= $availableSlotsPage - 1 ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </span>
+                                <?php endif; ?>
+
+                                <!-- Page Numbers -->
+                                <?php for ($i = 1; $i <= $totalAvailablePages; $i++): ?>
+                                    <?php if ($i == $availableSlotsPage): ?>
+                                        <span class="pagination-button active"><?= $i ?></span>
+                                    <?php else: ?>
+                                        <a href="?tab=appointment-management&appointment_tab=available-slots&available_page=<?= $i ?>" class="pagination-button"><?= $i ?></a>
+                                    <?php endif; ?>
+                                <?php endfor; ?>
+
+                                <!-- Next Button -->
+                                <?php if ($availableSlotsPage < $totalAvailablePages): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=available-slots&available_page=<?= $availableSlotsPage + 1 ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
                 
@@ -3014,7 +3215,7 @@ foreach ($occupiedSlots as $slot) {
                         <span class="text-sm text-gray-600"><?= count($pendingAppointments) ?> pending</span>
                     </div>
                     
-                    <?php if (empty($pendingAppointments)): ?>
+                    <?php if (empty($pendingAppointmentsPaginated)): ?>
                         <div class="bg-blue-50 p-4 rounded-lg text-center">
                             <p class="text-gray-600">No pending appointments.</p>
                         </div>
@@ -3032,8 +3233,10 @@ foreach ($occupiedSlots as $slot) {
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    <?php foreach ($pendingAppointments as $appointment): ?>
-                                        <tr>
+                                    <?php foreach ($pendingAppointmentsPaginated as $appointment): 
+                                        $isPast = $appointment['is_past'] ?? false;
+                                    ?>
+                                        <tr class="<?= $isPast ? 'status-row-missed' : '' ?>">
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
                                                 <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
@@ -3051,9 +3254,15 @@ foreach ($occupiedSlots as $slot) {
                                                 </div>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                                    Pending
-                                                </span>
+                                                <?php if ($isPast): ?>
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                        Missed Appointment
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                        Pending
+                                                    </span>
+                                                <?php endif; ?>
                                             </td>
                                             <td class="px-6 py-4">
                                                 <div class="text-sm text-gray-900">
@@ -3061,20 +3270,60 @@ foreach ($occupiedSlots as $slot) {
                                                 </div>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button onclick="openAppointmentApprovalModal(<?= $appointment['id'] ?>)" 
-                                                        class="btn-success-blue mr-2">
-                                                    <i class="fas fa-check-circle mr-1"></i> Approve
-                                                </button>
-                                                <button onclick="openRejectionModal(<?= $appointment['id'] ?>)" 
-                                                        class="btn-danger-blue">
-                                                    <i class="fas fa-times-circle mr-1"></i> Reject
-                                                </button>
+                                                <?php if (!$isPast): ?>
+                                                    <button onclick="openAppointmentApprovalModal(<?= $appointment['id'] ?>)" 
+                                                            class="btn-success-blue mr-2">
+                                                        <i class="fas fa-check-circle mr-1"></i> Approve
+                                                    </button>
+                                                    <button onclick="openRejectionModal(<?= $appointment['id'] ?>)" 
+                                                            class="btn-danger-blue">
+                                                        <i class="fas fa-times-circle mr-1"></i> Reject
+                                                    </button>
+                                                <?php else: ?>
+                                                    <span class="text-yellow-600 font-medium">Missed - No actions</span>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <!-- Pagination for Pending Appointments -->
+                        <?php if ($totalPendingPages > 1): ?>
+                            <div class="pagination mt-4">
+                                <!-- Previous Button -->
+                                <?php if ($pendingPage > 1): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=pending&pending_page=<?= $pendingPage - 1 ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </span>
+                                <?php endif; ?>
+
+                                <!-- Page Numbers -->
+                                <?php for ($i = 1; $i <= $totalPendingPages; $i++): ?>
+                                    <?php if ($i == $pendingPage): ?>
+                                        <span class="pagination-button active"><?= $i ?></span>
+                                    <?php else: ?>
+                                        <a href="?tab=appointment-management&appointment_tab=pending&pending_page=<?= $i ?>" class="pagination-button"><?= $i ?></a>
+                                    <?php endif; ?>
+                                <?php endfor; ?>
+
+                                <!-- Next Button -->
+                                <?php if ($pendingPage < $totalPendingPages): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=pending&pending_page=<?= $pendingPage + 1 ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
                 
@@ -3085,7 +3334,7 @@ foreach ($occupiedSlots as $slot) {
                         <span class="text-sm text-gray-600"><?= count($upcomingAppointments) ?> upcoming</span>
                     </div>
                     
-                    <?php if (empty($upcomingAppointments)): ?>
+                    <?php if (empty($upcomingAppointmentsPaginated)): ?>
                         <div class="bg-blue-50 p-4 rounded-lg text-center">
                             <p class="text-gray-600">No upcoming appointments.</p>
                         </div>
@@ -3104,10 +3353,11 @@ foreach ($occupiedSlots as $slot) {
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    <?php foreach ($upcomingAppointments as $appointment): 
+                                    <?php foreach ($upcomingAppointmentsPaginated as $appointment): 
                                         $isToday = $appointment['date'] == date('Y-m-d');
+                                        $isPast = $appointment['is_past'] ?? false;
                                     ?>
-                                        <tr>
+                                        <tr class="<?= $isPast ? 'status-row-missed' : '' ?>">
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
                                                 <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
@@ -3138,27 +3388,73 @@ foreach ($occupiedSlots as $slot) {
                                                 </div>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                    Approved
-                                                </span>
+                                                <?php if ($isPast): ?>
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                        Missed Consultation
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                        Approved
+                                                    </span>
+                                                <?php endif; ?>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button onclick="openCompleteConfirmationModal(
-                                                    <?= $appointment['id'] ?>, 
-                                                    '<?= htmlspecialchars(addslashes($appointment['full_name'])) ?>',
-                                                    '<?= $appointment['date'] ?>',
-                                                    '<?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>',
-                                                    '<?= $appointment['priority_number'] ?>'
-                                                )" 
-                                                        class="btn-success-blue">
-                                                    <i class="fas fa-check-circle mr-1"></i> Mark Completed
-                                                </button>
+                                                <?php if (!$isPast): ?>
+                                                    <button onclick="openCompleteConfirmationModal(
+                                                        <?= $appointment['id'] ?>, 
+                                                        '<?= htmlspecialchars(addslashes($appointment['full_name'])) ?>',
+                                                        '<?= $appointment['date'] ?>',
+                                                        '<?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?>',
+                                                        '<?= $appointment['priority_number'] ?>'
+                                                    )" 
+                                                            class="btn-success-blue">
+                                                        <i class="fas fa-check-circle mr-1"></i> Mark Completed
+                                                    </button>
+                                                <?php else: ?>
+                                                    <span class="text-yellow-600 font-medium">Missed - No actions</span>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <!-- Pagination for Upcoming Appointments -->
+                        <?php if ($totalUpcomingPages > 1): ?>
+                            <div class="pagination mt-4">
+                                <!-- Previous Button -->
+                                <?php if ($upcomingPage > 1): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=upcoming&upcoming_page=<?= $upcomingPage - 1 ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </span>
+                                <?php endif; ?>
+
+                                <!-- Page Numbers -->
+                                <?php for ($i = 1; $i <= $totalUpcomingPages; $i++): ?>
+                                    <?php if ($i == $upcomingPage): ?>
+                                        <span class="pagination-button active"><?= $i ?></span>
+                                    <?php else: ?>
+                                        <a href="?tab=appointment-management&appointment_tab=upcoming&upcoming_page=<?= $i ?>" class="pagination-button"><?= $i ?></a>
+                                    <?php endif; ?>
+                                <?php endfor; ?>
+
+                                <!-- Next Button -->
+                                <?php if ($upcomingPage < $totalUpcomingPages): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=upcoming&upcoming_page=<?= $upcomingPage + 1 ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
                 
@@ -3169,7 +3465,7 @@ foreach ($occupiedSlots as $slot) {
                         <span class="text-sm text-gray-600"><?= count($cancelledAppointments) ?> cancelled</span>
                     </div>
                     
-                    <?php if (empty($cancelledAppointments)): ?>
+                    <?php if (empty($cancelledAppointmentsPaginated)): ?>
                         <div class="bg-blue-50 p-6 rounded-lg text-center">
                             <p class="text-gray-600">No cancelled appointments found.</p>
                         </div>
@@ -3188,9 +3484,9 @@ foreach ($occupiedSlots as $slot) {
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    <?php foreach ($cancelledAppointments as $appointment): 
+                                    <?php foreach ($cancelledAppointmentsPaginated as $appointment): 
                                         $wasPending = empty($appointment['priority_number']) && empty($appointment['invoice_number']);
-                                        $cancelledBy = $wasPending ? 'Cancelled by Patient' : 'Cancelled by Staff';
+                                        $cancelledBy = $appointment['cancelled_by'] ?? ($wasPending ? 'Cancelled by Patient' : 'Cancelled by Staff');
                                     ?>
                                         <tr>
                                             <td class="px-6 py-4 whitespace-nowrap">
@@ -3220,15 +3516,58 @@ foreach ($occupiedSlots as $slot) {
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 <button onclick="openCancelledDetailsModal(<?= htmlspecialchars(json_encode($appointment)) ?>)" 
-                                                        class="btn-blue">
+                                                        class="btn-blue mr-2">
                                                     <i class="fas fa-eye mr-1"></i> View
                                                 </button>
+                                                <form method="POST" action="" class="inline" onsubmit="return confirm('Are you sure you want to delete this cancelled appointment record? This action cannot be undone.');">
+                                                    <input type="hidden" name="cancelled_appointment_id" value="<?= $appointment['id'] ?>">
+                                                    <button type="submit" name="delete_cancelled_appointment" 
+                                                            class="btn-delete">
+                                                        <i class="fas fa-trash mr-1"></i> Delete
+                                                    </button>
+                                                </form>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <!-- Pagination for Cancelled Appointments -->
+                        <?php if ($totalCancelledPages > 1): ?>
+                            <div class="pagination mt-4">
+                                <!-- Previous Button -->
+                                <?php if ($cancelledPage > 1): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=cancelled&cancelled_page=<?= $cancelledPage - 1 ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </span>
+                                <?php endif; ?>
+
+                                <!-- Page Numbers -->
+                                <?php for ($i = 1; $i <= $totalCancelledPages; $i++): ?>
+                                    <?php if ($i == $cancelledPage): ?>
+                                        <span class="pagination-button active"><?= $i ?></span>
+                                    <?php else: ?>
+                                        <a href="?tab=appointment-management&appointment_tab=cancelled&cancelled_page=<?= $i ?>" class="pagination-button"><?= $i ?></a>
+                                    <?php endif; ?>
+                                <?php endfor; ?>
+
+                                <!-- Next Button -->
+                                <?php if ($cancelledPage < $totalCancelledPages): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=cancelled&cancelled_page=<?= $cancelledPage + 1 ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                         
                         <!-- Information Box -->
                         <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -3240,6 +3579,121 @@ foreach ($occupiedSlots as $slot) {
                                         <li>• <strong>Pending appointments</strong> can be cancelled directly by patients online</li>
                                         <li>• <strong>Approved appointments</strong> require patients to contact support for cancellation</li>
                                         <li>• Click "View" to see detailed cancellation information</li>
+                                        <li>• Use "Delete" to remove cancelled appointment records (approved appointments cannot be deleted)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Missed Appointments -->
+                <div class="<?= $activeAppointmentTab === 'missed' ? '' : 'hidden' ?> p-6 bg-white rounded-lg border border-gray-200" id="missed" role="tabpanel" aria-labelledby="missed-tab">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-yellow-700">Missed Appointments</h2>
+                        <span class="text-sm text-gray-600"><?= count($missedAppointments) ?> missed</span>
+                    </div>
+                    
+                    <?php if (empty($missedAppointmentsPaginated)): ?>
+                        <div class="bg-blue-50 p-6 rounded-lg text-center">
+                            <p class="text-gray-600">No missed appointments found.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date & Time</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority Number</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Health Concerns</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <?php foreach ($missedAppointmentsPaginated as $appointment): ?>
+                                        <tr class="status-row-missed">
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
+                                                <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['contact']) ?></div>
+                                                <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900"><?= date('M d, Y', strtotime($appointment['date'])) ?></div>
+                                                <div class="text-sm text-gray-500"><?= date('g:i A', strtotime($appointment['start_time'])) ?> - <?= date('g:i A', strtotime($appointment['end_time'])) ?></div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                    Missed
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm font-medium text-red-600">
+                                                    <?= !empty($appointment['priority_number']) ? htmlspecialchars($appointment['priority_number']) : 'N/A' ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900">
+                                                    <?= !empty($appointment['invoice_number']) ? htmlspecialchars($appointment['invoice_number']) : 'N/A' ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="text-sm text-gray-900 max-w-xs truncate"><?= !empty($appointment['health_concerns']) ? htmlspecialchars($appointment['health_concerns']) : 'No concerns specified' ?></div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination for Missed Appointments -->
+                        <?php if ($totalMissedPages > 1): ?>
+                            <div class="pagination mt-4">
+                                <!-- Previous Button -->
+                                <?php if ($missedPage > 1): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=missed&missed_page=<?= $missedPage - 1 ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </span>
+                                <?php endif; ?>
+
+                                <!-- Page Numbers -->
+                                <?php for ($i = 1; $i <= $totalMissedPages; $i++): ?>
+                                    <?php if ($i == $missedPage): ?>
+                                        <span class="pagination-button active"><?= $i ?></span>
+                                    <?php else: ?>
+                                        <a href="?tab=appointment-management&appointment_tab=missed&missed_page=<?= $i ?>" class="pagination-button"><?= $i ?></a>
+                                    <?php endif; ?>
+                                <?php endfor; ?>
+
+                                <!-- Next Button -->
+                                <?php if ($missedPage < $totalMissedPages): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=missed&missed_page=<?= $missedPage + 1 ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <!-- Information Box -->
+                        <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <i class="fas fa-exclamation-triangle text-yellow-500 mt-1 mr-3"></i>
+                                <div>
+                                    <h4 class="font-semibold text-yellow-800">Missed Appointments Information</h4>
+                                    <ul class="text-sm text-yellow-700 mt-2 space-y-1">
+                                        <li>• Appointments are automatically marked as "Missed" when the appointment time has passed</li>
+                                        <li>• Pending appointments become "Missed Appointment"</li>
+                                        <li>• Approved appointments become "Missed Consultation"</li>
+                                        <li>• Missed appointments cannot be approved or completed</li>
                                     </ul>
                                 </div>
                             </div>
@@ -3250,7 +3704,7 @@ foreach ($occupiedSlots as $slot) {
                 <!-- All Appointments -->
                 <div class="<?= $activeAppointmentTab === 'all' ? '' : 'hidden' ?> p-4 bg-white rounded-lg border border-gray-200" id="all" role="tabpanel" aria-labelledby="all-tab">
                     <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-blue-700">All Appointments (Approved, Completed, Cancelled, Rejected)</h2>
+                        <h2 class="text-xl font-semibold text-blue-700">All Appointments (Approved, Completed, Cancelled, Rejected, Missed)</h2>
                         <span class="text-sm text-gray-600"><?= count($allAppointments) ?> total</span>
                     </div>
                     
@@ -3267,6 +3721,7 @@ foreach ($occupiedSlots as $slot) {
                                         <option value="completed" <?= $filterStatus === 'completed' ? 'selected' : '' ?>>Completed</option>
                                         <option value="cancelled" <?= $filterStatus === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
                                         <option value="rejected" <?= $filterStatus === 'rejected' ? 'selected' : '' ?>>Rejected</option>
+                                        <option value="missed" <?= $filterStatus === 'missed' ? 'selected' : '' ?>>Missed</option>
                                     </select>
                                 </div>
                                 
@@ -3289,7 +3744,7 @@ foreach ($occupiedSlots as $slot) {
                         </div>
                     </div>
                     
-                    <?php if (empty($allAppointments)): ?>
+                    <?php if (empty($allAppointmentsPaginated)): ?>
                         <div class="bg-blue-50 p-4 rounded-lg text-center">
                             <p class="text-gray-600">No appointments found.</p>
                         </div>
@@ -3309,8 +3764,8 @@ foreach ($occupiedSlots as $slot) {
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     <?php 
-                                    $filteredAppointments = array_filter($allAppointments, function($appointment) {
-                                        $allowedStatuses = ['approved', 'completed', 'cancelled', 'rejected'];
+                                    $filteredAppointments = array_filter($allAppointmentsPaginated, function($appointment) {
+                                        $allowedStatuses = ['approved', 'completed', 'cancelled', 'rejected', 'missed'];
                                         return in_array($appointment['status'], $allowedStatuses);
                                     });
                                     
@@ -3323,7 +3778,7 @@ foreach ($occupiedSlots as $slot) {
                                     foreach ($filteredAppointments as $appointment): 
                                         $isPast = strtotime($appointment['date']) < strtotime(date('Y-m-d'));
                                     ?>
-                                        <tr class="<?= $isPast ? 'bg-gray-50' : '' ?>">
+                                        <tr class="<?= $isPast ? 'bg-gray-50' : '' ?> <?= $appointment['status'] === 'missed' ? 'status-row-missed' : '' ?>">
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
                                                 <div class="text-sm text-gray-500"><?= htmlspecialchars($appointment['email']) ?></div>
@@ -3352,7 +3807,8 @@ foreach ($occupiedSlots as $slot) {
                                                     <?= $appointment['status'] === 'approved' ? 'bg-green-100 text-green-800' : 
                                                        ($appointment['status'] === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
                                                        ($appointment['status'] === 'rejected' ? 'bg-red-100 text-red-800' : 
-                                                       ($appointment['status'] === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'))) ?>">
+                                                       ($appointment['status'] === 'completed' ? 'bg-blue-100 text-blue-800' : 
+                                                       ($appointment['status'] === 'missed' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800')))) ?>">
                                                     <?= ucfirst($appointment['status']) ?>
                                                 </span>
                                             </td>
@@ -3374,6 +3830,42 @@ foreach ($occupiedSlots as $slot) {
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <!-- Pagination for All Appointments -->
+                        <?php if ($totalAllPages > 1): ?>
+                            <div class="pagination mt-4">
+                                <!-- Previous Button -->
+                                <?php if ($allPage > 1): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=all&all_page=<?= $allPage - 1 ?>&status=<?= $filterStatus ?>&date=<?= $filterDate ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </span>
+                                <?php endif; ?>
+
+                                <!-- Page Numbers -->
+                                <?php for ($i = 1; $i <= $totalAllPages; $i++): ?>
+                                    <?php if ($i == $allPage): ?>
+                                        <span class="pagination-button active"><?= $i ?></span>
+                                    <?php else: ?>
+                                        <a href="?tab=appointment-management&appointment_tab=all&all_page=<?= $i ?>&status=<?= $filterStatus ?>&date=<?= $filterDate ?>" class="pagination-button"><?= $i ?></a>
+                                    <?php endif; ?>
+                                <?php endfor; ?>
+
+                                <!-- Next Button -->
+                                <?php if ($allPage < $totalAllPages): ?>
+                                    <a href="?tab=appointment-management&appointment_tab=all&all_page=<?= $allPage + 1 ?>&status=<?= $filterStatus ?>&date=<?= $filterDate ?>" class="pagination-button">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="pagination-button disabled">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -3570,9 +4062,9 @@ foreach ($occupiedSlots as $slot) {
     </div>
 </div>
 
-<!-- Time Slot Selection Modal -->
+<!-- Time Slot Selection Modal - Desktop Size -->
 <div id="timeSlotModal" class="modal-overlay hidden">
-    <div class="modal-container max-w-4xl">
+    <div class="modal-container modal-time-slot-desktop">
         <div class="modal-header">
             <div class="flex justify-between items-center">
                 <h3 class="text-xl font-semibold text-gray-900" id="timeSlotModalTitle">
@@ -3597,7 +4089,7 @@ foreach ($occupiedSlots as $slot) {
             <div class="mb-6">
                 <div class="mb-6">
                     <h4 class="font-medium mb-4 text-gray-700 text-lg">Morning Slots (8:00 AM - 12:00 PM)</h4>
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="morningSlotsContainer">
+                    <div class="time-slots-grid" id="morningSlotsContainer">
                         <?php foreach ($morningSlots as $index => $slot): ?>
                             <div class="time-slot border-2 border-gray-200 rounded-lg p-6 cursor-pointer transition-all duration-200 hover:border-blue-300 bg-white" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
                                 <div class="flex flex-col items-center justify-center text-center">
@@ -3615,7 +4107,7 @@ foreach ($occupiedSlots as $slot) {
                 
                 <div class="mb-6">
                     <h4 class="font-medium mb-4 text-gray-700 text-lg">Afternoon Slots (1:00 PM - 5:00 PM)</h4>
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="afternoonSlotsContainer">
+                    <div class="time-slots-grid" id="afternoonSlotsContainer">
                         <?php foreach ($afternoonSlots as $index => $slot): ?>
                             <div class="time-slot border-2 border-gray-200 rounded-lg p-6 cursor-pointer transition-all duration-200 hover:border-blue-300 bg-white" data-time="<?= $slot['start'] ?> - <?= $slot['end'] ?>">
                                 <div class="flex flex-col items-center justify-center text-center">
@@ -3657,12 +4149,12 @@ foreach ($occupiedSlots as $slot) {
     </div>
 </div>
 
-<!-- User Details Modal -->
+<!-- User Details Modal - Desktop Size -->
 <div id="userDetailsModal" class="modal-overlay hidden">
-    <div class="modal-container max-w-4xl" style="max-height: 90vh;">
+    <div class="modal-container modal-desktop" style="max-height: 90vh;">
         <div class="modal-header">
             <div class="flex justify-between items-center">
-                <h2 class="text-lg font-semibold text-gray-800">Patient Details</h2>
+                <h2 class="text-xl font-semibold text-gray-800">Patient Registration Details</h2>
                 <button onclick="closeUserDetailsModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
                     <i class="fas fa-times"></i>
                 </button>
@@ -3670,184 +4162,226 @@ foreach ($occupiedSlots as $slot) {
         </div>
 
         <div class="modal-body" style="overflow-y: auto;">
-            <div class="space-y-6">
-                <!-- Personal Information -->
-                <div class="detail-section">
-                    <h4><i class="fas fa-user text-blue-500 mr-2"></i> Personal Information</h4>
-                    <div class="user-details-grid">
-                        <div class="detail-item">
-                            <span class="detail-label">Full Name:</span>
-                            <span class="detail-value" id="userFullName">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Username:</span>
-                            <span class="detail-value" id="userUsername">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Email:</span>
-                            <span class="detail-value" id="userEmail">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Contact Number:</span>
-                            <span class="detail-value" id="userContact">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Gender:</span>
-                            <span class="detail-value" id="userGender">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Age:</span>
-                            <span class="detail-value" id="userAge">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Civil Status:</span>
-                            <span class="detail-value" id="userCivilStatus">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Occupation:</span>
-                            <span class="detail-value" id="userOccupation">—</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Address Information -->
-                <div class="detail-section">
-                    <h4><i class="fas fa-map-marker-alt text-green-500 mr-2"></i> Address Information</h4>
-                    <div class="user-details-grid">
-                        <div class="detail-item">
-                            <span class="detail-label">Complete Address:</span>
-                            <span class="detail-value" id="userAddress">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Sitio:</span>
-                            <span class="detail-value" id="userSitio">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Date of Birth:</span>
-                            <span class="detail-value" id="userDateOfBirth">—</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ID Verification -->
-                <div class="detail-section">
-                    <h4><i class="fas fa-id-card text-purple-500 mr-2"></i> ID Verification</h4>
-                    <div class="user-details-grid">
-                        <div class="detail-item">
-                            <span class="detail-label">ID Type:</span>
-                            <span class="detail-value" id="userIdType">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">ID Status:</span>
-                            <span class="detail-value">
-                                <span id="userIdValidationStatus" class="px-2 py-1 text-xs rounded-full" style="background: #f3f4f6; color: #6b7280;">—</span>
-                            </span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">ID Verified:</span>
-                            <span class="detail-value" id="userIdVerified">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Verification Consent:</span>
-                            <span class="detail-value" id="userVerificationConsent">—</span>
-                        </div>
-                    </div>
-                    
-                    <!-- ID Image Preview -->
-                    <div class="mt-4">
-                        <h5 class="text-sm font-medium text-gray-700 mb-2">ID Document</h5>
-                        <div id="idImageSection" class="hidden">
-                            <div class="id-preview-container mb-3">
-                                <img id="userIdImage" src="" alt="ID Image" class="w-full h-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Left Column -->
+                <div class="space-y-6">
+                    <!-- Personal Information -->
+                    <div class="detail-section">
+                        <h4 class="text-lg font-semibold text-blue-600 mb-4">
+                            <i class="fas fa-user mr-2"></i> Personal Information
+                        </h4>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="detail-label">Full Name:</span>
+                                    <p class="detail-value" id="userFullName">—</p>
+                                </div>
+                                <div>
+                                    <span class="detail-label">Username:</span>
+                                    <p class="detail-value" id="userUsername">—</p>
+                                </div>
                             </div>
-                            <div class="flex space-x-3">
-                                <a id="userIdImageLink" href="#" target="_blank" class="btn-blue text-sm">
-                                    <i class="fas fa-external-link-alt mr-2"></i> View Original
-                                </a>
-                                <button onclick="openImageModal()" class="btn-blue text-sm">
-                                    <i class="fas fa-search mr-2"></i> Zoom Preview
-                                </button>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="detail-label">Email:</span>
+                                    <p class="detail-value" id="userEmail">—</p>
+                                </div>
+                                <div>
+                                    <span class="detail-label">Contact Number:</span>
+                                    <p class="detail-value" id="userContact">—</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="detail-label">Gender:</span>
+                                    <p class="detail-value" id="userGender">—</p>
+                                </div>
+                                <div>
+                                    <span class="detail-label">Age:</span>
+                                    <p class="detail-value" id="userAge">—</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="detail-label">Civil Status:</span>
+                                    <p class="detail-value" id="userCivilStatus">—</p>
+                                </div>
+                                <div>
+                                    <span class="detail-label">Occupation:</span>
+                                    <p class="detail-value" id="userOccupation">—</p>
+                                </div>
                             </div>
                         </div>
-                        <div id="noIdImageSection" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                            <p class="text-yellow-700 text-sm">
-                                <i class="fas fa-exclamation-triangle mr-2"></i>
-                                No ID image uploaded
-                            </p>
+                    </div>
+
+                    <!-- Address Information -->
+                    <div class="detail-section">
+                        <h4 class="text-lg font-semibold text-green-600 mb-4">
+                            <i class="fas fa-map-marker-alt mr-2"></i> Address Information
+                        </h4>
+                        <div class="space-y-4">
+                            <div>
+                                <span class="detail-label">Complete Address:</span>
+                                <p class="detail-value" id="userAddress">—</p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="detail-label">Sitio:</span>
+                                    <p class="detail-value" id="userSitio">—</p>
+                                </div>
+                                <div>
+                                    <span class="detail-label">Date of Birth:</span>
+                                    <p class="detail-value" id="userDateOfBirth">—</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Account Information -->
+                    <div class="detail-section">
+                        <h4 class="text-lg font-semibold text-red-600 mb-4">
+                            <i class="fas fa-user-circle mr-2"></i> Account Information
+                        </h4>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="detail-label">Account Status:</span>
+                                    <p class="detail-value" id="userStatus">—</p>
+                                </div>
+                                <div>
+                                    <span class="detail-label">Approved:</span>
+                                    <p class="detail-value" id="userApproved">—</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="detail-label">User Role:</span>
+                                    <p class="detail-value" id="userRole">—</p>
+                                </div>
+                                <div>
+                                    <span class="detail-label">Verification Method:</span>
+                                    <p class="detail-value" id="userVerificationMethod">—</p>
+                                </div>
+                            </div>
+                            <div id="uniqueNumberSection" style="display: none;">
+                                <span class="detail-label">Patient ID:</span>
+                                <p class="detail-value text-blue-600 font-semibold text-lg" id="userUniqueNumber">—</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Account Information -->
-                <div class="detail-section">
-                    <h4><i class="fas fa-user-circle text-red-500 mr-2"></i> Account Information</h4>
-                    <div class="user-details-grid">
-                        <div class="detail-item">
-                            <span class="detail-label">Account Status:</span>
-                            <span class="detail-value" id="userStatus">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Approved:</span>
-                            <span class="detail-value" id="userApproved">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">User Role:</span>
-                            <span class="detail-value" id="userRole">—</span>
-                        </div>
-                        <div class="detail-item" id="uniqueNumberSection" style="display: none;">
-                            <span class="detail-label">Patient ID:</span>
-                            <span class="detail-value text-blue-600 font-semibold" id="userUniqueNumber">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Verification Method:</span>
-                            <span class="detail-value" id="userVerificationMethod">—</span>
+                <!-- Right Column -->
+                <div class="space-y-6">
+                    <!-- ID Verification -->
+                    <div class="detail-section">
+                        <h4 class="text-lg font-semibold text-purple-600 mb-4">
+                            <i class="fas fa-id-card mr-2"></i> ID Verification
+                        </h4>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="detail-label">ID Type:</span>
+                                    <p class="detail-value" id="userIdType">—</p>
+                                </div>
+                                <div>
+                                    <span class="detail-label">ID Status:</span>
+                                    <p class="detail-value">
+                                        <span id="userIdValidationStatus" class="px-2 py-1 text-xs rounded-full" style="background: #f3f4f6; color: #6b7280;">—</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="detail-label">ID Verified:</span>
+                                    <p class="detail-value" id="userIdVerified">—</p>
+                                </div>
+                                <div>
+                                    <span class="detail-label">Verification Consent:</span>
+                                    <p class="detail-value" id="userVerificationConsent">—</p>
+                                </div>
+                            </div>
+                            
+                            <!-- ID Image Preview -->
+                            <div class="mt-4">
+                                <h5 class="text-sm font-medium text-gray-700 mb-2">ID Document</h5>
+                                <div id="idImageSection" class="hidden">
+                                    <div class="id-preview-container mb-3">
+                                        <img id="userIdImage" src="" alt="ID Image" class="w-full h-auto">
+                                    </div>
+                                    <div class="flex space-x-3">
+                                        <a id="userIdImageLink" href="#" target="_blank" class="btn-blue text-sm">
+                                            <i class="fas fa-external-link-alt mr-2"></i> View Original
+                                        </a>
+                                        <button onclick="openImageModal()" class="btn-blue text-sm">
+                                            <i class="fas fa-search mr-2"></i> Zoom Preview
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="noIdImageSection" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                    <p class="text-yellow-700 text-sm">
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        No ID image uploaded
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Registration Timeline -->
-                <div class="detail-section">
-                    <h4><i class="fas fa-history text-indigo-500 mr-2"></i> Registration Timeline</h4>
-                    <div class="user-details-grid">
-                        <div class="detail-item">
-                            <span class="detail-label">Registered Date:</span>
-                            <span class="detail-value" id="userRegisteredDate">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Last Updated:</span>
-                            <span class="detail-value" id="userUpdatedDate">—</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Verified At:</span>
-                            <span class="detail-value" id="userVerifiedAt">—</span>
+                    <!-- Registration Timeline -->
+                    <div class="detail-section">
+                        <h4 class="text-lg font-semibold text-indigo-600 mb-4">
+                            <i class="fas fa-history mr-2"></i> Registration Timeline
+                        </h4>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="detail-label">Registered Date:</span>
+                                    <p class="detail-value" id="userRegisteredDate">—</p>
+                                </div>
+                                <div>
+                                    <span class="detail-label">Last Updated:</span>
+                                    <p class="detail-value" id="userUpdatedDate">—</p>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="detail-label">Verified At:</span>
+                                <p class="detail-value" id="userVerifiedAt">—</p>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Verification Notes -->
-                <div id="verificationNotesSection" class="detail-section hidden">
-                    <h4><i class="fas fa-sticky-note text-yellow-500 mr-2"></i> Verification Notes</h4>
-                    <div class="bg-yellow-50 border border-yellow-100 rounded-lg p-4">
-                        <p class="text-sm text-gray-700" id="userVerificationNotes">—</p>
+                    <!-- Verification Notes -->
+                    <div id="verificationNotesSection" class="detail-section hidden">
+                        <h4 class="text-lg font-semibold text-yellow-600 mb-4">
+                            <i class="fas fa-sticky-note mr-2"></i> Verification Notes
+                        </h4>
+                        <div class="bg-yellow-50 border border-yellow-100 rounded-lg p-4">
+                            <p class="text-sm text-gray-700" id="userVerificationNotes">—</p>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Action Buttons -->
-                <div class="detail-section">
-                    <h4><i class="fas fa-cogs text-gray-500 mr-2"></i> Actions</h4>
-                    <div class="flex space-x-4">
-                        <button onclick="openApproveConfirmationModal()" 
-                                class="btn-success-blue flex-1">
-                            <i class="fas fa-check mr-2"></i> Approve Registration
-                        </button>
-                        <button onclick="openDeclineModalFromDetails()" 
-                                class="btn-danger-blue flex-1">
-                            <i class="fas fa-times mr-2"></i> Decline Registration
-                        </button>
-                        <button onclick="closeUserDetailsModal()" 
-                                class="btn-blue flex-1">
-                            <i class="fas fa-times mr-2"></i> Close Details
-                        </button>
+                    <!-- Action Buttons -->
+                    <div class="detail-section">
+                        <h4 class="text-lg font-semibold text-gray-600 mb-4">
+                            <i class="fas fa-cogs mr-2"></i> Actions
+                        </h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <button onclick="openApproveConfirmationModal()" 
+                                    class="btn-success-blue">
+                                <i class="fas fa-check mr-2"></i> Approve Registration
+                            </button>
+                            <button onclick="openDeclineModalFromDetails()" 
+                                    class="btn-danger-blue">
+                                <i class="fas fa-times mr-2"></i> Decline Registration
+                            </button>
+                        </div>
+                        <div class="mt-4">
+                            <button onclick="closeUserDetailsModal()" 
+                                    class="btn-blue w-full">
+                                <i class="fas fa-times mr-2"></i> Close Details
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3855,9 +4389,9 @@ foreach ($occupiedSlots as $slot) {
     </div>
 </div>
 
-<!-- Cancelled Appointment Details Modal -->
+<!-- Cancelled Appointment Details Modal - Wide Desktop -->
 <div id="cancelledDetailsModal" class="modal-overlay hidden">
-    <div class="modal-container max-w-4xl" style="max-height: 90vh;">
+    <div class="modal-container modal-wide-desktop" style="max-height: 90vh;">
         <div class="modal-header">
             <div class="flex justify-between items-center">
                 <h3 class="text-2xl font-semibold text-gray-900">Cancelled Appointment Details</h3>
@@ -3868,85 +4402,97 @@ foreach ($occupiedSlots as $slot) {
         </div>
         
         <div class="modal-body" style="overflow-y: auto;">
-            <div class="bg-gray-50 rounded-lg p-6 mb-6">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Patient Information -->
-                    <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Patient Information</h4>
-                        <div class="space-y-3">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Patient Information -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                    <h4 class="text-lg font-semibold text-blue-700 border-b pb-3 mb-4">
+                        <i class="fas fa-user mr-2"></i> Patient Information
+                    </h4>
+                    <div class="space-y-4">
+                        <div>
+                            <span class="text-sm font-medium text-gray-600 block">Full Name:</span>
+                            <p class="text-base text-gray-900 mt-1" id="cancelledFullName">N/A</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <span class="text-sm font-medium text-gray-600">Full Name:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="cancelledFullName">N/A</p>
+                                <span class="text-sm font-medium text-gray-600 block">Patient ID:</span>
+                                <p class="text-base text-gray-900 mt-1" id="cancelledPatientId">N/A</p>
                             </div>
                             <div>
-                                <span class="text-sm font-medium text-gray-600">Patient ID:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="cancelledPatientId">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Contact Number:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="cancelledContact">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Email:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="cancelledEmail">N/A</p>
+                                <span class="text-sm font-medium text-gray-600 block">Contact Number:</span>
+                                <p class="text-base text-gray-900 mt-1" id="cancelledContact">N/A</p>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Appointment Details -->
-                    <div class="bg-white p-4 rounded-lg border border-gray-200">
-                        <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Appointment Details</h4>
-                        <div class="space-y-3">
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Original Date:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="cancelledDate">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Original Time:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="cancelledTime">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Cancelled By:</span>
-                                <p class="text-sm font-semibold mt-1" id="cancelledBy">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Cancelled At:</span>
-                                <p class="text-sm text-gray-900 mt-1" id="cancelledAt">N/A</p>
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium text-gray-600">Original Status:</span>
-                                <p class="text-sm font-semibold mt-1" id="cancelledOriginalStatus">N/A</p>
-                            </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600 block">Email:</span>
+                            <p class="text-base text-gray-900 mt-1" id="cancelledEmail">N/A</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Cancellation Reason -->
-                <div class="mt-6 bg-white p-4 rounded-lg border border-gray-200">
-                    <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Cancellation Reason</h4>
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <p class="text-sm text-gray-900 leading-relaxed" id="cancelledReason">
-                            No reason provided for cancellation.
-                        </p>
+                <!-- Appointment Details -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                    <h4 class="text-lg font-semibold text-blue-700 border-b pb-3 mb-4">
+                        <i class="fas fa-calendar-alt mr-2"></i> Appointment Details
+                    </h4>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <span class="text-sm font-medium text-gray-600 block">Original Date:</span>
+                                <p class="text-base text-gray-900 mt-1" id="cancelledDate">N/A</p>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-600 block">Original Time:</span>
+                                <p class="text-base text-gray-900 mt-1" id="cancelledTime">N/A</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <span class="text-sm font-medium text-gray-600 block">Cancelled By:</span>
+                                <p class="text-base font-semibold mt-1" id="cancelledBy">N/A</p>
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium text-gray-600 block">Cancelled At:</span>
+                                <p class="text-base text-gray-900 mt-1" id="cancelledAt">N/A</p>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-600 block">Original Status:</span>
+                            <p class="text-base font-semibold mt-1" id="cancelledOriginalStatus">N/A</p>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Additional Information -->
-                <div class="mt-6 bg-white p-4 rounded-lg border border-gray-200">
-                    <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3">Additional Information</h4>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <div>
-                            <span class="text-sm font-medium text-gray-600">Priority Number:</span>
-                            <p class="text-sm text-gray-900 mt-1" id="cancelledPriorityNumber">N/A</p>
-                        </div>
-                        <div>
-                            <span class="text-sm font-medium text-gray-600">Invoice Number:</span>
-                            <p class="text-sm text-gray-900 mt-1" id="cancelledInvoiceNumber">N/A</p>
-                        </div>
-                        <div>
-                            <span class="text-sm font-medium text-gray-600">Health Concerns:</span>
-                            <p class="text-sm text-gray-900 mt-1" id="cancelledHealthConcerns">No health concerns specified</p>
-                        </div>
+            <!-- Cancellation Reason -->
+            <div class="mb-6 bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                <h4 class="text-lg font-semibold text-red-700 border-b pb-3 mb-4">
+                    <i class="fas fa-comment-alt mr-2"></i> Cancellation Reason
+                </h4>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-5">
+                    <p class="text-base text-gray-900 leading-relaxed" id="cancelledReason">
+                        No reason provided for cancellation.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Additional Information -->
+            <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                <h4 class="text-lg font-semibold text-blue-700 border-b pb-3 mb-4">
+                    <i class="fas fa-info-circle mr-2"></i> Additional Information
+                </h4>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <span class="text-sm font-medium text-gray-600 block">Priority Number:</span>
+                        <p class="text-lg text-gray-900 font-semibold mt-1" id="cancelledPriorityNumber">N/A</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <span class="text-sm font-medium text-gray-600 block">Invoice Number:</span>
+                        <p class="text-lg text-gray-900 font-semibold mt-1" id="cancelledInvoiceNumber">N/A</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <span class="text-sm font-medium text-gray-600 block">Health Concerns:</span>
+                        <p class="text-base text-gray-900 mt-1" id="cancelledHealthConcerns">No health concerns specified</p>
                     </div>
                 </div>
             </div>
@@ -4339,6 +4885,7 @@ const phHolidays = <?= json_encode($phHolidays) ?>;
 const dateSlots = <?= json_encode($dateSlots) ?>;
 const occupiedSlotsByDate = <?= json_encode($occupiedSlotsByDate) ?>;
 const nextAvailableDate = '<?= $nextAvailableDate ?>';
+const currentTime = '<?= date('H:i:s') ?>';
 
 // Enhanced Modal Management Functions
 function openModal(modalId) {
@@ -4478,7 +5025,7 @@ function updateTimeSlotsForDate(dateStr) {
     const isToday = dateStr === currentDate.toISOString().split('T')[0];
     
     document.querySelectorAll('.time-slot').forEach(slot => {
-        slot.classList.remove('selected', 'disabled', 'occupied', 'bg-blue-500', 'text-white', 'border-blue-600', 'border-yellow-400', 'bg-yellow-50');
+        slot.classList.remove('selected', 'disabled', 'occupied', 'current-time', 'bg-blue-500', 'text-white', 'border-blue-600', 'border-yellow-400', 'bg-yellow-50', 'border-red-600', 'bg-red-50');
         slot.classList.add('bg-white', 'border-gray-200');
         slot.style.cursor = 'pointer';
         
@@ -4491,8 +5038,23 @@ function updateTimeSlotsForDate(dateStr) {
     
     document.querySelectorAll('.time-slot').forEach(slot => {
         const timeRange = slot.getAttribute('data-time');
+        const [startTime, endTime] = timeRange.split(' - ');
         
-        if (occupiedSlots.includes(timeRange)) {
+        // Check if current time is within this time slot
+        const isCurrentTime = isToday && 
+                             currentTime >= startTime && 
+                             currentTime <= endTime;
+        
+        if (isCurrentTime) {
+            slot.classList.add('current-time', 'disabled');
+            slot.style.cursor = 'not-allowed';
+            
+            const statusEl = slot.querySelector('.slot-status');
+            statusEl.textContent = 'Ongoing - Cannot Edit';
+            statusEl.className = 'slot-status text-xs text-red-600 font-medium';
+            
+            slot.onclick = null;
+        } else if (occupiedSlots.includes(timeRange)) {
             slot.classList.add('occupied', 'disabled');
             slot.style.cursor = 'not-allowed';
             
@@ -4503,7 +5065,7 @@ function updateTimeSlotsForDate(dateStr) {
             slot.onclick = null;
         } else {
             slot.onclick = function() {
-                if (!this.classList.contains('disabled') && !this.classList.contains('occupied')) {
+                if (!this.classList.contains('disabled') && !this.classList.contains('occupied') && !this.classList.contains('current-time')) {
                     selectTimeSlot(this, timeRange);
                 }
             };
@@ -4533,12 +5095,12 @@ function updateTimeSlotsForDate(dateStr) {
 }
 
 function selectTimeSlot(slotEl, timeRange) {
-    if (slotEl.classList.contains('disabled') || slotEl.classList.contains('occupied')) {
+    if (slotEl.classList.contains('disabled') || slotEl.classList.contains('occupied') || slotEl.classList.contains('current-time')) {
         return;
     }
     
     document.querySelectorAll('.time-slot').forEach(el => {
-        if (!el.classList.contains('disabled') && !el.classList.contains('occupied')) {
+        if (!el.classList.contains('disabled') && !el.classList.contains('occupied') && !el.classList.contains('current-time')) {
             el.classList.remove('selected', 'bg-blue-500', 'text-white', 'border-blue-600');
             el.classList.add('bg-white', 'border-gray-200');
         }
@@ -4762,7 +5324,7 @@ function openCancelledDetailsModal(appointment) {
     const wasPending = !appointment.priority_number && !appointment.invoice_number;
     const originalStatus = wasPending ? 'Pending' : 'Approved';
     document.getElementById('cancelledOriginalStatus').textContent = originalStatus;
-    document.getElementById('cancelledOriginalStatus').className = 'text-sm font-semibold ' + 
+    document.getElementById('cancelledOriginalStatus').className = 'text-base font-semibold ' + 
         (wasPending ? 'text-yellow-600 mt-1' : 'text-green-600 mt-1');
     
     const reason = appointment.cancel_reason || 'No reason provided for cancellation.';
@@ -4932,7 +5494,8 @@ function openViewModal(appointment) {
         (appointment.status === 'approved' ? 'text-green-600' :
          appointment.status === 'pending' ? 'text-yellow-600' :
          appointment.status === 'rejected' ? 'text-red-600' :
-         appointment.status === 'completed' ? 'text-blue-600' : 'text-gray-600');
+         appointment.status === 'completed' ? 'text-blue-600' :
+         appointment.status === 'missed' ? 'text-yellow-600' : 'text-gray-600');
     
     document.getElementById('viewPriorityNumber').textContent = appointment.priority_number || 'N/A';
     document.getElementById('viewInvoiceNumber').textContent = appointment.invoice_number || 'N/A';
@@ -5207,7 +5770,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.querySelectorAll('.time-slot').forEach(slot => {
         slot.addEventListener('click', function() {
-            if (!this.classList.contains('disabled') && !this.classList.contains('occupied')) {
+            if (!this.classList.contains('disabled') && !this.classList.contains('occupied') && !this.classList.contains('current-time')) {
                 const timeRange = this.getAttribute('data-time');
                 selectTimeSlot(this, timeRange);
             }
@@ -5280,6 +5843,7 @@ function initializeCharts() {
                 '#F59E0B', // Yellow for pending
                 '#EF4444', // Red for rejected
                 '#8B5CF6', // Purple for cancelled
+                '#F59E0B', // Yellow for missed (same as pending)
                 '#6B7280'  // Gray for others
             ],
             borderWidth: 2,

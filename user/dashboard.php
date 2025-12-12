@@ -1773,7 +1773,7 @@ try {
         }
 
         .success-modal .notification-close-btn:hover {
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            background: #3C96E1;
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
         }
@@ -1903,50 +1903,57 @@ try {
     </div>
 
     <div class="container mx-auto px-4 py-6">
-        <!-- Cancellation Modal -->
         <div id="cancel-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300"></div>
-            <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-md w-full">
-                <div class="p-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Cancel Appointment</h3>
-                    <div id="cancel-warning" class="hidden mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                        <p class="text-sm text-yellow-800" id="cancel-warning-message"></p>
-                    </div>
-                    <form method="POST" class="space-y-4" id="cancel-form">
-                        <input type="hidden" name="cancel_appointment" value="1">
-                        <input type="hidden" name="appointment_id" id="modal-appointment-id">
-                        
-                        <div>
-                            <label for="cancel-reason" class="block text-sm font-medium text-gray-700 mb-1">
-                                Reason for cancellation <span class="text-red-500">*</span>
-                            </label>
-                            <textarea id="cancel-reason" name="cancel_reason" rows="4"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required placeholder="Please explain why you need to cancel this appointment"></textarea>
-                        </div>
-                        
-                        <div class="flex justify-end space-x-3 pt-4">
-                            <button type="button" onclick="closeCancelModal()"
-                                class="px-6 py-3 border border-gray-300 rounded-full text-base font-medium text-gray-700 hover:bg-gray-50 transition duration-200 modal-button">
-                                Go Back
-                            </button>
-                            <button type="submit" name="cancel_appointment" id="confirm-cancel-btn"
-                                class="px-6 py-3 bg-red-600 text-white rounded-full text-base font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-200 modal-button cancel-button">
-                                Confirm Cancellation
-                            </button>
-                        </div>
-                    </form>
-                </div>
+    <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300"></div>
+
+    <!-- Wider modal: changed max-w-md → max-w-2xl and added w-full -->
+    <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-2xl w-full">
+        <div class="p-8"><!-- Increased padding for better spacing -->
+            <h3 class="text-xl font-semibold text-gray-900 mb-6">Cancel Appointment</h3>
+
+            <div id="cancel-warning" class="hidden mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                <p class="text-sm text-yellow-800" id="cancel-warning-message"></p>
             </div>
+
+            <form method="POST" class="space-y-6" id="cancel-form">
+                <input type="hidden" name="cancel_appointment" value="1">
+                <input type="hidden" name="appointment_id" id="modal-appointment-id">
+
+                <div>
+                    <label for="cancel-reason" class="block text-sm font-lg text-gray-700 mb-2">
+                        Reason for cancellation <span class="text-red-500">*</span>
+                    </label>
+
+                    <!-- Wider textarea: added text-base and increased padding -->
+                    <textarea id="cancel-reason" name="cancel_reason" rows="5"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                        required placeholder="Kindly provide the reason for canceling this appointment."></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-4 pt-6">
+                    <button type="button" onclick="closeCancelModal()"
+                        class="px-6 py-3 border border-gray-300 rounded-full text-base font-medium text-gray-700 hover:bg-gray-50 transition duration-200">
+                        Go Back
+                    </button>
+
+                    <button type="submit" name="cancel_appointment" id="confirm-cancel-btn"
+                        class="px-6 py-3 bg-red-600 text-white rounded-full text-base font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-200">
+                        Confirm Cancellation
+                    </button>
+                </div>
+            </form>
         </div>
+    </div>
+</div>
+
 
         <!-- Appointment Booking Modal -->
         <div id="booking-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
             <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300"></div>
             <div class="bg-white rounded-lg shadow-xl transform transition-all duration-300 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 <div class="p-6">
-                    <h3 class="text-xl font-semibold text-gray-900 mb-4 flex items-center text-green-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <h3 class="text-xl font-semibold text-blue-600 mb-4 flex items-center text-blue-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                         </svg>
                         Confirm Health Visit
@@ -2028,7 +2035,7 @@ try {
                                 Cancel
                             </button>
                             <button type="submit" name="book_appointment" 
-                                    class="px-6 py-3 bg-green-600 text-white rounded-full text-base font-medium hover:bg-green-700 transition flex items-center justify-center modal-button">
+                                    class="px-6 py-3 bg-blue-600 text-white rounded-full text-base font-medium hover:bg-blue-500 transition flex items-center justify-center modal-button">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                 </svg>
@@ -2480,9 +2487,9 @@ try {
                                             <div class="font-medium text-lg"><?= date('D', strtotime($date)) ?></div>
                                             <div class="text-base"><?= date('M j', strtotime($date)) ?></div>
                                             <?php if ($userHasAppointment): ?>
-                                                <div class="text-xs text-yellow-600 mt-1">You have appointment</div>
+                                                <div class="text-xs text-white mt-1 mb-4">You have appointment</div>
                                             <?php elseif (!$hasAvailableSlots): ?>
-                                                <div class="text-xs text-red-500 mt-1">Fully Booked</div>
+                                                <div class="text-xs text-white mt-1 mb-4">Fully Booked</div>
                                             <?php endif; ?>
                                         </a>
                                     <?php endforeach; ?>
@@ -2497,7 +2504,7 @@ try {
                             <div class="grid grid-cols-1 gap-4">
                                 <div>
                                     <label for="appointment_date" class="block text-gray-700 mb-2 font-medium">Or select specific date:</label>
-                                    <select id="appointment_date" name="date" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 modern-input">
+                                    <select id="appointment_date" name="date" class="w-full pl-12 pr-12 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 modern-input">
                                         <option value="">-- Select date --</option>
                                         <?php foreach ($availableDates as $dateInfo): 
                                             $date = $dateInfo['date'];
@@ -2666,8 +2673,8 @@ try {
                                 }
                             ?>
                                 <div class="border border-gray-200 rounded-lg p-6 mb-6 stats-card">
-                                    <h3 class="font-semibold text-lg mb-4 flex items-center text-green-600">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <h3 class="font-semibold text-lg mb-4 flex items-center text-blue-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                         </svg>
                                         Slot Selected
