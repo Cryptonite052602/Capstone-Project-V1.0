@@ -15,4 +15,4 @@ Members:
 - Rica Java - Research Writer
 
 
-Project Name: Barangay Toong Health Monitoring and Tracking System
+Project Name: Barangay Luz Health Monitoring and Tracking System
