@@ -446,7 +446,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
                 'Time Slot' => date('g:i A', strtotime($selectedSlot['start_time'])) . ' - ' . date('g:i A', strtotime($selectedSlot['end_time'])),
                 'Status' => 'Pending Approval',
                 'Health Concerns' => $healthConcernsStr,
-                'Priority Number' => $priorityNumber  // NEW: Add priority number to notification
+                
             ]
         ];
         
@@ -1628,7 +1628,7 @@ try {
 
         /* Success Modal Specific Styles */
         .success-modal .notification-header {
-            background: linear-gradient(#2B7CC9, #3C96E1);
+            background: linear-gradient(#2B7CC9, #187acaff);
             padding: 30px 30px 10px;
             text-align: center;
             color: white;

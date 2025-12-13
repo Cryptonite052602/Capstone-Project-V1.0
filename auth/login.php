@@ -105,10 +105,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="flex flex-col items-center text-center">
                         <!-- Success Spinner -->
                         <div class="relative w-20 h-20 mb-6">
-                            <div class="absolute inset-0 rounded-full border-4 border-green-100"></div>
-                            <div class="absolute inset-0 rounded-full border-4 border-green-400 border-t-transparent animate-spin"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-blue-100"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-blue-400 border-t-transparent animate-spin"></div>
                             <div class="absolute inset-0 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                 </svg>
                             </div>
