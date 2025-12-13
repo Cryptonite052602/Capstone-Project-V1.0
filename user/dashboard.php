@@ -446,7 +446,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_appointment'])) 
                 'Time Slot' => date('g:i A', strtotime($selectedSlot['start_time'])) . ' - ' . date('g:i A', strtotime($selectedSlot['end_time'])),
                 'Status' => 'Pending Approval',
                 'Health Concerns' => $healthConcernsStr,
-                'Priority Number' => $priorityNumber  // NEW: Add priority number to notification
             ]
         ];
         
