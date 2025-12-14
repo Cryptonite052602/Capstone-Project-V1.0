@@ -551,6 +551,20 @@ if (isset($_SESSION['user']['id'])) {
         transform: translateY(-1px);
     }
 
+    /* Add these new styles for disabled buttons */
+    .continue-btn:disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
+        transform: none !important;
+        box-shadow: none !important;
+    }
+
+    .continue-btn:disabled:hover {
+        background-color: #4A90E2 !important;
+        transform: none !important;
+        box-shadow: none !important;
+    }
+
     /* Responsive adjustments */
     @media (max-width: 1024px) {
 
@@ -2128,62 +2142,134 @@ if (isset($_SESSION['user']['id'])) {
                     const today = new Date();
                     const birthDateObj = new Date(birthDate);
                     
+                    // Validate date
+                    if (isNaN(birthDateObj.getTime())) {
+                        return '';
+                    }
+                    
                     let age = today.getFullYear() - birthDateObj.getFullYear();
                     const monthDiff = today.getMonth() - birthDateObj.getMonth();
+                    const dayDiff = today.getDate() - birthDateObj.getDate();
                     
-                    // If birthday hasn't occurred yet this year, subtract 1
-                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+                    // Adjust age if birthday hasn't occurred yet this year
+                    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
                         age--;
+                    }
+                    
+                    // Return empty string for invalid ages (negative or too high)
+                    if (age < 0 || age > 120) {
+                        return '';
                     }
                     
                     return age;
                 }
                 
-                // Update age when date of birth changes
-                dateOfBirthInput.addEventListener('change', function() {
-                    const birthDate = this.value;
-                    const age = calculateAge(birthDate);
-                    
-                    if (age !== '' && age >= 0) {
-                        ageInput.value = age;
-                    } else {
-                        ageInput.value = '';
-                    }
-                    
-                    // Validate form completion
-                    validateFirstFormCompletion();
-                });
-                
-                // Validate first form completion
+                // Enhanced first form validation function
                 function validateFirstFormCompletion() {
                     const requiredFields = firstRegisterForm.querySelectorAll('[required]');
                     let allFilled = true;
                     
                     requiredFields.forEach(field => {
-                        if (!field.value.trim()) {
+                        const value = field.value.trim();
+                        
+                        if (!value) {
                             allFilled = false;
+                            return;
                         }
                         
-                        // Special validation for age
-                        if (field.id === 'age' && field.value.trim()) {
-                            const ageValue = parseInt(field.value);
-                            if (isNaN(ageValue) || ageValue < 0 || ageValue > 120) {
-                                allFilled = false;
-                            }
+                        // Special validation for specific fields
+                        switch(field.id) {
+                            case 'age':
+                                const ageValue = parseInt(value);
+                                if (isNaN(ageValue) || ageValue < 0 || ageValue > 120) {
+                                    allFilled = false;
+                                }
+                                break;
+                                
+                            case 'contact':
+                                // Validate phone number format (Philippine numbers)
+                                const cleanedContact = value.replace(/\D/g, '');
+                                if (cleanedContact.length < 10 || cleanedContact.length > 12) {
+                                    allFilled = false;
+                                }
+                                break;
+                                
+                            case 'gender':
+                            case 'sitio':
+                            case 'civil_status':
+                                // For select fields, check if a valid option is selected
+                                if (value === '' || field.value === '') {
+                                    allFilled = false;
+                                }
+                                break;
+                                
+                            case 'date_of_birth':
+                                // Validate date is not in the future
+                                const selectedDate = new Date(value);
+                                const today = new Date();
+                                if (selectedDate > today) {
+                                    allFilled = false;
+                                }
+                                break;
                         }
                     });
                     
+                    // Additional validation for address field
+                    const addressField = document.getElementById('address');
+                    if (!addressField.value.trim()) {
+                        allFilled = false;
+                    }
+                    
                     openSecondRegister.disabled = !allFilled;
+                    
+                    // Update button styling based on state
+                    if (allFilled) {
+                        openSecondRegister.classList.remove('disabled:opacity-50', 'disabled:cursor-not-allowed');
+                        openSecondRegister.classList.add('hover:shadow-lg', 'active:scale-[0.98]');
+                    } else {
+                        openSecondRegister.classList.add('disabled:opacity-50', 'disabled:cursor-not-allowed');
+                        openSecondRegister.classList.remove('hover:shadow-lg', 'active:scale-[0.98]');
+                    }
                     
                     return allFilled;
                 }
                 
-                // Add event listeners to first form fields
-                const firstFormFields = firstRegisterForm.querySelectorAll('input, select');
-                firstFormFields.forEach(field => {
-                    field.addEventListener('input', validateFirstFormCompletion);
-                    field.addEventListener('change', validateFirstFormCompletion);
-                });
+                // Setup form validation
+                function setupFormValidation() {
+                    // Add event listeners to first form fields
+                    const firstFormFields = firstRegisterForm.querySelectorAll('input, select');
+                    firstFormFields.forEach(field => {
+                        field.addEventListener('input', function() {
+                            // Re-calculate age if date of birth changes
+                            if (field.id === 'date_of_birth') {
+                                const birthDate = field.value;
+                                const age = calculateAge(birthDate);
+                                
+                                if (age !== '' && age >= 0) {
+                                    ageInput.value = age;
+                                } else {
+                                    ageInput.value = '';
+                                }
+                            }
+                            
+                            validateFirstFormCompletion();
+                        });
+                        
+                        field.addEventListener('change', function() {
+                            validateFirstFormCompletion();
+                        });
+                        
+                        field.addEventListener('blur', function() {
+                            validateFirstFormCompletion();
+                        });
+                    });
+                    
+                    // Initialize validation on page load
+                    validateFirstFormCompletion();
+                }
+                
+                // Call setup function
+                setupFormValidation();
                 
                 // Go back to first form
                 backToFirstRegister.addEventListener('click', function () {
@@ -2196,61 +2282,63 @@ if (isset($_SESSION['user']['id'])) {
                     }
                 });
 
-                // Password matching validation
+                // Enhanced password matching validation
                 function validatePasswordMatch() {
-                    if (password.value && confirmPassword.value && password.value !== confirmPassword.value) {
-                        confirmPassword.classList.add('border-red-500');
-                        passwordMatchError.classList.remove('hidden');
-                        submitButton.disabled = true;
-                        return false;
+                    const passwordValue = password.value.trim();
+                    const confirmPasswordValue = confirmPassword.value.trim();
+                    
+                    if (passwordValue && confirmPasswordValue) {
+                        if (passwordValue !== confirmPasswordValue) {
+                            confirmPassword.classList.add('border-red-500');
+                            passwordMatchError.classList.remove('hidden');
+                            return false;
+                        } else {
+                            confirmPassword.classList.remove('border-red-500');
+                            passwordMatchError.classList.add('hidden');
+                            return true;
+                        }
+                    }
+                    return true; // Return true if one or both are empty (will be caught by required validation)
+                }
+
+                // Enhanced second form completion check
+                function checkSecondFormCompletion() {
+                    const allRequiredFilled = Array.from(secondRegisterForm.querySelectorAll('[required]')).every(
+                        field => {
+                            const value = field.value.trim();
+                            
+                            // Skip validation for consent if manual verification is selected
+                            if (field.name === 'verification_consent') {
+                                const selectedMethod = document.querySelector('input[name="verification_method"]:checked');
+                                if (selectedMethod && selectedMethod.value === 'manual_verification') {
+                                    return true; // Skip consent requirement for manual verification
+                                }
+                            }
+                            
+                            return value !== '';
+                        }
+                    );
+
+                    const passwordsMatch = validatePasswordMatch();
+                    const verificationValid = validateVerificationSection();
+
+                    submitButton.disabled = !allRequiredFilled || !passwordsMatch || !verificationValid;
+                    
+                    // Update button styling
+                    if (!submitButton.disabled) {
+                        submitButton.classList.remove('disabled:opacity-50', 'disabled:cursor-not-allowed');
                     } else {
-                        confirmPassword.classList.remove('border-red-500');
-                        passwordMatchError.classList.add('hidden');
-
-                        // Only enable if all required fields are filled
-                        const allFilled = Array.from(secondRegisterForm.querySelectorAll('[required]')).every(
-                            field => field.value.trim()
-                        );
-
-                        submitButton.disabled = !allFilled;
-                        return true;
+                        submitButton.classList.add('disabled:opacity-50', 'disabled:cursor-not-allowed');
                     }
                 }
 
-                // Check if all required fields in second form are filled
-                function checkSecondFormCompletion() {
-                    const allFilled = Array.from(secondRegisterForm.querySelectorAll('[required]')).every(
-                        field => field.value.trim()
-                    );
-
-                    // Only enable if passwords match (if both password fields have values)
-                    const passwordsMatch = !password.value || !confirmPassword.value || password.value === confirmPassword.value;
-
-                    submitButton.disabled = !allFilled || !passwordsMatch;
-                }
-
-                // Add event listeners to second form fields
-                const secondFormFields = secondRegisterForm.querySelectorAll('input');
+                // Update all event listeners for second form
+                const secondFormFields = secondRegisterForm.querySelectorAll('input, select, textarea');
                 secondFormFields.forEach(field => {
-                    field.addEventListener('input', function () {
-                        if (field.id === 'reg-password' || field.id === 'confirm_password') {
-                            validatePasswordMatch();
-                        } else {
-                            checkSecondFormCompletion();
-                        }
-                    });
-
-                    field.addEventListener('change', function () {
-                        if (field.id === 'reg-password' || field.id === 'confirm_password') {
-                            validatePasswordMatch();
-                        } else {
-                            checkSecondFormCompletion();
-                        }
-                    });
+                    field.addEventListener('input', checkSecondFormCompletion);
+                    field.addEventListener('change', checkSecondFormCompletion);
+                    field.addEventListener('blur', checkSecondFormCompletion);
                 });
-
-                // Initial check for second form
-                checkSecondFormCompletion();
 
                 // Form submission validation
                 if (secondRegisterForm) {
@@ -2412,96 +2500,8 @@ if (isset($_SESSION['user']['id'])) {
         </script>
 
         <script>
-            // ID Verification Method Toggle
+            // ID Verification Method Toggle and Validation
 document.addEventListener('DOMContentLoaded', function() {
-    const verificationMethodRadios = document.querySelectorAll('input[name="verification_method"]');
-    const idUploadSection = document.getElementById('idUploadSection');
-    const manualVerificationSection = document.getElementById('manualVerificationSection');
-    const idImageInput = document.getElementById('id_image');
-    const filePreview = document.getElementById('filePreview');
-    const previewImage = document.getElementById('previewImage');
-    const verificationConsent = document.querySelector('input[name="verification_consent"]');
-
-    // Toggle verification sections based on selection
-    verificationMethodRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
-            if (this.value === 'id_upload') {
-                idUploadSection.classList.remove('hidden');
-                manualVerificationSection.classList.add('hidden');
-                // Make consent required for ID upload
-                verificationConsent.required = true;
-            } else {
-                idUploadSection.classList.add('hidden');
-                manualVerificationSection.classList.remove('hidden');
-                // Remove required for manual verification
-                verificationConsent.required = false;
-            }
-            validateVerificationSection();
-        });
-    });
-
-    // File preview functionality
-    idImageInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    previewImage.src = e.target.result;
-                    filePreview.classList.remove('hidden');
-                }
-                reader.readAsDataURL(file);
-            } else {
-                filePreview.classList.add('hidden');
-            }
-        } else {
-            filePreview.classList.add('hidden');
-        }
-        validateVerificationSection();
-    });
-
-    // Consent checkbox validation
-    verificationConsent.addEventListener('change', validateVerificationSection);
-
-    // Validate verification section
-    function validateVerificationSection() {
-        const selectedMethod = document.querySelector('input[name="verification_method"]:checked').value;
-        let isValid = true;
-
-        if (selectedMethod === 'id_upload') {
-            const hasFile = idImageInput.files.length > 0;
-            const hasConsent = verificationConsent.checked;
-            isValid = hasFile && hasConsent;
-        }
-
-        // Update submit button state
-        const submitButton = document.getElementById('submitButton');
-        const allFilled = Array.from(document.querySelectorAll('#secondRegisterForm [required]')).every(
-            field => field.value.trim()
-        );
-        
-        submitButton.disabled = !allFilled || !isValid;
-    }
-
-    // Add validation for file size
-    idImageInput.addEventListener('change', function() {
-        const file = this.files[0];
-        if (file && file.size > 5 * 1024 * 1024) {
-            alert('File size exceeds 5MB limit. Please choose a smaller file.');
-            this.value = '';
-            filePreview.classList.add('hidden');
-        }
-    });
-
-    // Initial validation
-    validateVerificationSection();
-});
-        </script>
-
-        <script>
-            // Enhanced ID verification functionality
-document.addEventListener('DOMContentLoaded', function() {
-    // ID Verification Method Toggle
     const verificationMethodRadios = document.querySelectorAll('input[name="verification_method"]');
     const idUploadSection = document.getElementById('idUploadSection');
     const manualVerificationSection = document.getElementById('manualVerificationSection');
@@ -2510,6 +2510,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewImage = document.getElementById('previewImage');
     const verificationConsent = document.querySelector('input[name="verification_consent"]');
     const submitButton = document.getElementById('submitButton');
+
+    // Validate verification section
+    function validateVerificationSection() {
+        const selectedMethod = document.querySelector('input[name="verification_method"]:checked');
+        if (!selectedMethod) return true;
+
+        let isValid = true;
+
+        if (selectedMethod.value === 'id_upload') {
+            const hasFile = idImageInput && idImageInput.files.length > 0;
+            const hasConsent = verificationConsent && verificationConsent.checked;
+            isValid = hasFile && hasConsent;
+        }
+
+        return isValid;
+    }
 
     // Toggle verification sections based on selection
     verificationMethodRadios.forEach(radio => {
@@ -2529,7 +2545,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     verificationConsent.required = false;
                 }
             }
-            validateVerificationSection();
+            
+            // Re-validate the entire form
+            if (window.checkSecondFormCompletion) {
+                checkSecondFormCompletion();
+            }
         });
     });
 
@@ -2556,36 +2576,21 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 filePreview.classList.add('hidden');
             }
-            validateVerificationSection();
+            
+            // Re-validate the entire form
+            if (window.checkSecondFormCompletion) {
+                checkSecondFormCompletion();
+            }
         });
     }
 
     // Consent checkbox validation
     if (verificationConsent) {
-        verificationConsent.addEventListener('change', validateVerificationSection);
-    }
-
-    // Validate verification section
-    function validateVerificationSection() {
-        const selectedMethod = document.querySelector('input[name="verification_method"]:checked');
-        if (!selectedMethod) return;
-
-        let isValid = true;
-
-        if (selectedMethod.value === 'id_upload') {
-            const hasFile = idImageInput && idImageInput.files.length > 0;
-            const hasConsent = verificationConsent && verificationConsent.checked;
-            isValid = hasFile && hasConsent;
-        }
-
-        // Update submit button state
-        if (submitButton) {
-            const allFilled = Array.from(document.querySelectorAll('#secondRegisterForm [required]')).every(
-                field => field.value.trim()
-            );
-            
-            submitButton.disabled = !allFilled || !isValid;
-        }
+        verificationConsent.addEventListener('change', function() {
+            if (window.checkSecondFormCompletion) {
+                checkSecondFormCompletion();
+            }
+        });
     }
 
     // Add validation for file size
@@ -2596,7 +2601,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('File size exceeds 5MB limit. Please choose a smaller file.');
                 this.value = '';
                 filePreview.classList.add('hidden');
-                validateVerificationSection();
+                if (window.checkSecondFormCompletion) {
+                    checkSecondFormCompletion();
+                }
             }
         });
     }
@@ -2625,6 +2632,19 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         });
     }
+    
+    // Make validateVerificationSection function available globally
+    window.validateVerificationSection = validateVerificationSection;
+    
+    // Also listen for changes in verification method
+    const verificationMethodRadios2 = document.querySelectorAll('input[name="verification_method"]');
+    verificationMethodRadios2.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (window.checkSecondFormCompletion) {
+                checkSecondFormCompletion();
+            }
+        });
+    });
 });
         </script>
         
