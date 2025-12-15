@@ -324,41 +324,6 @@ if (isset($_SESSION['user']['id'])) {
         line-height: 1.2;
     }
 
-    /* Search bar styles */
-    .search-container {
-        position: relative;
-    }
-
-    .search-input {
-        height: 40px;
-        width: 256px;
-        border-radius: 20px;
-        padding-left: 2rem;
-        padding-right: 2.5rem;
-        border: 1px solid #d1d5db;
-        outline: none;
-        transition: all 0.3s ease;
-    }
-
-    .search-input:focus {
-        border-color: #3b82f6;
-        ring: 2px;
-        ring-color: rgba(59, 130, 246, 0.2);
-    }
-
-    .search-icon {
-        position: absolute;
-        right: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #9ca3af;
-        transition: color 0.3s ease;
-    }
-
-    .search-icon:hover {
-        color: #6b7280;
-    }
-
     /* Profile section styles */
     .profile-section {
         display: flex;
@@ -1343,6 +1308,9 @@ if (isset($_SESSION['user']['id'])) {
                             <option value="Upper Luz">Upper Luz</option>
                             <option value="Luz Proper">Luz Proper</option>
                             <option value="Luz Heights">Luz Heights</option>
+                            <option value="Panganiban">Panganiban</option>
+                            <option value="Balagtas">Balagtas</option>
+                            <option value="Carbon">Carbon</option>
                             <!-- Add more sitios as needed for Barangay Luz -->
                         </select>
                     </div>

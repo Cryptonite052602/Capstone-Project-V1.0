@@ -892,7 +892,18 @@ if (isset($_GET['export'])) {
         } elseif ($exportType === 'pdf') {
             require_once __DIR__ . '/../vendor/autoload.php';
             
-            $mpdf = new \Mpdf\Mpdf();
+            try {
+                if (!class_exists('Mpdf\Mpdf')) {
+                    throw new Exception('mPDF class not found. Library may not be installed.');
+                }
+                $mpdf = new \Mpdf\Mpdf();
+            } catch (\Throwable $e) {
+                header('Content-Type: text/plain');
+                http_response_code(500);
+                echo 'Error: mPDF library is not properly installed. Please contact your administrator. Details: ' . $e->getMessage();
+                error_log('mPDF Error: ' . $e->getMessage());
+                exit;
+            }
             $mpdf->SetTitle('Appointments Report');
             
             $html = '
@@ -2063,7 +2074,7 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
         .date-status-display {
             position: absolute;
             top: 8px;
-            left: 8px;
+            right: 8px;
             font-size: 10px;
             font-weight: bold;
             padding: 2px 6px;
@@ -2075,6 +2086,21 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
         .date-status-display.occupied {
             background: rgba(255, 193, 7, 0.2);
             color: #856404;
+        }
+        
+        /* NEW: Set Date indicator - position at right side upper */
+        .set-date-indicator {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            font-size: 9px;
+            font-weight: bold;
+            padding: 2px 4px;
+            border-radius: 3px;
+            background: rgba(255, 193, 7, 0.9);
+            color: #856404;
+            z-index: 5;
+            white-space: nowrap;
         }
         
         /* Modal buttons */
@@ -2408,6 +2434,45 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
 
         .btn-blue:active {
             transform: translateY(-1px) !important;
+        }
+
+        /* New Approve and Decline Button Styles with White Background */
+        .btn-approve-white {
+            background: white !important;
+            color: #3C96E1 !important;
+            border-radius: 9999px !important;
+            padding: 10px 20px !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            transition: all 0.3s ease !important;
+            border: 2px solid #3C96E1 !important;
+            box-shadow: 0 2px 4px rgba(60, 150, 225, 0.1) !important;
+        }
+
+        .btn-approve-white:hover {
+            background: #3C96E1 !important;
+            color: white !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(60, 150, 225, 0.3) !important;
+        }
+
+        .btn-decline-white {
+            background: white !important;
+            color: #EF4444 !important;
+            border-radius: 9999px !important;
+            padding: 10px 20px !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            transition: all 0.3s ease !important;
+            border: 2px solid #EF4444 !important;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1) !important;
+        }
+
+        .btn-decline-white:hover {
+            background: #EF4444 !important;
+            color: white !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3) !important;
         }
 
         /* Success button in blue theme */
@@ -2753,6 +2818,23 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
         .disabled-action:hover {
             transform: none !important;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        /* Horizontal layout for user details */
+        .horizontal-user-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        
+        .horizontal-user-details .detail-section {
+            margin-bottom: 0;
+        }
+        
+        @media (max-width: 1024px) {
+            .horizontal-user-details {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -4149,9 +4231,9 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
     </div>
 </div>
 
-<!-- User Details Modal - Desktop Size -->
+<!-- User Details Modal - Horizontal Layout -->
 <div id="userDetailsModal" class="modal-overlay hidden">
-    <div class="modal-container modal-desktop" style="max-height: 90vh;">
+    <div class="modal-container modal-wide-desktop" style="max-height: 90vh;">
         <div class="modal-header">
             <div class="flex justify-between items-center">
                 <h2 class="text-xl font-semibold text-gray-800">Patient Registration Details</h2>
@@ -4162,197 +4244,168 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
         </div>
 
         <div class="modal-body" style="overflow-y: auto;">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Left Column -->
-                <div class="space-y-6">
-                    <!-- Personal Information -->
-                    <div class="detail-section">
-                        <h4 class="text-lg font-semibold text-blue-600 mb-4">
-                            <i class="fas fa-user mr-2"></i> Personal Information
-                        </h4>
-                        <div class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="detail-label">Full Name:</span>
-                                    <p class="detail-value" id="userFullName">—</p>
-                                </div>
-                                <div>
-                                    <span class="detail-label">Username:</span>
-                                    <p class="detail-value" id="userUsername">—</p>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="detail-label">Email:</span>
-                                    <p class="detail-value" id="userEmail">—</p>
-                                </div>
-                                <div>
-                                    <span class="detail-label">Contact Number:</span>
-                                    <p class="detail-value" id="userContact">—</p>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="detail-label">Gender:</span>
-                                    <p class="detail-value" id="userGender">—</p>
-                                </div>
-                                <div>
-                                    <span class="detail-label">Age:</span>
-                                    <p class="detail-value" id="userAge">—</p>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="detail-label">Civil Status:</span>
-                                    <p class="detail-value" id="userCivilStatus">—</p>
-                                </div>
-                                <div>
-                                    <span class="detail-label">Occupation:</span>
-                                    <p class="detail-value" id="userOccupation">—</p>
-                                </div>
-                            </div>
+            <div class="horizontal-user-details">
+                <!-- Personal Information -->
+                <div class="detail-section">
+                    <h4 class="text-lg font-semibold text-blue-600 mb-4">
+                        <i class="fas fa-user mr-2"></i> Personal Information
+                    </h4>
+                    <div class="space-y-4">
+                        <div class="detail-item">
+                            <span class="detail-label">Full Name:</span>
+                            <span class="detail-value" id="userFullName">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Username:</span>
+                            <span class="detail-value" id="userUsername">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Email:</span>
+                            <span class="detail-value" id="userEmail">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Contact Number:</span>
+                            <span class="detail-value" id="userContact">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Gender:</span>
+                            <span class="detail-value" id="userGender">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Age:</span>
+                            <span class="detail-value" id="userAge">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Civil Status:</span>
+                            <span class="detail-value" id="userCivilStatus">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Occupation:</span>
+                            <span class="detail-value" id="userOccupation">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Address & Account Information -->
+                <div class="detail-section">
+                    <h4 class="text-lg font-semibold text-green-600 mb-4">
+                        <i class="fas fa-map-marker-alt mr-2"></i> Address Information
+                    </h4>
+                    <div class="space-y-4 mb-6">
+                        <div class="detail-item">
+                            <span class="detail-label">Complete Address:</span>
+                            <span class="detail-value" id="userAddress">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Sitio:</span>
+                            <span class="detail-value" id="userSitio">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Date of Birth:</span>
+                            <span class="detail-value" id="userDateOfBirth">—</span>
                         </div>
                     </div>
 
-                    <!-- Address Information -->
-                    <div class="detail-section">
-                        <h4 class="text-lg font-semibold text-green-600 mb-4">
-                            <i class="fas fa-map-marker-alt mr-2"></i> Address Information
-                        </h4>
-                        <div class="space-y-4">
-                            <div>
-                                <span class="detail-label">Complete Address:</span>
-                                <p class="detail-value" id="userAddress">—</p>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="detail-label">Sitio:</span>
-                                    <p class="detail-value" id="userSitio">—</p>
-                                </div>
-                                <div>
-                                    <span class="detail-label">Date of Birth:</span>
-                                    <p class="detail-value" id="userDateOfBirth">—</p>
-                                </div>
-                            </div>
+                    <h4 class="text-lg font-semibold text-red-600 mb-4 mt-6">
+                        <i class="fas fa-user-circle mr-2"></i> Account Information
+                    </h4>
+                    <div class="space-y-4">
+                        <div class="detail-item">
+                            <span class="detail-label">Account Status:</span>
+                            <span class="detail-value" id="userStatus">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Approved:</span>
+                            <span class="detail-value" id="userApproved">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">User Role:</span>
+                            <span class="detail-value" id="userRole">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Verification Method:</span>
+                            <span class="detail-value" id="userVerificationMethod">—</span>
+                        </div>
+                        <div class="detail-item" id="uniqueNumberSection" style="display: none;">
+                            <span class="detail-label">Patient ID:</span>
+                            <span class="detail-value text-blue-600 font-semibold" id="userUniqueNumber">—</span>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Account Information -->
-                    <div class="detail-section">
-                        <h4 class="text-lg font-semibold text-red-600 mb-4">
-                            <i class="fas fa-user-circle mr-2"></i> Account Information
-                        </h4>
-                        <div class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="detail-label">Account Status:</span>
-                                    <p class="detail-value" id="userStatus">—</p>
+                <!-- ID Verification -->
+                <div class="detail-section">
+                    <h4 class="text-lg font-semibold text-purple-600 mb-4">
+                        <i class="fas fa-id-card mr-2"></i> ID Verification
+                    </h4>
+                    <div class="space-y-4">
+                        <div class="detail-item">
+                            <span class="detail-label">ID Type:</span>
+                            <span class="detail-value" id="userIdType">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">ID Status:</span>
+                            <span class="detail-value">
+                                <span id="userIdValidationStatus" class="px-2 py-1 text-xs rounded-full" style="background: #f3f4f6; color: #6b7280;">—</span>
+                            </span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">ID Verified:</span>
+                            <span class="detail-value" id="userIdVerified">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Verification Consent:</span>
+                            <span class="detail-value" id="userVerificationConsent">—</span>
+                        </div>
+                        
+                        <!-- ID Image Preview -->
+                        <div class="mt-4">
+                            <h5 class="text-sm font-medium text-gray-700 mb-2">ID Document</h5>
+                            <div id="idImageSection" class="hidden">
+                                <div class="id-preview-container mb-3">
+                                    <img id="userIdImage" src="" alt="ID Image" class="w-full h-auto">
                                 </div>
-                                <div>
-                                    <span class="detail-label">Approved:</span>
-                                    <p class="detail-value" id="userApproved">—</p>
+                                <div class="flex space-x-3">
+                                    <a id="userIdImageLink" href="#" target="_blank" class="btn-blue text-sm">
+                                        <i class="fas fa-external-link-alt mr-2"></i> View Original
+                                    </a>
+                                    <button onclick="openImageModal()" class="btn-blue text-sm">
+                                        <i class="fas fa-search mr-2"></i> Zoom Preview
+                                    </button>
                                 </div>
                             </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="detail-label">User Role:</span>
-                                    <p class="detail-value" id="userRole">—</p>
-                                </div>
-                                <div>
-                                    <span class="detail-label">Verification Method:</span>
-                                    <p class="detail-value" id="userVerificationMethod">—</p>
-                                </div>
-                            </div>
-                            <div id="uniqueNumberSection" style="display: none;">
-                                <span class="detail-label">Patient ID:</span>
-                                <p class="detail-value text-blue-600 font-semibold text-lg" id="userUniqueNumber">—</p>
+                            <div id="noIdImageSection" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <p class="text-yellow-700 text-sm">
+                                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                                    No ID image uploaded
+                                </p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Right Column -->
-                <div class="space-y-6">
-                    <!-- ID Verification -->
-                    <div class="detail-section">
-                        <h4 class="text-lg font-semibold text-purple-600 mb-4">
-                            <i class="fas fa-id-card mr-2"></i> ID Verification
-                        </h4>
-                        <div class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="detail-label">ID Type:</span>
-                                    <p class="detail-value" id="userIdType">—</p>
-                                </div>
-                                <div>
-                                    <span class="detail-label">ID Status:</span>
-                                    <p class="detail-value">
-                                        <span id="userIdValidationStatus" class="px-2 py-1 text-xs rounded-full" style="background: #f3f4f6; color: #6b7280;">—</span>
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="detail-label">ID Verified:</span>
-                                    <p class="detail-value" id="userIdVerified">—</p>
-                                </div>
-                                <div>
-                                    <span class="detail-label">Verification Consent:</span>
-                                    <p class="detail-value" id="userVerificationConsent">—</p>
-                                </div>
-                            </div>
-                            
-                            <!-- ID Image Preview -->
-                            <div class="mt-4">
-                                <h5 class="text-sm font-medium text-gray-700 mb-2">ID Document</h5>
-                                <div id="idImageSection" class="hidden">
-                                    <div class="id-preview-container mb-3">
-                                        <img id="userIdImage" src="" alt="ID Image" class="w-full h-auto">
-                                    </div>
-                                    <div class="flex space-x-3">
-                                        <a id="userIdImageLink" href="#" target="_blank" class="btn-blue text-sm">
-                                            <i class="fas fa-external-link-alt mr-2"></i> View Original
-                                        </a>
-                                        <button onclick="openImageModal()" class="btn-blue text-sm">
-                                            <i class="fas fa-search mr-2"></i> Zoom Preview
-                                        </button>
-                                    </div>
-                                </div>
-                                <div id="noIdImageSection" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                    <p class="text-yellow-700 text-sm">
-                                        <i class="fas fa-exclamation-triangle mr-2"></i>
-                                        No ID image uploaded
-                                    </p>
-                                </div>
-                            </div>
+                <!-- Registration Timeline & Actions -->
+                <div class="detail-section">
+                    <h4 class="text-lg font-semibold text-indigo-600 mb-4">
+                        <i class="fas fa-history mr-2"></i> Registration Timeline
+                    </h4>
+                    <div class="space-y-4 mb-6">
+                        <div class="detail-item">
+                            <span class="detail-label">Registered Date:</span>
+                            <span class="detail-value" id="userRegisteredDate">—</span>
                         </div>
-                    </div>
-
-                    <!-- Registration Timeline -->
-                    <div class="detail-section">
-                        <h4 class="text-lg font-semibold text-indigo-600 mb-4">
-                            <i class="fas fa-history mr-2"></i> Registration Timeline
-                        </h4>
-                        <div class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="detail-label">Registered Date:</span>
-                                    <p class="detail-value" id="userRegisteredDate">—</p>
-                                </div>
-                                <div>
-                                    <span class="detail-label">Last Updated:</span>
-                                    <p class="detail-value" id="userUpdatedDate">—</p>
-                                </div>
-                            </div>
-                            <div>
-                                <span class="detail-label">Verified At:</span>
-                                <p class="detail-value" id="userVerifiedAt">—</p>
-                            </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Last Updated:</span>
+                            <span class="detail-value" id="userUpdatedDate">—</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Verified At:</span>
+                            <span class="detail-value" id="userVerifiedAt">—</span>
                         </div>
                     </div>
 
                     <!-- Verification Notes -->
-                    <div id="verificationNotesSection" class="detail-section hidden">
+                    <div id="verificationNotesSection" class="hidden mb-6">
                         <h4 class="text-lg font-semibold text-yellow-600 mb-4">
                             <i class="fas fa-sticky-note mr-2"></i> Verification Notes
                         </h4>
@@ -4362,31 +4415,24 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
                     </div>
 
                     <!-- Action Buttons -->
-                    <div class="detail-section">
-                        <h4 class="text-lg font-semibold text-gray-600 mb-4">
-                            <i class="fas fa-cogs mr-2"></i> Actions
-                        </h4>
-                        <div class="grid grid-cols-2 gap-4">
-                            <button onclick="openApproveConfirmationModal()" 
-                                    class="btn-success-blue">
-                                <i class="fas fa-check mr-2"></i> Approve Registration
-                            </button>
-                            <button onclick="openDeclineModalFromDetails()" 
-                                    class="btn-danger-blue">
-                                <i class="fas fa-times mr-2"></i> Decline Registration
-                            </button>
-                        </div>
-                        <div class="mt-4">
-                            <button onclick="closeUserDetailsModal()" 
-                                    class="btn-blue w-full">
-                                <i class="fas fa-times mr-2"></i> Close Details
-                            </button>
-                        </div>
+                    <h4 class="text-lg font-semibold text-gray-600 mb-4">
+                        <i class="fas fa-cogs mr-2"></i> Actions
+                    </h4>
+                    <div class="grid grid-cols-1 gap-4">
+                        <button onclick="openApproveConfirmationModal()" 
+                                class="btn-approve-white w-full">
+                            <i class="fas fa-check mr-2"></i> Approve Registration
+                        </button>
+                        <button onclick="openDeclineModalFromDetails()" 
+                                class="btn-decline-white w-full">
+                            <i class="fas fa-times mr-2"></i> Decline Registration
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <!-- Cancelled Appointment Details Modal - Wide Desktop -->
