@@ -250,7 +250,9 @@ try {
                         <option value="Upper Luz" ' . (($patient['display_sitio'] ?? '') == 'Upper Luz' ? 'selected' : '') . '>Upper Luz</option>
                         <option value="Luz Proper" ' . (($patient['display_sitio'] ?? '') == 'Luz Proper' ? 'selected' : '') . '>Luz Proper</option>
                         <option value="Luz Heights" ' . (($patient['display_sitio'] ?? '') == 'Luz Heights' ? 'selected' : '') . '>Luz Heights</option>
-                        <option value="Pangpang" ' . (($patient['display_sitio'] ?? '') == 'Pangpang' ? 'selected' : '') . '>Pangpang</option>
+                        <option value="Panganiban" ' . (($patient['display_sitio'] ?? '') == 'Panganiban' ? 'selected' : '') . '>Panganiban</option>
+                        <option value="Balagtas" ' . (($patient['display_sitio'] ?? '') == 'Balagtas' ? 'selected' : '') . '>Balagtas</option>
+                        <option value="Carbon" ' . (($patient['display_sitio'] ?? '') == 'Carbon' ? 'selected' : '') . '>Carbon</option>
                         <!-- Add other Luz sitios as needed -->
                     </select>
                 </div>

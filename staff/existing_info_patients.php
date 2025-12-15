@@ -1656,7 +1656,7 @@ if (!empty($selectedPatientId)) {
                                 
                                 <input type="text" id="search" name="search" value="<?= htmlspecialchars($searchTerm) ?>" 
                                     class="search-input" 
-                                    placeholder="<?= $searchBy === 'unique_number' ? 'Enter unique number...' : 'Search patients by name...' ?>">
+                                    placeholder="<?= $searchBy === 'unique_number' ? 'Enter Patients Name...' : 'Search patients by name...' ?>">
                             </div>
                         </div>
                         
@@ -2292,21 +2292,14 @@ if (!empty($selectedPatientId)) {
                                 <label for="modal_sitio" class="form-label-modal">Sitio</label>
                                 <select id="modal_sitio" name="sitio" class="form-select-modal modal-form-field">
                                     <option value="">Select Sitio</option>
-                                    <option value="Proper Toong">Proper Toong</option>
-                                    <option value="Lower Toong">Lower Toong</option>
-                                    <option value="Buacao">Buacao</option>
-                                    <option value="Angay-Angay">Angay-Angay</option>
-                                    <option value="Badiang">Badiang</option>
-                                    <option value="Candahat">Candahat</option>
-                                    <option value="NapNapan">NapNapan</option>
-                                    <option value="Buyo">Buyo</option>
-                                    <option value="Kalumboyan">Kalumboyan</option>
-                                    <option value="Bugna">Bugna</option>
-                                    <option value="Kaangking">Kaangking</option>
-                                    <option value="Caolong">Caolong</option>
-                                    <option value="Acasia">Acasia</option>
-                                    <option value="Buad">Buad</option>
-                                    <option value="Pangpang">Pangpang</option>
+                            <option value="Proper Luz">Proper Luz</option>
+                            <option value="Lower Luz">Lower Luz</option>
+                            <option value="Upper Luz">Upper Luz</option>
+                            <option value="Luz Proper">Luz Proper</option>
+                            <option value="Luz Heights">Luz Heights</option>
+                            <option value="Panganiban">Panganiban</option>
+                            <option value="Balagtas">Balagtas</option>
+                            <option value="Carbon">Carbon</option>
                                 </select>
                             </div>
                             <?php endif; ?>
