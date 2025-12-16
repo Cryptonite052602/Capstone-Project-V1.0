@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 if (isLoggedIn()) {
@@ -220,7 +219,7 @@ function showGlassModal($type, $title, $description = '') {
     $redirectUrl = $type === 'success' ? '../index.php' : 'javascript:history.back()';
     
     if ($type === 'success') {
-        $icon = '<svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        $icon = '<svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>';
         $color = 'text-green-400';

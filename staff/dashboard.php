@@ -119,213 +119,234 @@ function sendAccountStatusEmail($email, $status, $message = '', $uniqueNumber = 
         $mail->Port       = 587;
 
         // Recipients
-        $mail->setFrom('cabanagarchiel@gmail.com', 'Community Health Tracker');
+        $mail->setFrom('cabanagarchiel@gmail.com', 'Barangay Luz Health Center');
         $mail->addAddress($email);
 
         // Content
         $mail->isHTML(true);
         
         if ($status === 'approved') {
-            $mail->Subject = 'Account Approval - Community Health Tracker';
-            $mail->Body    = '
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="utf-8">
-                    <style>
-                        body { 
-                            font-family: Arial, sans-serif; 
-                            line-height: 1.6;
-                            color: #333;
-                            max-width: 600px;
-                            margin: 0 auto;
-                            padding: 20px;
-                        }
-                        .header {
-                            text-align: center;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            padding: 30px;
-                            border-radius: 10px 10px 0 0;
-                            color: white;
-                        }
-                        .logo {
-                            font-size: 28px;
-                            font-weight: bold;
-                            margin-bottom: 10px;
-                        }
-                        .content {
-                            background: #f9f9f9;
-                            padding: 30px;
-                            border-radius: 0 0 10px 10px;
-                        }
-                        .unique-number {
-                            background: #e8f5e8;
-                            border: 2px solid #4CAF50;
-                            padding: 15px;
-                            border-radius: 8px;
-                            text-align: center;
-                            margin: 20px 0;
-                            font-size: 20px;
-                            font-weight: bold;
-                            color: #2e7d32;
-                        }
-                        .footer {
-                            text-align: center;
-                            margin-top: 30px;
-                            padding-top: 20px;
-                            border-top: 1px solid #ddd;
-                            color: #666;
-                            font-size: 12px;
-                        }
-                        .button {
-                            display: inline-block;
-                            background: #4CAF50;
-                            color: white;
-                            padding: 12px 24px;
-                            text-decoration: none;
-                            border-radius: 5px;
-                            margin: 10px 0;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <div class="logo">🏥 Community Health Tracker</div>
-                        <h1>Account Approved</h1>
-                    </div>
-                    <div class="content">
-                        <p>Dear Valued Patient,</p>
-                        
-                        <p>We are pleased to inform you that your account registration with <strong>Community Health Tracker</strong> has been successfully approved by our administrative team.</p>
-                        
-                        <div class="unique-number">
-                            Your Unique Identification Number:<br>
-                            <strong>' . $uniqueNumber . '</strong>
-                        </div>
-                        
-                        <p>Please keep this number secure as it will be used to identify you in our healthcare system for all future appointments and medical records.</p>
-                        
-                        <p>With your approved account, you can now:</p>
-                        <ul>
-                            <li>Schedule appointments with healthcare providers</li>
-                            <li>Access your medical history and records</li>
-                            <li>Receive personalized health recommendations</li>
-                            <li>Communicate securely with healthcare staff</li>
-                        </ul>
-                        
-                        <p style="text-align: center;">
-                            <a href="https://your-health-portal.com/login" class="button">Access Your Account</a>
-                        </p>
-                        
-                        <p>If you have any questions or require assistance, please don\'t hesitate to contact our support team.</p>
-                        
-                        <p>Thank you for choosing Community Health Tracker for your healthcare needs.</p>
-                        
-                        <p>Best regards,<br>
-                        <strong>The Community Health Tracker Team</strong></p>
-                    </div>
-                    <div class="footer">
-                        <p>This is an automated message. Please do not reply to this email.</p>
-                        <p>&copy; ' . date('Y') . ' Community Health Tracker. All rights reserved.</p>
-                    </div>
-                </body>
-                </html>
-            ';
-        } else {
-            $mail->Subject = 'Account Registration Update - Community Health Tracker';
-            $mail->Body    = '
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="utf-8">
-                    <style>
-                        body { 
-                            font-family: Arial, sans-serif; 
-                            line-height: 1.6;
-                            color: #333;
-                            max-width: 600px;
-                            margin: 0 auto;
-                            padding: 20px;
-                        }
-                        .header {
-                            text-align: center;
-                            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
-                            padding: 30px;
-                            border-radius: 10px 10px 0 0;
-                            color: white;
-                        }
-                        .logo {
-                            font-size: 28px;
-                            font-weight: bold;
-                            margin-bottom: 10px;
-                        }
-                        .content {
-                            background: #f9f9f9;
-                            padding: 30px;
-                            border-radius: 0 0 10px 10px;
-                        }
-                        .reason-box {
-                            background: #ffeaea;
-                            border: 2px solid #ff6b6b;
-                            padding: 15px;
-                            border-radius: 8px;
-                            margin: 20px 0;
-                        }
-                        .footer {
-                            text-align: center;
-                            margin-top: 30px;
-                            padding-top: 20px;
-                            border-top: 1px solid #ddd;
-                            color: #666;
-                            font-size: 12px;
-                        }
-                        .contact-info {
-                            background: #e3f2fd;
-                            padding: 15px;
-                            border-radius: 8px;
-                            margin: 20px 0;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <div class="logo">🏥 Community Health Tracker</div>
-                        <h1>Account Registration Update</h1>
-                    </div>
-                    <div class="content">
-                        <p>Dear Applicant,</p>
-                        
-                        <p>Thank you for your interest in registering with <strong>Community Health Tracker</strong>. After careful review of your application, we regret to inform you that we are unable to approve your account registration at this time.</p>
-                        
-                        <div class="reason-box">
-                            <strong>Reason for Declination:</strong><br>
-                            ' . htmlspecialchars($message) . '
-                        </div>
-                        
-                        <p>This decision may be due to various factors including incomplete information, documentation requirements, or current system capacity limitations.</p>
-                        
-                        <div class="contact-info">
-                            <strong>Need Assistance?</strong><br>
-                            If you believe this decision was made in error, or if you would like to provide additional information for reconsideration, please contact our support team:<br>
-                            📞 Support Hotline: (02) 8-123-4567<br>
-                            ✉️ Email: support@communityhealthtracker.ph
-                        </div>
-                        
-                        <p>We appreciate your understanding and encourage you to reach out if you have any questions about this decision or if you wish to reapply in the future.</p>
-                        
-                        <p>Thank you for considering Community Health Tracker for your healthcare needs.</p>
-                        
-                        <p>Sincerely,<br>
-                        <strong>The Community Health Tracker Team</strong></p>
-                    </div>
-                    <div class="footer">
-                        <p>This is an automated message. Please do not reply to this email.</p>
-                        <p>&copy; ' . date('Y') . ' Community Health Tracker. All rights reserved.</p>
-                    </div>
-                </body>
-                </html>
-            ';
-        }
+
+$mail->Subject = 'Barangay Luz Health Monitoring and Tracking System';
+$mail->Body = '
+<!DOCTYPE html>
+<html>
+<body style="margin:0; padding:0; background-color:#ffffff; font-family: Arial, Helvetica, sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;">
+<tr>
+<td align="center">
+
+<table width="600" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb; border-radius:10px; overflow:hidden;">
+
+<!-- Header -->
+<tr>
+<td style="background-color:#2563eb; padding:30px; text-align:center;">
+    <div style="font-size:26px; font-weight:bold; color:#ffffff;">
+        <img src="/asssets/images/Luz.jpg" style="width: 100px; height: auto; margin-right: 10px;">
+            Barangay Luz Health Monitoring and Tracking
+    </div>
+    <div style="margin-top:8px; font-size:16px; color:#dbeafe;">
+        Account Approval Notice
+    </div>
+</td>
+</tr>
+
+<!-- Content -->
+<tr>
+<td style="padding:30px; color:#1f2937; font-size:15px; line-height:1.7;">
+
+<p>Hello, </p>
+
+<p>
+We are happy to inform you that your registration has been
+<strong style="color:#2563eb;">successfully approved</strong>.
+Your account is now active and ready for use.
+</p>
+
+<!-- Unique Number -->
+<div style="
+    background-color:#eff6ff;
+    border:1px solid #3b82f6;
+    border-radius:8px;
+    padding:16px;
+    text-align:center;
+    margin:25px 0;
+">
+    <div style="font-size:13px; color:#2563eb; margin-bottom:6px;">
+        Your Unique Identification Number
+    </div>
+    <div style="font-size:22px; font-weight:bold; letter-spacing:1px; color:#1e3a8a;">
+        ' . $uniqueNumber . '
+    </div>
+</div>
+
+<p>
+Please keep this number secure. It will be used for appointments,
+medical records, and identity verification.
+</p>
+
+<ul style="padding-left:18px;">
+    <li>Book healthcare appointments</li>
+    <li>View medical history</li>
+    <li>Receive health updates</li>
+</ul>
+
+<!-- Button -->
+<div style="text-align:center; margin-top:30px;">
+    <a href="https://your-health-portal.com/login"
+       style="
+        background-color:#3b82f6;
+        color:#ffffff;
+        text-decoration:none;
+        padding:14px 28px;
+        border-radius:6px;
+        font-size:15px;
+        display:inline-block;
+       ">
+        Access Your Account
+    </a>
+</div>
+
+<p style="margin-top:30px;">
+Thank you for trusting <strong>Barangay Luz Health Monitoring and Tracking Platform</strong> with your healthcare needs.
+</p>
+
+<p>
+Warm regards,<br>
+<strong>The Barangay Luz Health Center Team</strong>
+</p>
+
+</td>
+</tr>
+
+<!-- Footer -->
+<tr>
+<td style="
+    background-color:#f8fafc;
+    padding:20px;
+    text-align:center;
+    font-size:12px;
+    color:#6b7280;
+    border-top:1px solid #e5e7eb;
+">
+This is an automated message. Please do not reply.<br>
+© ' . date('Y') . ' Barangay Luz Health Monitoring and Tracking System
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>
+';
+}
+ else {
+
+$mail->Subject = 'Account Registration Update – Barangay Luz Health Monitoring and Tracking System';
+$mail->Body = '
+<!DOCTYPE html>
+<html>
+<body style="margin:0; padding:0; background-color:#ffffff; font-family: Arial, Helvetica, sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td align="center">
+
+<table width="600" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb; border-radius:10px;">
+
+<!-- Header -->
+<tr>
+<td style="background-color:#3b82f6; padding:30px; text-align:center;">
+    <div style="font-size:26px; font-weight:bold; color:#ffffff;">
+        🏥 Barangay Luz Health Monitoring and Tracking System
+    </div>
+    <div style="margin-top:8px; font-size:16px; color:#dbeafe;">
+        Registration Status Update
+    </div>
+</td>
+</tr>
+
+<!-- Content -->
+<tr>
+<td style="padding:30px; color:#1f2937; font-size:15px; line-height:1.7;">
+
+<p>Hello,</p>
+
+<p>
+Thank you for submitting your registration. After careful review,
+we are unable to approve your account at this time.
+</p>
+
+<!-- Reason -->
+<div style="
+    background-color:#f8fafc;
+    border-left:4px solid #3b82f6;
+    padding:15px;
+    margin:20px 0;
+">
+    <strong>Reason Provided:</strong><br>
+    ' . htmlspecialchars($message) . '
+</div>
+
+<p>
+You may reapply or contact our support team if you believe this decision
+requires further review.
+</p>
+
+<div style="
+    background-color:#eff6ff;
+    padding:15px;
+    border-radius:8px;
+    margin:25px 0;
+">
+    <strong>Support Contact</strong><br>
+    📞 (02) 8-123-4567<br>
+    ✉️ support@communityhealthtracker.ph
+</div>
+
+<p>
+We appreciate your understanding and interest in our services.
+</p>
+
+<p>
+Sincerely,<br>
+<strong>The Barangay Luz Health Monitoring and Tracking System Team</strong>
+</p>
+
+</td>
+</tr>
+
+<!-- Footer -->
+<tr>
+<td style="
+    background-color:#f8fafc;
+    padding:20px;
+    text-align:center;
+    font-size:12px;
+    color:#6b7280;
+    border-top:1px solid #e5e7eb;
+">
+This is an automated message. Please do not reply.<br>
+© ' . date('Y') . ' Barangay Luz Health Monitoring and Tracking System
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>
+';
+}
+
 
         $mail->send();
         return true;
@@ -2800,15 +2821,6 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
             }
         }
         
-        /* Table row status colors */
-        .status-row-missed {
-            background-color: #fef3c7 !important;
-        }
-        
-        .status-row-missed:hover {
-            background-color: #fde68a !important;
-        }
-        
         /* Disabled appointment actions */
         .disabled-action {
             opacity: 0.5;
@@ -3019,12 +3031,7 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
                         <span class="count-badge"><?= count($cancelledAppointments) ?></span>
                     </button>
                     
-                    <button class="appointment-tab-button <?= $activeAppointmentTab === 'missed' ? 'active' : '' ?>" 
-                            id="missed-tab" data-tabs-target="#missed" type="button" role="tab" aria-controls="missed" aria-selected="<?= $activeAppointmentTab === 'missed' ? 'true' : 'false' ?>">
-                        <i class="fas fa-user-clock"></i>
-                        Missed
-                        <span class="count-badge"><?= count($missedAppointments) ?></span>
-                    </button>
+                    
                     
                     <button class="appointment-tab-button <?= $activeAppointmentTab === 'all' ? 'active' : '' ?>" 
                             id="all-tab" data-tabs-target="#all" type="button" role="tab" aria-controls="all" aria-selected="<?= $activeAppointmentTab === 'all' ? 'true' : 'false' ?>">
@@ -3442,7 +3449,45 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
                                         <tr class="<?= $isPast ? 'status-row-missed' : '' ?>">
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($appointment['full_name']) ?></div>
-                                                <div class="text-sm text-gray-500">ID: <?= htmlspecialchars($appointment['unique_number']) ?></div>
+                                                <div class="flex items-center space-x-3">
+    <!-- Label -->
+    <span class="text-1xl text-gray-500 font-medium">
+        Unique Number:
+    </span>
+
+    <!-- Value Container -->
+    <div class="flex items-center bg-gray-500 px-4 py-2 rounded-lg text-white text-1xl">
+        
+        <!-- Copy Button -->
+        <button
+            type="button"
+            onclick="copyToClipboard('<?= htmlspecialchars($appointment['unique_number']) ?>')"
+            class="mr-2 hover:text-gray-200 focus:outline-none"
+            title="Copy to clipboard"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 16h8m-8-4h8m-2-6H6a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V8l-4-4z"/>
+            </svg>
+        </button>
+
+        <!-- Unique Number Text -->
+        <span class="text-center">
+            <?= htmlspecialchars($appointment['unique_number']) ?>
+        </span>
+    </div>
+</div>
+
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        // Optional feedback
+        alert('Unique Number copied!');
+    });
+}
+</script>
+
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="text-sm text-gray-900"><?= htmlspecialchars($appointment['contact']) ?></div>

@@ -29,9 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <script src="https://cdn.tailwindcss.com"></script>
         </head>
-        <body class="bg-gray-100">
+        <body class="bg-white">
             <div class="fixed inset-0 flex items-center justify-center">
-                <div class="absolute inset-0 bg-black bg-opacity-20 backdrop-blur-sm"></div>
+                <div class="absolute inset-0 bg-white backdrop-blur-sm"></div>
                 <div class="relative bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl border border-gray-200 animate-fade-in">
                     <div class="flex flex-col items-center text-center">
                         <!-- Error Spinner -->
