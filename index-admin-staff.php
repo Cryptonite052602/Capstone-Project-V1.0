@@ -1,27 +1,30 @@
 <?php
 require_once __DIR__ . '/includes/auth.php';
 
+// Check if user is already logged in
 if (isLoggedIn()) {
     redirectBasedOnRole();
 }
 
-$error = '';
+// Logic to handle AJAX request
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username']);
-    $password = trim($_POST['password']);
-    $role = $_POST['role'];
+    $username = trim($_POST['username'] ?? '');
+    $password = trim($_POST['password'] ?? '');
+    $role = $_POST['role'] ?? '';
 
     if (!empty($username) && !empty($password) && !empty($role)) {
+        // This function should be defined in your includes/auth.php
         $result = loginUser($username, $password, $role);
-        if ($result === true) {
+        
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
             header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'role' => $role]);
+            if ($result === true) {
+                echo json_encode(['success' => true, 'role' => $role]);
+            } else {
+                echo json_encode(['success' => false, 'message' => $result ?: 'Invalid username or password.']);
+            }
             exit;
-        } else {
-            $error = $result ?: 'Invalid username or password.';
         }
-    } else {
-        $error = 'Please fill in all fields.';
     }
 }
 ?>
@@ -32,13 +35,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | Barangay Luz Healthcare</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Poppins', sans-serif;
         }
 
         body {  
@@ -46,667 +50,344 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 40px 20px;
             background: #f0f4f8;
         }
 
         .container {
             display: flex;
             width: 100%;
-            max-width: 1000px;
+            max-width: 1100px; /* Slightly wider for better proportions */
             background: white;
-            border-radius: 15px;
+            border-radius: 24px;
             overflow: hidden;
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
         }
 
+        /* --- Left Branding --- */
         .left-section {
-            flex: 1;
+            flex: 1.2;
             background: #3C96E1;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 40px;
+            padding: 80px 40px; 
             color: white;
             text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .left-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #328fdbff;
-            z-index: 1;
-        }
-
-        .left-content {
-            z-index: 2;
-            width: 100%;
         }
 
         .logo-container {
-            width: 150px;
-            height: 150px;
+            width: 140px;
+            height: 140px;
             border-radius: 50%;
             overflow: hidden;
-            margin: 0 auto 20px;
-            border: 5px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            margin-bottom: 30px;
+            border: 6px solid rgba(255, 255, 255, 0.3);
             background: white;
         }
 
-        .logo-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .left-title {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            letter-spacing: 1.5px;
-        }
-
-        .left-subtitle {
-            font-size: 20px;
-            font-weight: 500;
-            letter-spacing: 1px;
-            opacity: 0.9;
-            margin-bottom: 40px;
-        }
-
-        .features {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-top: 30px;
-            width: 100%;
-            max-width: 300px;
-            margin-left: auto;
-            margin-right: auto;
-        }
+        .logo-container img { width: 100%; height: 100%; object-fit: cover; }
+        .left-title { font-size: 34px; font-weight: 700; margin-bottom: 12px; }
+        .left-subtitle { font-size: 20px; opacity: 0.9; margin-bottom: 45px; }
 
         .feature {
             display: flex;
             align-items: center;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            backdrop-filter: blur(5px);
-        }
-
-        .feature i {
-            margin-right: 12px;
-            color: #a3d9ff;
-            font-size: 18px;
-            width: 20px;
-        }
-
-        .right-section {
-            flex: 1;
-            padding: 40px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .login-box {
-            background: #f8fafc;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-        }
-
-        .login-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: #1e293b;
-            margin-bottom: 5px;
-            text-align: center;
-        }
-
-        .login-subtitle {
-            color: #64748b;
-            font-size: 16px;
-            margin-bottom: 25px;
-            text-align: center;
-            font-weight: 500;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            color: #374151;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            font-size: 15px;
             margin-bottom: 12px;
-            margin-left: 5px;
+            width: 100%;
+            max-width: 350px;
+            text-align: left;
+        }
+        .feature i { margin-right: 15px; font-size: 1.2rem; color: #a3d9ff; }
+
+        /* --- Right Login Section --- */
+        .right-section { 
+            flex: 1; 
+            padding: 80px 60px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
         }
 
-        .input-container {
-            position: relative;
-        }
+        .login-title { font-size: 28px; font-weight: 700; color: #1e293b; text-align: center; margin-bottom: 8px; }
+        .login-subtitle { color: #64748b; font-size: 16px; text-align: center; margin-bottom: 40px; }
+
+        .form-group { margin-bottom: 24px; position: relative; }
+        .form-label { display: block; font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 10px; margin-left: 5px; }
 
         .form-select, .form-input {
             width: 100%;
-            padding: 0 20px;
-            border: 1px solid #d1d5db;
-            border-radius: 1000px; /* Full round radius */
-            font-size: 14px;
-            transition: all 0.3s;
-            background: white;
-            height: 55px; /* Changed to 55px */
-        }
-
-        .form-select:focus, .form-input:focus {
+            padding: 0 25px;
+            border: 2px solid #e2e8f0;
+            border-radius: 50px;
+            font-size: 15px;
+            height: 60px;
             outline: none;
-            border-color: #0077AA;
-            box-shadow: 0 0 0 3px rgba(0, 119, 170, 0.1);
+            transition: all 0.3s ease;
+            background-color: #f8fafc;
+            appearance: none;
         }
 
         .form-select {
-            appearance: none;
-            padding-right: 40px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 20px center;
+            background-size: 18px;
+            cursor: pointer;
         }
 
-        .select-arrow {
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #64748b;
-            pointer-events: none;
-        }
-
-        .remember-forgot {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            font-size: 14px;
-        }
-
-        .remember-container {
-            display: flex;
-            align-items: center;
-        }
-
-        .remember-checkbox {
-            margin-right: 8px;
-        }
-
-        .forgot-link {
-            color: #0077AA;
-            text-decoration: none;
-        }
-
-        .forgot-link:hover {
-            text-decoration: underline;
+        .form-select:focus, .form-input:focus {
+            border-color: #3C96E1;
+            background-color: #fff;
+            box-shadow: 0 0 0 5px rgba(60, 150, 225, 0.15);
         }
 
         .btn-login {
             width: 100%;
-            padding: 14px;
-            background: #0077AA;
+            height: 60px;
+            background: #3C96E1;
             color: white;
             border: none;
-            border-radius: 1000px;
-            font-size: 16px;
+            border-radius: 50px;
+            font-size: 17px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            margin-top: 15px;
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 55px; /* Changed to 55px */
+            gap: 12px;
         }
 
-        .btn-login:hover {
-            background: #006699;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 119, 170, 0.3);
-        }
+        .btn-login:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .btn-login:hover:not(:disabled) { background: #2d81c7; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(60, 150, 225, 0.2); }
 
-        .btn-login:active {
-            transform: translateY(0);
-        }
+        .support-text { text-align: center; margin-top: 45px; color: #94a3b8; font-size: 13px; }
 
-        .btn-login i {
-            margin-left: 8px;
-        }
-
-        .btn-login:disabled {
-            background: #9ca3af;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-            opacity: 0.6;
-        }
-
-        .support-text {
-            text-align: center;
-            margin-top: 30px;
-            color: #64748b;
-            font-size: 14px;
-        }
-
-        .error-message {
-            background: #fef2f2;
-            color: #dc2626;
-            padding: 12px 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            font-size: 14px;
-            border-left: 4px solid #dc2626;
-        }
-
-        .error-icon {
-            margin-right: 10px;
-        }
-
-        /* Modal Styles */
+        /* --- BIGGER MODAL DESIGN --- */
         .modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(5px);
-            z-index: 1000;
-            align-items: center;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(8px);
             justify-content: center;
+            align-items: center;
+            z-index: 9999;
             opacity: 0;
-            transition: opacity 0.3s ease;
-            padding: 20px;
+            transition: opacity 0.4s ease;
         }
 
-        .modal.show {
-            opacity: 1;
-        }
+        .modal.show { display: flex; opacity: 1; }
 
         .modal-content {
             background: white;
-            border-radius: 15px;
-            padding: 40px 30px;
-            width: 100%;
-            max-width: 450px;
+            padding: 60px 40px; /* Much bigger padding */
+            border-radius: 30px;
             text-align: center;
-            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-            margin: 0 auto;
+            max-width: 500px; /* Wider modal */
+            width: 90%;
+            transform: scale(0.8);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.3);
         }
 
-        .modal.show .modal-content {
-            transform: translateY(0);
+        .modal.show .modal-content { transform: scale(1); }
+
+        .modal-icon {
+            font-size: 80px;
+            margin-bottom: 25px;
         }
+
+        .modal-title { font-size: 28px; font-weight: 700; margin-bottom: 15px; color: #1e293b; }
+        .modal-message { font-size: 18px; color: #64748b; line-height: 1.6; margin-bottom: 35px; }
 
         .spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(0, 119, 170, 0.2);
-            border-top: 4px solid #0077AA;
+            width: 80px; height: 80px;
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #3C96E1;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+            margin: 0 auto 25px;
         }
 
-        .success-check {
-            color: #10b981;
-            font-size: 50px;
-            margin-bottom: 20px;
-        }
-
-        .error-x {
-            color: #ef4444;
-            font-size: 50px;
-            margin-bottom: 20px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .modal-title {
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 15px;
-            color: #1e293b;
-        }
-
-        .modal-message {
-            color: #64748b;
-            margin-bottom: 30px;
-            line-height: 1.5;
-            font-size: 16px;
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .modal-btn {
-            padding: 12px 30px;
-            background: #0077AA;
-            color: white;
-            border: none;
-            border-radius: 1000px;
+            padding: 15px 45px;
             font-size: 16px;
-            font-weight: 500;
+            font-weight: 600;
+            border-radius: 50px;
+            border: none;
             cursor: pointer;
-            transition: all 0.3s;
-            margin: 0 auto;
-            display: block;
+            transition: 0.3s;
         }
 
-        .modal-btn:hover {
-            background: #006699;
-        }
+        .btn-close { background: #f1f5f9; color: #475569; }
+        .btn-close:hover { background: #e2e8f0; }
 
-        @media (max-width: 768px) {
-            .container {
-                flex-direction: column;
-            }
-            
-            .left-section {
-                display: none;
-            }
+        @media (max-width: 768px) { 
+            .left-section { display: none; }
+            .right-section { padding: 60px 30px; }
         }
     </style>
 </head>
 <body>
+
     <div class="container">
-        <!-- Left Section - Information -->
         <div class="left-section">
-            <div class="left-content">
-                <!-- Circular Logo -->
-                <div class="logo-container">
-                    <img src="asssets/images/Luz.jpg" alt="Barangay Luz Logo">
-                </div>
-                
-                <h1 class="left-title">Barangay Luz</h1>
-                <p class="left-subtitle">Healthcare Management System</p>
-                
-                <div class="features">
-                    <div class="feature">
-                        <i class="fas fa-shield-alt"></i>
-                        <span>Secure & HIPAA Compliant</span>
-                    </div>
-                    <div class="feature">
-                        <i class="fas fa-chart-line"></i>
-                        <span>Real-time Health Analytics</span>
-                    </div>
-                    <div class="feature">
-                        <i class="fas fa-users"></i>
-                        <span>Community Health Tracking</span>
-                    </div>
-                    <div class="feature">
-                        <i class="fas fa-file-medical"></i>
-                        <span>Digital Health Records</span>
-                    </div>
-                </div>
-                <div class="logo-text">Barangay Pahina San Nicolas</div>
+            <div class="logo-container">
+                <img src="asssets/images/Luz.jpg" alt="Logo">
             </div>
+            <h1 class="left-title">Barangay Luz, Cebu City</h1>
+            <p class="left-subtitle">Healthcare Management System</p>
+            <div class="feature"><i class="fas fa-shield-virus"></i> Secure HIPAA Compliance</div>
+            <div class="feature"><i class="fas fa-chart-line"></i> Real-time Health Data</div>
+            <div class="feature"><i class="fas fa-clock"></i> 24/7 Technical Reliability</div>
         </div>
 
-        <!-- Right Section - Login Form -->
         <div class="right-section">
             <div class="login-box">
-                <h2 class="login-title">System Administrator</h2>
-                <p class="login-subtitle">Sign in to your Admin or Staff account</p>
+                <h2 class="login-title">Administrator Access</h2>
+                <p class="login-subtitle">Please sign in to your workstation</p>
 
-                <?php if ($error): ?>
-                    <div class="error-message">
-                        <i class="fas fa-exclamation-circle error-icon"></i>
-                        <?php echo htmlspecialchars($error); ?>
-                    </div>
-                <?php endif; ?>
-
-                <form id="loginForm" method="POST" action="">
+                <form id="loginForm">
                     <div class="form-group">
-                        <label for="role" class="form-label">Role *</label>
-                        <div class="input-container">
-                            <select id="role" name="role" class="form-select" required>
-                                <option value="">Select Role</option>
-                                <option value="admin">Super Admin</option>
-                                <option value="staff">Admin</option>
-                            </select>
-                            <div class="select-arrow">
-                                <i class="fas fa-chevron-down"></i>
-                            </div>
-                        </div>
+                        <label class="form-label">System Role *</label>
+                        <select id="role" name="role" class="form-select" required>
+                            <option value="">Select Role Type</option>
+                            <option value="admin">Super Admin</option>
+                            <option value="staff">Admin / Staff</option>
+                        </select>
                     </div>
 
                     <div class="form-group">
-                        <label for="username" class="form-label">User Name *</label>
-                        <div class="input-container">
-                            <input type="text" id="username" name="username" class="form-input" placeholder="Enter Your User Name" required>
-                        </div>
+                        <label class="form-label">Username *</label>
+                        <input type="text" name="username" class="form-input" placeholder="Workstation username" required>
                     </div>
 
                     <div class="form-group">
-                        <label for="password" class="form-label">Password *</label>
-                        <div class="input-container">
-                            <input type="password" id="password" name="password" class="form-input" placeholder="Enter Your Password" required>
-                        </div>
+                        <label class="form-label">Password *</label>
+                        <input type="password" name="password" class="form-input" placeholder="Workstation password" required>
                     </div>
 
-                    <div class="remember-forgot">
-                        <div class="remember-container">
-                            <input type="checkbox" id="remember" class="remember-checkbox">
-                            <label for="remember">Remember your Password</label>
-                        </div>
-                        <a href="#" class="forgot-link">Forgot your Password?</a>
-                    </div>
-
-                    <button type="submit" class="btn-login" id="loginButton">
-                        <span id="roleText">Select Role Type</span> <i class="fas fa-arrow-right"></i>
+                    <button type="submit" class="btn-login" id="loginButton" disabled>
+                        <span id="roleText">Select Role Type</span>
+                        <i class="fas fa-arrow-right"></i>
                     </button>
                 </form>
-            </div>
-
-            <div class="support-text">
-                <p>On Going System Production - CHMTS : V1.0</p>
+                <div class="support-text">Production Version • BLMTS : V1.0</div>
             </div>
         </div>
     </div>
 
-    <!-- Validation Modal -->
     <div id="validationModal" class="modal">
         <div class="modal-content">
-            <div id="loadingSpinner" class="spinner"></div>
-            <div id="successIcon" class="success-check" style="display: none;">
-                <i class="fas fa-check-circle"></i>
+            <div id="modalLoading">
+                <div class="spinner"></div>
+                <h3 class="modal-title">Verifying Identity</h3>
+                <p class="modal-message">Connecting to the secure health server...</p>
             </div>
-            <div id="errorIcon" class="error-x" style="display: none;">
-                <i class="fas fa-times-circle"></i>
+
+            <div id="modalResponse" style="display:none;">
+                <div id="iconContainer" class="modal-icon"></div>
+                <h3 id="resTitle" class="modal-title"></h3>
+                <p id="resMsg" class="modal-message"></p>
+                <button id="modalActionBtn" class="modal-btn" onclick="closeModal()"></button>
             </div>
-            
-            <h3 id="modalTitle" class="modal-title">Authenticating...</h3>
-            <p id="modalMessage" class="modal-message">Please wait while we verify your credentials</p>
-            
-            <button id="successButton" class="modal-btn" style="display: none;">Continue</button>
-            <button id="errorButton" class="modal-btn" style="display: none;">Okay</button>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const loginForm = document.getElementById('loginForm');
-            const roleSelect = document.getElementById('role');
-            const roleText = document.getElementById('roleText');
-            const loginButton = document.getElementById('loginButton');
-            const modal = document.getElementById('validationModal');
-            const successButton = document.getElementById('successButton');
-            const errorButton = document.getElementById('errorButton');
-            
-            // Function to update login button text and state based on selected role
-            function updateLoginButtonState() {
-                if (!roleSelect.value) {
-                    roleText.textContent = 'Select Role Type';
-                    loginButton.disabled = true;
-                } else {
-                    if (roleSelect.value === 'admin') {
-                        roleText.textContent = 'Login as Admin';
-                    } else {
-                        roleText.textContent = 'Login as Staff';
-                    }
-                    loginButton.disabled = false;
-                }
+        const roleSelect = document.getElementById('role');
+        const loginButton = document.getElementById('loginButton');
+        const roleText = document.getElementById('roleText');
+        const modal = document.getElementById('validationModal');
+
+        // Toggle button state and text
+        roleSelect.addEventListener('change', function() {
+            if (this.value) {
+                roleText.textContent = 'Login as ' + (this.value === 'admin' ? 'Super Admin' : 'Admin/Staff');
+                loginButton.disabled = false;
+            } else {
+                roleText.textContent = 'Select Role Type';
+                loginButton.disabled = true;
             }
+        });
+
+        // AJAX Handle
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
             
-            // Initialize button state
-            updateLoginButtonState();
+            // Show Modal and animate in
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
             
-            // Update login button text and state when role selection changes
-            roleSelect.addEventListener('change', updateLoginButtonState);
-            
-            // Function to show modal with smooth animation
-            function showModal() {
-                modal.style.display = 'flex';
-                setTimeout(() => {
-                    modal.classList.add('show');
-                }, 10);
-            }
-            
-            // Function to hide modal with smooth animation
-            function hideModal() {
-                modal.classList.remove('show');
-                setTimeout(() => {
-                    modal.style.display = 'none';
-                    // Reset modal state
-                    document.getElementById('loadingSpinner').style.display = 'block';
-                    document.getElementById('successIcon').style.display = 'none';
-                    document.getElementById('errorIcon').style.display = 'none';
-                    successButton.style.display = 'none';
-                    errorButton.style.display = 'none';
-                    document.getElementById('modalTitle').textContent = 'Authenticating...';
-                    document.getElementById('modalMessage').textContent = 'Please wait while we verify your credentials';
-                }, 300);
-            }
-            
-            // Handle login form submission
-            loginForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                // Check if role is selected
-                if (!roleSelect.value) {
-                    // Show error state immediately since no role is selected
-                    showModal();
-                    document.getElementById('loadingSpinner').style.display = 'none';
-                    document.getElementById('errorIcon').style.display = 'block';
-                    errorButton.style.display = 'block';
+            // Reset to loading state
+            document.getElementById('modalLoading').style.display = 'block';
+            document.getElementById('modalResponse').style.display = 'none';
+
+            fetch('', {
+                method: 'POST',
+                body: new FormData(this),
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Network error');
+                return res.json();
+            })
+            .then(data => {
+                setTimeout(() => { // Small delay to feel realistic
+                    document.getElementById('modalLoading').style.display = 'none';
+                    document.getElementById('modalResponse').style.display = 'block';
                     
-                    document.getElementById('modalTitle').textContent = 'Incorrect Role Selected';
-                    document.getElementById('modalMessage').textContent = 'Please choose the correct role based on your username and password.';
-                    return;
-                }
-                
-                showModal();
-                
-                const formData = new FormData(this);
-                
-                // Simulate API call with timeout
-                setTimeout(() => {
-                    // For demonstration, we'll simulate a successful login
-                    // In a real application, this would be replaced with actual API call
-                    const success = true; // Change to false to simulate failed login
-                    
-                    if (success) {
-                        // Show success state
-                        document.getElementById('loadingSpinner').style.display = 'none';
-                        document.getElementById('successIcon').style.display = 'block';
-                        successButton.style.display = 'block';
+                    const iconBox = document.getElementById('iconContainer');
+                    const actionBtn = document.getElementById('modalActionBtn');
+
+                    if(data.success) {
+                        iconBox.innerHTML = '<i class="fas fa-check-circle" style="color: #10b981;"></i>';
+                        document.getElementById('resTitle').textContent = 'Access Granted';
+                        document.getElementById('resMsg').textContent = 'Verification successful. Welcome to the Barangay Luz Portal.';
+                        actionBtn.textContent = 'Redirecting...';
+                        actionBtn.className = 'modal-btn';
+                        actionBtn.style.background = '#10b981';
+                        actionBtn.style.color = 'white';
                         
-                        document.getElementById('modalTitle').textContent = 'Login Successful';
-                        document.getElementById('modalMessage').textContent = 'You are redirecting to admin dashboard';
-                        
-                        // Handle success button click
-                        successButton.onclick = function() {
-                            if (roleSelect.value === 'admin') {
-                                window.location.href = 'admin/dashboard.php';
-                            } else if (roleSelect.value === 'staff') {
-                                window.location.href = 'staff/dashboard.php';
-                            }
-                        };
+                        setTimeout(() => {
+                            window.location.href = data.role + '/dashboard.php';
+                        }, 2000);
                     } else {
-                        // Show error state
-                        document.getElementById('loadingSpinner').style.display = 'none';
-                        document.getElementById('errorIcon').style.display = 'block';
-                        errorButton.style.display = 'block';
-                        
-                        document.getElementById('modalTitle').textContent = 'Incorrect Role Selected';
-                        document.getElementById('modalMessage').textContent = 'Please choose the correct role based on your username and password.';
+                        iconBox.innerHTML = '<i class="fas fa-times-circle" style="color: #ef4444;"></i>';
+                        document.getElementById('resTitle').textContent = 'Login Failed';
+                        document.getElementById('resMsg').textContent = data.message;
+                        actionBtn.textContent = 'Try Again';
+                        actionBtn.className = 'modal-btn btn-close';
                     }
-                }, 2000);
-                
-                // Actual fetch code (commented out for demo)
-                
-                fetch('', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Show success state
-                        document.getElementById('loadingSpinner').style.display = 'none';
-                        document.getElementById('successIcon').style.display = 'block';
-                        successButton.style.display = 'block';
-                        
-                        document.getElementById('modalTitle').textContent = 'Login Successful';
-                        document.getElementById('modalMessage').textContent = 'You are redirecting to admin dashboard';
-                        
-                        // Handle success button click
-                        successButton.onclick = function() {
-                            if (data.role === 'admin') {
-                                window.location.href = 'admin/dashboard.php';
-                            } else if (data.role === 'staff') {
-                                window.location.href = 'staff/dashboard.php';
-                            }
-                        };
-                    } else {
-                        // Show error state
-                        document.getElementById('loadingSpinner').style.display = 'none';
-                        document.getElementById('errorIcon').style.display = 'block';
-                        errorButton.style.display = 'block';
-                        
-                        document.getElementById('modalTitle').textContent = 'Login Failed';
-                        document.getElementById('modalMessage').textContent = 'Incorrect username and password';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    // Show error state
-                    document.getElementById('loadingSpinner').style.display = 'none';
-                    document.getElementById('errorIcon').style.display = 'block';
-                    errorButton.style.display = 'block';
-                    
-                    document.getElementById('modalTitle').textContent = 'Error';
-                    document.getElementById('modalMessage').textContent = 'An error occurred. Please try again.';
-                });
-                
-            });
-            
-            // Handle error button click
-            errorButton.addEventListener('click', function() {
-                hideModal();
+                }, 800);
+            })
+            .catch(err => {
+                document.getElementById('modalLoading').style.display = 'none';
+                document.getElementById('modalResponse').style.display = 'block';
+                document.getElementById('iconContainer').innerHTML = '<i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>';
+                document.getElementById('resTitle').textContent = 'Connection Error';
+                document.getElementById('resMsg').textContent = 'Unable to connect to the server. Please check your internet.';
+                document.getElementById('modalActionBtn').textContent = 'Close';
+                document.getElementById('modalActionBtn').className = 'modal-btn btn-close';
             });
         });
+
+        function closeModal() {
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 400);
+        }
     </script>
 </body>
 </html>

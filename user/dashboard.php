@@ -798,6 +798,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Dashboard - Community Health Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* ... (All CSS styles remain exactly the same) ... */
@@ -2043,176 +2044,172 @@ try {
             </div>
         </div>
 
-        <!-- Contact Info Modal - Redesigned -->
-        <div id="contact-info-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300"></div>
-            <div class="bg-white rounded-2xl shadow-2xl transform transition-all duration-300 w-full max-w-2xl max-h-[90vh] overflow-hidden">
-                <!-- Modal Header -->
-                <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center">
-                            <div class="bg-white bg-opacity-20 p-2 rounded-full mr-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                </svg>
-                            </div>
-                            <h3 class="text-xl font text-white">Contact Support Team</h3>
-                        </div>
-                        <button type="button" onclick="closeContactModal()" class="text-white hover:text-blue-100 transition-colors duration-200">
+
+
+<style>
+    /* Applying Poppins as the primary font */
+    #contact-info-modal {
+        font-family: 'Poppins', sans-serif;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+    }
+</style>
+
+<div id="contact-info-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div class="fixed inset-0 bg-slate-400/40 backdrop-blur-md transition-opacity" onclick="closeContactModal()"></div>
+    
+    <div class="relative bg-white rounded-2xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col md:flex-row transform transition-all border border-slate-100">
+        
+        <div class="w-full md:w-80 bg-blue-700 p-10 text-white flex flex-col justify-between">
+            <div>
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-500 mb-8">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.516l2.257-1.13a1 1 0 00.502-1.21L9.281 3.684A1 1 0 008.588 3H5z" />
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-semibold mb-2">Help Center</h3>
+                <p class="text-slate-400 text-sm font-light leading-relaxed mb-8">
+                    Our support team is dedicated to assisting you with appointment management and general inquiries.
+                </p>
+
+                <div class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+                    <div class="flex items-center mb-3">
+                        <span class="flex h-2 w-2 rounded-full bg-emerald-400 mr-3"></span>
+                        <span class="text-xs font-medium uppercase tracking-widest text-emerald-400">System Live</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 leading-normal">
+                        Note: Approved appointments require verbal verification before any modification.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <p class="text-[10px] text-slate-500 font-medium uppercase tracking-[0.2em]">Cebu City Government</p>
+            </div>
+        </div>
+
+        <div class="flex-1 bg-white flex flex-col">
+            <div class="flex items-center justify-between px-10 py-8">
+                <h4 class="text-xl font-bold text-slate-800 tracking-tight">Direct Contact Channels</h4>
+                <button onclick="closeContactModal()" class="text-slate-300 hover:text-slate-600 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="px-10 pb-10 overflow-y-auto flex-1 custom-scrollbar">
+                <div class="space-y-6">
+                    
+                    <div class="group flex items-center p-6 rounded-2xl border-2 border-slate-50 hover:border-blue-100 hover:bg-blue-50/20 transition-all duration-300">
+                        <div class="w-12 h-12 bg-blue-100/50 text-blue-600 rounded-xl flex items-center justify-center mr-6 shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                             </svg>
+                        </div>
+                        <div class="flex-1">
+                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Support Line</span>
+                            <span class="text-lg font-semibold text-slate-900 leading-none">(02) 1234-5678</span>
+                        </div>
+                        <button onclick="copyToClipboard('(02) 1234-5678', this)" class="text-xs font-bold text-blue-600 bg-white border border-blue-200 px-5 py-2.5 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                            COPY
                         </button>
                     </div>
-                </div>
-                
-                <!-- Modal Content -->
-                <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
-                    <!-- Important Notice -->
-                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg">
+
+                    <div class="group flex items-center p-6 rounded-2xl border-2 border-slate-50 hover:border-slate-200 hover:bg-slate-50/50 transition-all duration-300">
+                        <div class="w-12 h-12 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center mr-6 shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <div class="flex-1 overflow-hidden">
+                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Email Inquiries</span>
+                            <span class="text-base font-semibold text-slate-900 leading-none truncate block">support@brgyluzcebucity.com</span>
+                        </div>
+                        <button onclick="copyToClipboard('support@brgyluzcebucity.com', this)" class="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-5 py-2.5 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm">
+                            COPY
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8 pt-6 border-t border-slate-100">
                         <div class="flex items-start">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-600 mt-0.5 mr-3" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                            </svg>
+                            <div class="p-2 bg-slate-50 rounded-lg mr-3 text-slate-500">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
                             <div>
-                                <h4 class="text-lg font-semibold text-yellow-800 mb-1">Approved Appointments</h4>
-                                <p class="text-yellow-700 text-base">
-                                    For approved appointments, please contact our support team directly to cancel. 
-                                    This ensures proper handling of your appointment and helps us serve you better.
-                                </p>
+                                <h5 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Office Hours</h5>
+                                <p class="text-xs font-semibold text-slate-700">Mon - Fri: 8 AM - 5 PM</p>
+                                <p class="text-[10px] text-slate-500 italic">Sat: 9 AM - 1 PM</p>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Contact Methods -->
-                    <div class="space-y-6">
-                        <!-- Phone Section -->
-                        <div class="bg-blue-50 rounded-xl p-5 border border-blue-200">
-                            <div class="flex items-start mb-3">
-                                <div class="bg-blue-100 p-2 rounded-lg mr-4">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h4 class="text-lg font-semibold text-gray-800 mb-1">Call Us Directly</h4>
-                                    <p class="text-gray-600 text-base mb-2">Speak with our support team for immediate assistance</p>
-                                    <div class="flex items-center">
-                                        <span class="text-2xl font text-blue-600 mr-3">(02) 1234-5678</span>
-                                        <button onclick="copyToClipboard('(02) 1234-5678')" class="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                            </svg>
-                                            Copy
-                                        </button>
-                                    </div>
-                                </div>
+                        <div class="flex items-start">
+                            <div class="p-2 bg-slate-50 rounded-lg mr-3 text-slate-500">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            <div>
+                                <h5 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Preparation</h5>
+                                <p class="text-xs font-semibold text-slate-700 leading-relaxed">Have your Reference # and ID ready before calling.</p>
                             </div>
                         </div>
-
-                        <!-- Email Section -->
-                        <div class="bg-green-50 rounded-xl p-5 border border-green-200">
-                            <div class="flex items-start mb-3">
-                                <div class="bg-green-100 p-2 rounded-lg mr-4">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h4 class="text-lg font-semibold text-gray-800 mb-1">Send Us an Email</h4>
-                                    <p class="text-gray-600 text-base mb-2">We'll respond to your inquiry within 24 hours</p>
-                                    <div class="flex items-center">
-                                        <span class="text-xl font text-green-600 mr-3">support@brgyluzcebucity.com</span>
-                                        <button onclick="copyToClipboard('support@brgyluzcebucity.com')" class="text-green-600 hover:text-green-700 text-sm font-medium flex items-center">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                            </svg>
-                                            Copy
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Office Hours Section -->
-                        <div class="bg-purple-50 rounded-xl p-5 border border-purple-200">
-                            <div class="flex items-start">
-                                <div class="bg-purple-100 p-2 rounded-lg mr-4">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 01118 0z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h4 class="text-lg font-semibold text-gray-800 mb-1">Office Hours</h4>
-                                    <p class="text-gray-600 text-base mb-3">Our support team is available during these hours</p>
-                                    <div class="space-y-2">
-                                        <div class="flex justify-between items-center py-2 border-b border-purple-100">
-                                            <span class="text-gray-700 font-medium">Monday - Friday</span>
-                                            <span class="text-purple-600 font-semibold text-lg">8:00 AM - 5:00 PM</span>
-                                        </div>
-                                        <div class="flex justify-between items-center py-2 border-b border-purple-100">
-                                            <span class="text-gray-700 font-medium">Saturday</span>
-                                            <span class="text-purple-600 font-semibold text-lg">9:00 AM - 1:00 PM</span>
-                                        </div>
-                                        <div class="flex justify-between items-center py-2">
-                                            <span class="text-gray-700 font-medium">Sunday</span>
-                                            <span class="text-gray-500 font-medium">Closed</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Additional Information -->
-                        <div class="bg-gray-50 rounded-xl p-5 border border-gray-200">
-                            <h4 class="text-lg font-semibold text-gray-800 mb-3">What to Prepare When Contacting Us</h4>
-                            <ul class="space-y-2 text-gray-600 text-base">
-                                <li class="flex items-start">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Your full name and appointment reference number</span>
-                                </li>
-                                <li class="flex items-start">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                                    </svg>
-                                    <span>The date and time of your scheduled appointment</span>
-                                </li>
-                                <li class="flex items-start">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Reason for cancellation or rescheduling</span>
-                                </li>
-                                <li class="flex items-start">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Your preferred alternative date/time if rescheduling</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Modal Footer -->
-                <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                    <div class="flex justify-between items-center">
-                        <p class="text-gray-600 text-sm">
-                            Need urgent assistance? Call us now for immediate help.
-                        </p>
-                        <button type="button" onclick="closeContactModal()"
-                            class="bg-blue-600 text-white px-8 py-3 rounded-full text-base font-semibold hover:bg-blue-700 transition duration-200 flex items-center action-button">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Got It, Thanks!
-                        </button>
                     </div>
                 </div>
             </div>
+
+            <div class="px-10 py-6 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
+                <button onclick="closeContactModal()" class="group relative px-10 py-3 bg-[#1e293b] text-white text-xs font-bold rounded-xl shadow-lg hover:bg-blue-600 transition-all duration-300 tracking-widest overflow-hidden">
+                    <span class="relative z-10 uppercase">Dismiss</span>
+                </button>
+            </div>
         </div>
+    </div>
+</div>
+
+<script>
+    // Logic for Modal
+    function openContactModal() {
+        const modal = document.getElementById('contact-info-modal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeContactModal() {
+        const modal = document.getElementById('contact-info-modal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    // Modern Copy Clipboard
+    function copyToClipboard(text, btn) {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalText = btn.innerText;
+            const originalClasses = [...btn.classList];
+            
+            btn.innerText = 'COPIED';
+            btn.classList.add('!bg-emerald-500', '!text-white', '!border-emerald-500');
+            
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.className = ''; // Clear classes
+                originalClasses.forEach(cls => btn.classList.add(cls));
+                btn.classList.remove('!bg-emerald-500', '!text-white', '!border-emerald-500');
+            }, 1500);
+        });
+    }
+
+    // Modal behavior
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeContactModal();
+    });
+</script>
 
         <!-- Profile Image Upload Modal -->
         <div id="profile-image-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
@@ -3990,20 +3987,53 @@ try {
         }
     }
 
-    // Add this function to handle copying contact info
-    function copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(function() {
+    function handleCopy(text, btn) {
+    // 1. Core Navigator API
+    navigator.clipboard.writeText(text).then(function() {
+        
+        // 2. Button Visual Feedback (Consistent with design theme)
+        const originalText = btn.innerText;
+        btn.innerText = 'COPIED';
+        btn.classList.replace('bg-slate-900', 'bg-emerald-600');
+        btn.classList.add('scale-95');
+
+        // 3. Trigger your Global Generic Notification
+        if (typeof showGenericNotification === "function") {
             showGenericNotification({
                 type: 'success',
-                title: 'Copied!',
-                message: 'Text copied to clipboard',
+                title: 'Text Copied',
+                message: 'Support info has been added to your clipboard.',
                 icon: 'fas fa-copy',
                 details: {}
             });
-        }).catch(function(err) {
-            console.error('Failed to copy text: ', err);
-        });
-    }
+        }
+
+        // Reset Button State
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.classList.replace('bg-emerald-600', 'bg-slate-900');
+            btn.classList.remove('scale-95');
+        }, 2000);
+
+    }).catch(function(err) {
+        console.error('Copy process failed:', err);
+    });
+}
+
+function openContactModal() {
+    const m = document.getElementById('contact-info-modal');
+    m.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeContactModal() {
+    const m = document.getElementById('contact-info-modal');
+    m.classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+// Global Listener for ESC
+window.addEventListener('keydown', (e) => { if(e.key === 'Escape') closeContactModal(); });
     </script>
 
 </body>

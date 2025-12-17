@@ -356,32 +356,47 @@ This is an automated message. Please do not reply.<br>
     }
 }
 
-// Function to generate sequential priority number per time slot (01-05 only)
+// MODIFIED FUNCTION: Generate sequential priority number 01-05 per time slot
 function generatePriorityNumber($pdo, $appointmentId, $staffId, $date, $timeSlotId) {
-    // Get the count of approved appointments for this specific time slot on this date
+    // Get all approved appointments for this specific time slot on this date
     $stmt = $pdo->prepare("
-        SELECT COUNT(*) as appointment_count 
+        SELECT ua.id, ua.priority_number 
         FROM user_appointments ua
         JOIN sitio1_appointments a ON ua.appointment_id = a.id
         WHERE a.staff_id = ? 
         AND a.date = ? 
         AND a.id = ?
         AND ua.status = 'approved'
-        AND ua.id < ?
+        ORDER BY ua.processed_at ASC, ua.id ASC
     ");
-    $stmt->execute([$staffId, $date, $timeSlotId, $appointmentId]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->execute([$staffId, $date, $timeSlotId]);
+    $approvedAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Add 1 to get the next number in sequence for this time slot
-    $sequenceNumber = ($result['appointment_count'] ?? 0) + 1;
-    
-    // If sequence number exceeds 5, keep it at 5 (maximum)
-    if ($sequenceNumber > 5) {
-        $sequenceNumber = 5;
+    // Count existing priority numbers in this time slot
+    $existingPriorityNumbers = [];
+    foreach ($approvedAppointments as $appointment) {
+        if (!empty($appointment['priority_number'])) {
+            $existingPriorityNumbers[] = $appointment['priority_number'];
+        }
     }
     
-    // Format as two-digit number (01, 02, 03, 04, 05)
-    return str_pad($sequenceNumber, 2, '0', STR_PAD_LEFT);
+    // Find the next available sequential number (01-05)
+    $availableNumbers = ['01', '02', '03', '04', '05'];
+    $nextNumber = null;
+    
+    foreach ($availableNumbers as $number) {
+        if (!in_array($number, $existingPriorityNumbers)) {
+            $nextNumber = $number;
+            break;
+        }
+    }
+    
+    // If all numbers 01-05 are taken, use the next in sequence (shouldn't happen with max 5 slots)
+    if ($nextNumber === null) {
+        $nextNumber = '05'; // Fallback to 05 if all taken
+    }
+    
+    return $nextNumber;
 }
 
 // Function to generate appointment ticket with time slot info
@@ -903,7 +918,7 @@ if (isset($_GET['export'])) {
                 $time = date('g:i A', strtotime($appointment['start_time'])) . ' - ' . date('g:i A', strtotime($appointment['end_time']));
                 $status = ucfirst($appointment['status']);
                 $priorityNumber = $appointment['priority_number'] ?? 'N/A';
-                $invoiceNumber = $appointment['invoice_number'] ?? 'N/A';
+                $invoiceNumber = $appointment['invoice_number'] || 'N/A';
                 $healthConcerns = str_replace(["\t", "\n", "\r"], " ", $appointment['health_concerns'] ?? 'No concerns specified');
                 
                 echo "$appointmentId\t$patientName\t$patientId\t$contactNumber\t$date\t$time\t$status\t$priorityNumber\t$invoiceNumber\t$healthConcerns\n";
@@ -1148,7 +1163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         throw new Exception('Appointment not found');
                     }
                     
-                    // Generate invoice and priority number using the new function
+                    // Generate invoice and priority number using the MODIFIED function
                     $invoiceNumber = 'INV-' . date('Ymd') . '-' . str_pad($appointmentId, 4, '0', STR_PAD_LEFT);
                     $priorityNumber = generatePriorityNumber($pdo, $appointmentId, $appointmentDetails['staff_id'], 
                                                             $appointmentDetails['date'], $appointmentDetails['slot_id']);
@@ -1497,7 +1512,7 @@ try {
         JOIN sitio1_appointments a ON ua.appointment_id = a.id 
         WHERE a.staff_id = ? AND ua.status = 'approved'
         AND (a.date >= CURDATE())
-        ORDER BY a.date, a.start_time
+        ORDER BY a.date, a.start_time, ua.priority_number
     ");
     $stmt->execute([$currentDateTime, $staffId]);
     $upcomingAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
