@@ -40,7 +40,7 @@ if (isset($_SESSION['user']['id'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barangay Luz Health Monitoring and Tracking</title>
-    <link rel="icon" type="image/png" href="./asssets/images/Luz.jpg">
+    <link rel="icon" type="image/png" href="../asssets/images/Luz.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/community-health-tracker/assets/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -125,7 +125,7 @@ if (isset($_SESSION['user']['id'])) {
 
     /* CLEAN: Simple Logout Button - UPDATED FOR FULL ROUND */
     .logout-btn {
-        background: #ef4444;
+        background: #2B7CC9;
         padding: 0.75rem 1.5rem;
         border-radius: 9999px !important; /* Full round radius */
         font-weight: 600;
@@ -140,8 +140,9 @@ if (isset($_SESSION['user']['id'])) {
     }
 
     .logout-btn:hover {
-        background: #dc2626;
+        background: #3C96E1;
         transform: translateY(-1px);
+        color: white;
     }
 
     /* NEW: Improved time display containers - Horizontal layout */
@@ -203,7 +204,7 @@ if (isset($_SESSION['user']['id'])) {
         font-size: 0.75rem;
         margin-left: 0.25rem;
         opacity: 0.9;
-        font-style: italic;
+        font-family: 'Poppins', sans-serif;
         font-weight: 500;
     }
 

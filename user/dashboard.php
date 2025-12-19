@@ -2077,7 +2077,7 @@ try {
                     </svg>
                 </div>
                 <h3 class="text-2xl font-semibold mb-2">Help Center</h3>
-                <p class="text-slate-400 text-sm font-light leading-relaxed mb-8">
+                <p class="text-white text-sm font-light leading-relaxed mb-8">
                     Our support team is dedicated to assisting you with appointment management and general inquiries.
                 </p>
 
@@ -2086,7 +2086,7 @@ try {
                         <span class="flex h-2 w-2 rounded-full bg-emerald-400 mr-3"></span>
                         <span class="text-xs font-medium uppercase tracking-widest text-emerald-400">System Live</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 leading-normal">
+                    <p class="text-[11px] text-white leading-normal">
                         Note: Approved appointments require verbal verification before any modification.
                     </p>
                 </div>
@@ -2263,7 +2263,7 @@ try {
             </h1>
             <!-- Help Button -->
             <button onclick="openHelpModal()" class="help-icon text-blue-600 p-8 rounded-full hover:text-blue-500 transition action-button">
-                <i class="fas fa-question-circle text-3xl"></i>
+                <i class="fa-solid fa-circle-info text-4xl"></i>
             </button>
         </div>
 
