@@ -737,6 +737,7 @@ if (!empty($selectedPatientId)) {
     <title>Patient Health Records - Barangay Luz Health Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -756,687 +757,719 @@ if (!empty($selectedPatientId)) {
         }
     </script>
     <style>
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .patient-card { transition: all 0.3s ease; }
-        .patient-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-        .modal { transition: opacity 0.3s ease; }
-        .required-field::after { content: " *"; color: #e74c3c; }
-        .patient-table { width: 100%; border-collapse: collapse; }
-        .patient-table th, .patient-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-        .patient-table th { background-color: #f8fafc; font-weight: 600; color: #2c3e50; }
-        .patient-table tr:hover { background-color: #f1f5f9; }
-        .patient-id { font-weight: bold; color: #3498db; }
-        .user-badge { background-color: #e0e7ff; color: #3730a3; display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
-        
-        /* UPDATED BUTTON STYLES - 100% opacity normally, 60% opacity on hover */
-        .btn-view { 
-            background-color: white; 
-            color: #3498db; 
-            border: 2px solid #3498db; 
-            opacity: 1;
-            border-radius: 8px; 
-            padding: 10px 20px; 
-            transition: all 0.3s ease; 
-            font-weight: 500;
-            min-height: 45px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .btn-view:hover { 
-            background-color: #f0f9ff; 
-            border-color: #3498db;
-            opacity: 0.6;
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
-        }
-        
-        .btn-archive { 
-            background-color: white; 
-            color: #e74c3c; 
-            border: 2px solid #e74c3c; 
-            opacity: 1;
-            border-radius: 8px; 
-            padding: 10px 20px; 
-            transition: all 0.3s ease; 
-            font-weight: 500;
-            min-height: 45px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .btn-archive:hover { 
-            background-color: #fef2f2; 
-            border-color: #e74c3c;
-            opacity: 0.6;
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
-        }
-        
-        .btn-add-patient { 
-            background-color: white; 
-            color: #2ecc71; 
-            border: 2px solid #2ecc71; 
-            opacity: 1;
-            border-radius: 8px; 
-            padding: 10px 20px; 
-            transition: all 0.3s ease; 
-            font-weight: 500;
-            min-height: 45px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .btn-add-patient:hover { 
-            background-color: #f0fdf4; 
-            border-color: #2ecc71;
-            opacity: 0.6;
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
-        }
-        
-        .btn-primary { 
-            background-color: white; 
-            color: #3498db; 
-            border: 2px solid #3498db; 
-            opacity: 1;
-            border-radius: 8px; 
-            padding: 12px 24px; 
-            transition: all 0.3s ease; 
-            font-weight: 500;
-            min-height: 55px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-        }
-        .btn-primary:hover { 
-            background-color: #f0f9ff; 
-            border-color: #3498db;
-            opacity: 0.6;
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
-        }
-        
-        .btn-success { 
-            background-color: white; 
-            color: #2ecc71; 
-            border: 2px solid #2ecc71; 
-            opacity: 1;
-            border-radius: 8px; 
-            padding: 12px 24px; 
-            transition: all 0.3s ease; 
-            font-weight: 500;
-            min-height: 55px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-        }
-        .btn-success:hover { 
-            background-color: #f0fdf4; 
-            border-color: #2ecc71;
-            opacity: 0.6;
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
-        }
-        
-        .btn-gray { 
-            background-color: white; 
-            color: #6b7280; 
-            border: 2px solid #6b7280; 
-            opacity: 1;
-            border-radius: 8px; 
-            padding: 12px 24px; 
-            transition: all 0.3s ease; 
-            font-weight: 500;
-            min-height: 55px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-        }
-        .btn-gray:hover { 
-            background-color: #f9fafb; 
-            border-color: #6b7280;
-            opacity: 0.6;
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(107, 114, 128, 0.15);
-        }
-        
-        /* NEW: Print Button - Bigger and Readable */
-        .btn-print { 
-            background-color: white; 
-            color: #3498db; 
-            border: 2px solid #3498db; 
-            opacity: 1;
-            border-radius: 8px; 
-            padding: 14px 28px; 
-            transition: all 0.3s ease; 
-            font-weight: 600;
-            min-height: 60px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            width: 355px;
-            margin: 8px 0;
-        }
-        .btn-print:hover { 
-            background-color: #f0f9ff; 
-            border-color: #3498db;
-            opacity: 0.6;
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
-        }
-        
-        /* NEW: Edit Button */
-        .btn-edit { 
-            background-color: white; 
-            color: #f39c12; 
-            border: 2px solid #f39c12; 
-            opacity: 1;
-            border-radius: 8px; 
-            padding: 14px 28px; 
-            transition: all 0.3s ease; 
-            font-weight: 600;
-            min-height: 60px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            width: 355px;
-            margin: 8px 0;
-        }
-        .btn-edit:hover { 
-            background-color: #fef3c7; 
-            border-color: #f39c12;
-            opacity: 0.6;
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(243, 156, 18, 0.15);
-        }
-        
-        /* NEW: Save Medical Information Button - UPDATED with warmBlue border */
-        .btn-save-medical { 
-            background-color: white; 
-            color: #3498db; 
-            border: 3px solid #60acdfff;  /* Changed to warmBlue */
-            opacity: 1;
-            border-radius: 8px; 
-            padding: 14px 28px; 
-            transition: all 0.3s ease; 
-            font-weight: 600;
-            min-height: 60px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            width: 355px;
-            margin: 8px 0;
-        }
-        .btn-save-medical:hover { 
-            background-color: #f0f9ff; 
-            border-color: #f0f9ff;  /* Changed to warmBlue */
-            opacity: 0.6;
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
-        }
-        
-        #viewModal { backdrop-filter: blur(5px); transition: opacity 0.3s ease; }
-        #viewModal > div { transform: scale(0.95); transition: transform 0.3s ease; }
-        #viewModal[style*="display: flex"] > div { transform: scale(1); }
-        
-        #viewModal ::-webkit-scrollbar { width: 8px; }
-        #viewModal ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-        #viewModal ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        #viewModal ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        
-        #modalContent input:not([type="checkbox"]):not([type="radio"]),
-        #modalContent select,
-        #modalContent textarea { min-height: 48px; font-size: 16px; }
-        
-        #modalContent .grid { gap: 1.5rem; }
-        
-        @media (max-width: 1024px) { #viewModal > div { margin: 1rem; max-height: calc(100vh - 2rem); } }
-        @media (max-width: 768px) { #viewModal > div { margin: 0.5rem; max-height: calc(100vh - 1rem); } #viewModal .p-8 { padding: 1.5rem; } }
-        
-        .custom-notification { animation: slideIn 0.3s ease-out; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        
-        .visit-type-badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
-        .visit-type-checkup { background-color: #e0f2fe; color: #0369a1; }
-        .visit-type-consultation { background-color: #fef3c7; color: #92400e; }
-        .visit-type-emergency { background-color: #fee2e2; color: #b91c1c; }
-        .visit-type-followup { background-color: #d1fae5; color: #065f46; }
-        .readonly-field { background-color: #f9fafb; cursor: not-allowed; }
-        
-        /* Enhanced Pagination Styles */
-        .pagination-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 2rem;
-            padding: 1rem 0;
-            border-top: 1px solid #e2e8f0;
-        }
-        
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 0.5rem;
-            flex-grow: 1;
-        }
-        
-        .pagination-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 2.5rem;
-            height: 2.5rem;
-            border-radius: 8px;
-            background-color: white;
-            border: 1px solid #3498db;
-            opacity: 1;
-            color: #4b5563;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            text-decoration: none;
-        }
-        
-        .pagination-btn:hover {
-            background-color: #f0f9ff;
-            border-color: #3498db;
-            opacity: 0.6;
-            color: #374151;
-        }
-        
-        .pagination-btn.active {
-            background-color: white;
-            color: #3498db;
-            border: 2px solid #3498db;
-            opacity: 1;
-            font-weight: 600;
-        }
-        
-        .pagination-btn.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .pagination-btn.disabled:hover {
-            background-color: white;
-            color: #4b5563;
-            border-color: #3498db;
-            opacity: 0.5;
-        }
-        
-        .pagination-actions {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .btn-view-all {
-            background-color: white;
-            color: #3498db;
-            border: 2px solid #3498db;
-            opacity: 1;
-            border-radius: 8px;
-            padding: 12px 24px;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            font-weight: 500;
-            min-height: 55px;
-            font-size: 16px;
-        }
-        
-        .btn-view-all:hover {
-            background-color: #f0f9ff;
-            border-color: #3498db;
-            opacity: 0.6;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
-        }
-        
-        .btn-back-to-pagination {
-            background-color: white;
-            color: #3498db;
-            border: 2px solid #3498db;
-            opacity: 1;
-            border-radius: 8px;
-            padding: 12px 24px;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            font-weight: 500;
-            min-height: 55px;
-            font-size: 16px;
-            margin-bottom: 1rem;
-        }
-        
-        .btn-back-to-pagination:hover {
-            background-color: #f0f9ff;
-            border-color: #3498db;
-            opacity: 0.6;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
-        }
-        
-        /* Scrollable table for all records */
-        .scrollable-table-container {
-            max-height: 70vh;
-            overflow-y: auto;
-            border: 1px solid #e2e8f0;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-        }
-        
-        .scrollable-table-container table {
-            margin-bottom: 0;
-        }
-        
-        /* Form validation styles */
-        .field-empty { background-color: #fef2f2 !important; border-color: #fecaca !important; }
-        .field-filled { background-color: #f0f9ff !important; border-color: #bae6fd !important; }
-        .btn-disabled { 
-            background-color: #f9fafb !important; 
-            color: #9ca3af !important; 
-            border-color: #e5e7eb !important;
-            opacity: 1;
-            cursor: not-allowed !important; 
-            transform: none !important; 
-            box-shadow: none !important;
-        }
-        .btn-disabled:hover { 
-            background-color: #f9fafb !important; 
-            color: #9ca3af !important;
-            border-color: #e5e7eb !important;
-            opacity: 1;
-            transform: none !important; 
-            box-shadow: none !important;
-        }
-        
-        /* Enhanced Form Input Styles for Add Patient Modal - WITH STROKE EFFECT */
-        .form-input-modal {
-            border-radius: 8px !important;
-            padding: 16px 20px !important;
-            border: 2px solid #e2e8f0 !important;
-            transition: all 0.3s ease;
-            width: 100%;
-            font-size: 16px;
-            min-height: 52px;
-            background-color: white;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-        }
-        
-        .form-input-modal:focus {
-            outline: none;
-            border-color: #3498db !important;
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
-            background-color: white;
-        }
-        
-        .form-select-modal {
-            border-radius: 8px !important;
-            padding: 16px 20px !important;
-            border: 2px solid #e2e8f0 !important;
-            transition: all 0.3s ease;
-            width: 100%;
-            font-size: 16px;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 20px center;
-            background-repeat: no-repeat;
-            background-size: 1.5em 1.5em;
-            padding-right: 50px;
-            min-height: 52px;
-            background-color: white;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-        }
-        
-        .form-select-modal:focus {
-            outline: none;
-            border-color: #3498db !important;
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
-            background-color: white;
-        }
-        
-        .form-textarea-modal {
-            border-radius: 8px !important;
-            padding: 16px 20px !important;
-            border: 2px solid #e2e8f0 !important;
-            transition: all 0.3s ease;
-            width: 100%;
-            font-size: 16px;
-            resize: vertical;
-            min-height: 120px;
-            background-color: white;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-        }
-        
-        .form-textarea-modal:focus {
-            outline: none;
-            border-color: #3498db !important;
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
-            background-color: white;
-        }
-        
-        .form-label-modal {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #374151;
-            font-size: 14px;
-        }
-        
-        /* UPDATED: Changed form section title icons */
-        .form-section-title-modal {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: #3498db;
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 2px solid #f0f9ff;
-            display: flex;
-            align-items: center;
-        }
-        
-        .form-section-title-modal i {
-            margin-right: 10px;
-            font-size: 1.1em;
-            color: #3498db;
-        }
-        
-        .form-checkbox-modal {
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
-            border: 2px solid #e2e8f0;
-        }
-        
-        /* Add Patient Modal Specific Styles */
-        #addPatientModal { backdrop-filter: blur(5px); transition: opacity 0.3s ease; }
-        #addPatientModal > div { transform: scale(0.95); transition: transform 0.3s ease; }
-        #addPatientModal[style*="display: flex"] > div { transform: scale(1); }
-        
-        .modal-header {
-            background-color: white;
-            border-bottom: 2px solid #f0f9ff;
-        }
-        
-        .modal-grid-gap {
-            gap: 1.25rem !important;
-        }
-        
-        .modal-field-spacing {
-            margin-bottom: 1.25rem;
-        }
-        
-        /* Active Tab Styling */
-        .tab-btn {
-            position: relative;
-            transition: all 0.3s ease;
-        }
-        
-        .tab-btn.active {
-            color: #3498db;
-            border-bottom-color: #3498db;
-            background-color: #f0f9ff;
-        }
-        
-        .tab-btn:hover:not(.active) {
-            color: #3498db;
-            background-color: #f8fafc;
-        }
-        
-        /* UPDATED Search box styling - Consistent height and width with warmBlue border */
-        .search-input {
-            border: 2px solid #badff8ff !important;
-            background-color: white !important;
-            transition: all 0.3s ease;
-            border-radius: 8px !important;
-            padding: 16px 20px 16px 55px !important;
-            min-height: 55px !important;
-            font-size: 16px;
-            width: 355px !important;
-            box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
-            position: relative;
-        }
-        
-        .search-input:focus {
-            border-color: #84c0e9ff !important;
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
-        }
-        
-        .search-select {
-            border: 2px solid #badff8ff !important;
-            background-color: white !important;
-            transition: all 0.3s ease;
-            border-radius: 8px !important;
-            padding: 16px 20px !important;
-            min-height: 55px !important;
-            font-size: 16px;
-            width: 355px !important;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233498db' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 20px center;
-            background-repeat: no-repeat;
-            background-size: 1.5em 1.5em;
-            padding-right: 50px;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-        }
-        
-        .search-select:focus {
-            border-color: #f0f9ff !important;
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
-        }
-        
-        /* Search icon position */
-        .search-icon-container {
-            position: absolute;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 10;
-            pointer-events: none;
-        }
-        
-        .search-icon {
-            color: #3498db;
-            font-size: 18px;
-        }
-        
-        /* Table styling */
-        .patient-table th {
-            background-color: #f0f9ff;
-            color: #2c3e50;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        
-        .patient-table tr:hover {
-            background-color: #f8fafc;
-        }
-        
-        /* Main container styling */
-        .main-container {
-            background-color: white;
-            border: 1px solid #f0f9ff;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-        }
-        
-        /* Section backgrounds */
-        .section-bg {
-            background-color: white;
-            border: 1px solid #f0f9ff;
-            border-radius: 12px;
-        }
-        
-        /* Success/Error message styling */
-        .alert-success {
-            background-color: #f0fdf4;
-            border: 2px solid #bbf7d0;
-            color: #065f46;
-        }
-        
-        .alert-error {
-            background-color: #fef2f2;
-            border: 2px solid #fecaca;
-            color: #b91c1c;
-        }
-        
-        /* Search form layout */
-        .search-form-container {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            width: 100%;
-        }
-        
-        .search-field-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            width: 100%;
-        }
-        
-        @media (min-width: 768px) {
-            .search-form-container {
-                flex-direction: row;
-                align-items: flex-end;
-                gap: 1.5rem;
-            }
-            
-            .search-field-group {
-                width: auto;
-            }
-        }
-        
-        /* Ensure opacity is visible */
-        * {
-            --tw-border-opacity: 1 !important;
-        }
-        
-        /* Fix for browsers that don't support opacity */
-        .btn-view, .btn-archive, .btn-add-patient, .btn-primary, .btn-success, .btn-gray, 
-        .btn-print, .btn-edit, .btn-save-medical, .btn-view-all, .btn-back-to-pagination, .pagination-btn,
-        .search-input, .search-select {
-            border-style: solid !important;
-        }
-        
-        /* Hover state opacity */
-        .btn-view:hover, .btn-archive:hover, .btn-add-patient:hover, .btn-primary:hover, 
-        .btn-success:hover, .btn-gray:hover, .btn-print:hover, .btn-edit:hover, 
-        .btn-save-medical:hover, .btn-view-all:hover, .btn-back-to-pagination:hover, .pagination-btn:hover,
-        .search-input:focus, .search-select:focus {
-            border-color: inherit !important;
-        }
-        
-        /* Add these styles to your existing CSS in existing_info_patients.php */
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+body,
+.tab-btn,
+.patient-card,
+.modal,
+.patient-table,
+.btn-view,
+.btn-archive,
+.btn-add-patient,
+.btn-primary,
+.btn-success,
+.btn-gray,
+.btn-print,
+.btn-edit,
+.btn-save-medical,
+.pagination-btn,
+.btn-view-all,
+.btn-back-to-pagination,
+#modalContent input,
+#modalContent select,
+#modalContent textarea,
+.search-input,
+.search-select {
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.form-section-title-modal {
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 700 !important;
+}
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.patient-card { transition: all 0.3s ease; }
+.patient-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+.modal { transition: opacity 0.3s ease; }
+.required-field::after { content: " *"; color: #e74c3c; }
+.patient-table { width: 100%; border-collapse: collapse; }
+.patient-table th, .patient-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+.patient-table th { background-color: #f8fafc; font-weight: 600; color: #2c3e50; }
+.patient-table tr:hover { background-color: #f1f5f9; }
+.patient-id { font-weight: bold; color: #3498db; }
+.user-badge { background-color: #e0e7ff; color: #3730a3; display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+
+/* UPDATED BUTTON STYLES - 100% opacity normally, 60% opacity on hover */
+.btn-view {
+    background-color: white;
+    color: #3498db;
+    border: 2px solid #3498db;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 10px 20px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    min-height: 45px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-view:hover {
+    background-color: #f0f9ff;
+    border-color: #3498db;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+.btn-archive {
+    background-color: white;
+    color: #e74c3c;
+    border: 2px solid #e74c3c;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 10px 20px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    min-height: 45px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-archive:hover {
+    background-color: #fef2f2;
+    border-color: #e74c3c;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
+}
+
+.btn-add-patient {
+    background-color: white;
+    color: #2ecc71;
+    border: 2px solid #2ecc71;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 10px 20px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    min-height: 45px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-add-patient:hover {
+    background-color: #f0fdf4;
+    border-color: #2ecc71;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
+}
+
+.btn-primary {
+    background-color: white;
+    color: #3498db;
+    border: 2px solid #3498db;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 12px 24px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    min-height: 55px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+.btn-primary:hover {
+    background-color: #f0f9ff;
+    border-color: #3498db;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+.btn-success {
+    background-color: white;
+    color: #2ecc71;
+    border: 2px solid #2ecc71;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 12px 24px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    min-height: 55px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+.btn-success:hover {
+    background-color: #f0fdf4;
+    border-color: #2ecc71;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
+}
+
+.btn-gray {
+    background-color: white;
+    color: #6b7280;
+    border: 2px solid #6b7280;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 12px 24px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    min-height: 55px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+.btn-gray:hover {
+    background-color: #f9fafb;
+    border-color: #6b7280;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(107, 114, 128, 0.15);
+}
+
+/* NEW: Print Button - Bigger and Readable */
+.btn-print {
+    background-color: white;
+    color: #3498db;
+    border: 2px solid #3498db;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 14px 28px;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    min-height: 60px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    width: 355px;
+    margin: 8px 0;
+}
+.btn-print:hover {
+    background-color: #f0f9ff;
+    border-color: #3498db;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+/* NEW: Edit Button */
+.btn-edit {
+    background-color: white;
+    color: #f39c12;
+    border: 2px solid #f39c12;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 14px 28px;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    min-height: 60px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    width: 355px;
+    margin: 8px 0;
+}
+.btn-edit:hover {
+    background-color: #fef3c7;
+    border-color: #f39c12;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(243, 156, 18, 0.15);
+}
+
+/* NEW: Save Medical Information Button - UPDATED with warmBlue border */
+.btn-save-medical {
+    background-color: white;
+    color: #3498db;
+    border: 3px solid #60acdfff;  /* Changed to warmBlue */
+    opacity: 1;
+    border-radius: 8px;
+    padding: 14px 28px;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    min-height: 60px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    width: 355px;
+    margin: 8px 0;
+}
+.btn-save-medical:hover {
+    background-color: #f0f9ff;
+    border-color: #f0f9ff;  /* Changed to warmBlue */
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+#viewModal { backdrop-filter: blur(5px); transition: opacity 0.3s ease; }
+#viewModal > div { transform: scale(0.95); transition: transform 0.3s ease; }
+#viewModal[style*="display: flex"] > div { transform: scale(1); }
+
+#viewModal ::-webkit-scrollbar { width: 8px; }
+#viewModal ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+#viewModal ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+#viewModal ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+#modalContent input:not([type="checkbox"]):not([type="radio"]),
+#modalContent select,
+#modalContent textarea { min-height: 48px; font-size: 16px; }
+
+#modalContent .grid { gap: 1.5rem; }
+
+@media (max-width: 1024px) { #viewModal > div { margin: 1rem; max-height: calc(100vh - 2rem); } }
+@media (max-width: 768px) { #viewModal > div { margin: 0.5rem; max-height: calc(100vh - 1rem); } #viewModal .p-8 { padding: 1.5rem; } }
+
+.custom-notification { animation: slideIn 0.3s ease-out; }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+.visit-type-badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+.visit-type-checkup { background-color: #e0f2fe; color: #0369a1; }
+.visit-type-consultation { background-color: #fef3c7; color: #92400e; }
+.visit-type-emergency { background-color: #fee2e2; color: #b91c1c; }
+.visit-type-followup { background-color: #d1fae5; color: #065f46; }
+.readonly-field { background-color: #f9fafb; cursor: not-allowed; }
+
+/* Enhanced Pagination Styles */
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2rem;
+    padding: 1rem 0;
+    border-top: 1px solid #e2e8f0;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    flex-grow: 1;
+}
+
+.pagination-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 8px;
+    background-color: white;
+    border: 1px solid #3498db;
+    opacity: 1;
+    color: #4b5563;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.pagination-btn:hover {
+    background-color: #f0f9ff;
+    border-color: #3498db;
+    opacity: 0.6;
+    color: #374151;
+}
+
+.pagination-btn.active {
+    background-color: white;
+    color: #3498db;
+    border: 2px solid #3498db;
+    opacity: 1;
+    font-weight: 600;
+}
+
+.pagination-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pagination-btn.disabled:hover {
+    background-color: white;
+    color: #4b5563;
+    border-color: #3498db;
+    opacity: 0.5;
+}
+
+.pagination-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.btn-view-all {
+    background-color: white;
+    color: #3498db;
+    border: 2px solid #3498db;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 12px 24px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    font-weight: 500;
+    min-height: 55px;
+    font-size: 16px;
+}
+
+.btn-view-all:hover {
+    background-color: #f0f9ff;
+    border-color: #3498db;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+.btn-back-to-pagination {
+    background-color: white;
+    color: #3498db;
+    border: 2px solid #3498db;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 12px 24px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    font-weight: 500;
+    min-height: 55px;
+    font-size: 16px;
+    margin-bottom: 1rem;
+}
+
+.btn-back-to-pagination:hover {
+    background-color: #f0f9ff;
+    border-color: #3498db;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+/* Scrollable table for all records */
+.scrollable-table-container {
+    max-height: 70vh;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.scrollable-table-container table {
+    margin-bottom: 0;
+}
+
+/* Form validation styles */
+.field-empty { background-color: #fef2f2 !important; border-color: #fecaca !important; }
+.field-filled { background-color: #f0f9ff !important; border-color: #bae6fd !important; }
+.btn-disabled {
+    background-color: #f9fafb !important;
+    color: #9ca3af !important;
+    border-color: #e5e7eb !important;
+    opacity: 1;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+.btn-disabled:hover {
+    background-color: #f9fafb !important;
+    color: #9ca3af !important;
+    border-color: #e5e7eb !important;
+    opacity: 1;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Enhanced Form Input Styles for Add Patient Modal - WITH STROKE EFFECT */
+.form-input-modal {
+    border-radius: 8px !important;
+    padding: 16px 20px !important;
+    border: 2px solid #e2e8f0 !important;
+    transition: all 0.3s ease;
+    width: 100%;
+    font-size: 16px;
+    min-height: 52px;
+    background-color: white;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.form-input-modal:focus {
+    outline: none;
+    border-color: #3498db !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    background-color: white;
+}
+
+.form-select-modal {
+    border-radius: 8px !important;
+    padding: 16px 20px !important;
+    border: 2px solid #e2e8f0 !important;
+    transition: all 0.3s ease;
+    width: 100%;
+    font-size: 16px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 20px center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 50px;
+    min-height: 52px;
+    background-color: white;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.form-select-modal:focus {
+    outline: none;
+    border-color: #3498db !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    background-color: white;
+}
+
+.form-textarea-modal {
+    border-radius: 8px !important;
+    padding: 16px 20px !important;
+    border: 2px solid #e2e8f0 !important;
+    transition: all 0.3s ease;
+    width: 100%;
+    font-size: 16px;
+    resize: vertical;
+    min-height: 120px;
+    background-color: white;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.form-textarea-modal:focus {
+    outline: none;
+    border-color: #3498db !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    background-color: white;
+}
+
+.form-label-modal {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #374151;
+    font-size: 14px;
+}
+
+/* UPDATED: Changed form section title icons */
+.form-section-title-modal {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #3498db;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #f0f9ff;
+    display: flex;
+    align-items: center;
+}
+
+.form-section-title-modal i {
+    margin-right: 10px;
+    font-size: 1.1em;
+    color: #3498db;
+}
+
+.form-checkbox-modal {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 2px solid #e2e8f0;
+}
+
+/* Add Patient Modal Specific Styles */
+#addPatientModal { backdrop-filter: blur(5px); transition: opacity 0.3s ease; }
+#addPatientModal > div { transform: scale(0.95); transition: transform 0.3s ease; }
+#addPatientModal[style*="display: flex"] > div { transform: scale(1); }
+
+.modal-header {
+    background-color: white;
+    border-bottom: 2px solid #f0f9ff;
+}
+
+.modal-grid-gap {
+    gap: 1.25rem !important;
+}
+
+.modal-field-spacing {
+    margin-bottom: 1.25rem;
+}
+
+/* Active Tab Styling */
+.tab-btn {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+    color: #3498db;
+    border-bottom-color: #3498db;
+    background-color: #f0f9ff;
+}
+
+.tab-btn:hover:not(.active) {
+    color: #3498db;
+    background-color: #f8fafc;
+}
+
+/* UPDATED Search box styling - Consistent height and width with warmBlue border */
+.search-input {
+    border: 2px solid #badff8ff !important;
+    background-color: white !important;
+    transition: all 0.3s ease;
+    border-radius: 8px !important;
+    padding: 16px 20px 16px 55px !important;
+    min-height: 55px !important;
+    font-size: 16px;
+    width: 355px !important;
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
+    position: relative;
+}
+
+.search-input:focus {
+    border-color: #84c0e9ff !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.search-select {
+    border: 2px solid #badff8ff !important;
+    background-color: white !important;
+    transition: all 0.3s ease;
+    border-radius: 8px !important;
+    padding: 16px 20px !important;
+    min-height: 55px !important;
+    font-size: 16px;
+    width: 355px !important;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233498db' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 20px center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 50px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.search-select:focus {
+    border-color: #f0f9ff !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Search icon position */
+.search-icon-container {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.search-icon {
+    color: #3498db;
+    font-size: 18px;
+}
+
+/* Table styling */
+.patient-table th {
+    background-color: #f0f9ff;
+    color: #2c3e50;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.patient-table tr:hover {
+    background-color: #f8fafc;
+}
+
+/* Main container styling */
+.main-container {
+    background-color: white;
+    border: 1px solid #f0f9ff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Section backgrounds */
+.section-bg {
+    background-color: white;
+    border: 1px solid #f0f9ff;
+    border-radius: 12px;
+}
+
+/* Success/Error message styling */
+.alert-success {
+    background-color: #f0fdf4;
+    border: 2px solid #bbf7d0;
+    color: #065f46;
+}
+
+.alert-error {
+    background-color: #fef2f2;
+    border: 2px solid #fecaca;
+    color: #b91c1c;
+}
+
+/* Search form layout */
+.search-form-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+}
+
+.search-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+@media (min-width: 768px) {
+    .search-form-container {
+        flex-direction: row;
+        align-items: flex-end;
+        gap: 1.5rem;
+    }
+
+    .search-field-group {
+        width: auto;
+    }
+}
+
+/* Ensure opacity is visible */
+* {
+    --tw-border-opacity: 1 !important;
+}
+
+/* Fix for browsers that don't support opacity */
+.btn-view, .btn-archive, .btn-add-patient, .btn-primary, .btn-success, .btn-gray,
+.btn-print, .btn-edit, .btn-save-medical, .btn-view-all, .btn-back-to-pagination, .pagination-btn,
+.search-input, .search-select {
+    border-style: solid !important;
+}
+
+/* Hover state opacity */
+.btn-view:hover, .btn-archive:hover, .btn-add-patient:hover, .btn-primary:hover,
+.btn-success:hover, .btn-gray:hover, .btn-print:hover, .btn-edit:hover,
+.btn-save-medical:hover, .btn-view-all:hover, .btn-back-to-pagination:hover, .pagination-btn:hover,
+.search-input:focus, .search-select:focus {
+    border-color: inherit !important;
+}
+
+/* Add these styles to your existing CSS in existing_info_patients.php */
 
 /* Success modal specific styles */
 .success-modal-bg {

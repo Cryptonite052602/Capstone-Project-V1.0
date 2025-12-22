@@ -115,10 +115,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         
                         <!-- Title -->
-                        <h3 class="text-2xl font-semibold text-gray-800 mb-3">Login Successful</h3>
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-3">You’ve successfully signed in.</h3>
                         
                         <!-- Instruction -->
-                        <p class="text-gray-600 text-lg">Redirecting to dashboard...</p>
+                        <p class="text-gray-600 text-lg">Taking you to your dashboard…</p>
                     </div>
                 </div>
             </div>

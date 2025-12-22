@@ -56,10 +56,10 @@ echo <<<HTML
                 </div>
                 
                 <!-- Title -->
-                <h3 class="text-2xl font-semibold text-gray-800 mb-3">Logging Out</h3>
+                <h3 class="text-2xl font-semibold text-gray-800 mb-3">You’re now logged out.</h3>
                 
                 <!-- Instruction -->
-                <p class="text-gray-600 text-lg">Please wait while we securely sign you out...</p>
+                <p class="text-gray-600 text-lg">See you next time!</p>
             </div>
         </div>
     </div>

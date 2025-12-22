@@ -405,6 +405,7 @@ function generateAppointmentTicket($appointmentData, $priorityNumber) {
     <!DOCTYPE html>
     <html>
     <head>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
         <meta charset="utf-8">
         <title>Appointment Ticket - ' . $priorityNumber . '</title>
         <style>
