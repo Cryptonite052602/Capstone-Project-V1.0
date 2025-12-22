@@ -47,52 +47,516 @@ if (isset($_SESSION['user']['id'])) {
     <script src="/community-health-tracker/assets/js/scripts.js" defer></script>
 </head>
 <style>
-    /* Smooth transition for sidebar */
-    .sidebar {
-        transition: transform 0.3s ease-in-out;
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+body,
+.sidebar,
+.nav-tab,
+.logout-btn,
+.time-display-container,
+.continue-btn,
+.complete-btn,
+.profile-upload-btn,
+.profile-remove-btn,
+.logout-cancel-btn,
+.logout-confirm-btn {
+    font-family: 'Poppins', sans-serif !important;
+}
+
+/* Smooth transition for sidebar */
+.sidebar {
+    transition: transform 0.3s ease-in-out;
+}
+
+.sidebar-hidden {
+    transform: translateX(-100%);
+}
+
+/* Optional: Add overlay for mobile */
+.overlay {
+    background: rgba(0, 0, 0, 0.5);
+    transition: opacity 0.3s ease-in-out;
+}
+
+.overlay-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Blinking colon animation */
+@keyframes blink {
+    0% {
+        opacity: 1;
     }
 
-    .sidebar-hidden {
-        transform: translateX(-100%);
-    }
-
-    /* Optional: Add overlay for mobile */
-    .overlay {
-        background: rgba(0, 0, 0, 0.5);
-        transition: opacity 0.3s ease-in-out;
-    }
-
-    .overlay-hidden {
+    50% {
         opacity: 0;
-        pointer-events: none;
     }
 
-    /* Blinking colon animation */
-    @keyframes blink {
-        0% {
-            opacity: 1;
-        }
-
-        50% {
-            opacity: 0;
-        }
-
-        100% {
-            opacity: 1;
-        }
+    100% {
+        opacity: 1;
     }
+}
 
-    .blinking-colon {
-        animation: blink 1s infinite;
-    }
+.blinking-colon {
+    animation: blink 1s infinite;
+}
 
-    /* CLEAN: Simple Navigation Tab Styles */
-    .nav-tab-container {
-        display: flex;
-        align-items: center;
+/* CLEAN: Simple Navigation Tab Styles */
+.nav-tab-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nav-tab {
+    position: relative;
+    transition: all 0.3s ease;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    z-index: 1;
+}
+
+.nav-tab.active {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.nav-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 2px;
+    background: white;
+    border-radius: 2px;
+}
+
+.nav-tab:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* CLEAN: Simple Logout Button - UPDATED FOR FULL ROUND */
+.logout-btn {
+    background: #ef4444;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px !important; /* Full round radius */
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    outline: none;
+}
+
+.logout-btn:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+/* NEW: Improved time display containers - Horizontal layout */
+.time-display-container {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.6rem 1.2rem;
+    border-radius: 0.75rem;
+    margin-left: auto;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.staff-time-container {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.user-time-container {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.admin-time-container {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* NEW: Horizontal time display styles */
+.time-display-horizontal {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.date-display-horizontal {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.time-display-main-horizontal {
+    display: flex;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+.time-separator {
+    height: 24px;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.4);
+    margin: 0 0.5rem;
+}
+
+.time-zone {
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+    opacity: 0.9;
+    font-style: italic;
+    font-weight: 500;
+}
+
+/* Hidden refresh indicator */
+.refresh-indicator {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+}
+
+/* Form validation styles */
+.form-input:invalid {
+    border-color: #fca5a5;
+}
+
+.form-input:valid {
+    border-color: #74b4fdff;
+}
+
+/* Updated Registration Button Styles with Rounded XL Sides */
+.continue-btn, .complete-btn {
+    width: 100%;
+    border-radius: 9999px !important; /* rounded-full equivalent */
+    padding: 0.75rem 1.5rem !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    color: white !important;
+    transition: all 0.3s ease !important;
+    border: none !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    text-decoration: none !important; /* Remove underline for links */
+}
+
+/* First Registration Modal Button (Red) */
+.continue-btn {
+    background-color: #4A90E2 !important;
+}
+
+.continue-btn:hover {
+    background-color: #337ed3ff !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(252, 86, 108, 0.3) !important;
+}
+
+/* Complete Registration, Login, and Book Appointment Buttons (Warm Blue) */
+.complete-btn {
+    background-color: #4A90E2 !important;
+}
+
+.complete-btn:hover {
+    background-color: #357ABD !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(74, 144, 226, 0.3) !important;
+}
+
+.continue-btn:active, .complete-btn:active {
+    transform: scale(0.98) !important;
+}
+
+.continue-btn:disabled, .complete-btn:disabled {
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+    opacity: 0.5 !important;
+}
+
+.continue-btn:disabled {
+    background-color: #4A90E2 !important;
+}
+
+.complete-btn:disabled {
+    background-color: #4A90E2 !important;
+}
+
+.continue-btn svg, .complete-btn svg {
+    width: 16px !important;
+    height: 16px !important;
+    margin-left: 8px !important;
+}
+
+.continue-btn:disabled:hover, .complete-btn:disabled:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Logo image styles */
+.logo-image {
+    width: 65px;
+    height: 65px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Header title styles */
+.header-title-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.barangay-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    margin-bottom: 2px;
+    opacity: 0.9;
+}
+
+.main-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    line-height: 1.2;
+}
+
+/* Profile section styles */
+.profile-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-left: 1rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.profile-avatar {
+    background-color: #d1d5db;
+    height: 32px;
+    width: 32px;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.profile-avatar:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.profile-avatar.has-image::after {
+    content: 'Change';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.profile-avatar.has-image:hover::after {
+    opacity: 1;
+}
+
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.welcome-text {
+    color: white;
+    font-size: 0.875rem;
+}
+
+.username-text {
+    font-size: 0.75rem;
+}
+
+/* NEW: Enhanced Modal Styles */
+.modal-overlay {
+    background: rgba(0, 0, 0, 0.5);
+    transition: opacity 0.3s ease-in-out;
+}
+
+.modal-content {
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    transform: scale(0.95);
+    opacity: 0;
+}
+
+.modal-content.open {
+    transform: scale(1);
+    opacity: 1;
+}
+
+.modal-close-btn {
+    transition: all 0.3s ease;
+    padding: 0.5rem;
+    border-radius: 50%;
+}
+
+.modal-close-btn:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+    transform: rotate(90deg);
+}
+
+/* Profile Picture Upload Modal */
+.profile-modal-content {
+    background: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.profile-preview {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid #3C96E1;
+    margin: 0 auto;
+}
+
+.profile-upload-btn {
+    background: #3C96E1;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.profile-upload-btn:hover {
+    background: #2B7CC9;
+    transform: translateY(-1px);
+}
+
+.profile-remove-btn {
+    background: #ef4444;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.profile-remove-btn:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+/* Logout Modal Styles */
+.logout-modal-content {
+    background: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.logout-modal-buttons {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.logout-cancel-btn {
+    flex: 1;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 2px solid #d1d5db;
+    background: white;
+    color: #4b5563;
+    cursor: pointer;
+}
+
+.logout-cancel-btn:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.logout-confirm-btn {
+    flex: 1;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+    background: #ef4444;
+    color: white;
+    cursor: pointer;
+}
+
+.logout-confirm-btn:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+/* Add these new styles for disabled buttons */
+.continue-btn:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.continue-btn:disabled:hover {
+    background-color: #4A90E2 !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+
+    .staff-nav-container,
+    .user-nav-container,
+    .admin-nav-container {
+        flex-direction: column;
         gap: 0.5rem;
     }
 
+<<<<<<< HEAD
     .nav-tab {
         position: relative;
         transition: all 0.3s ease;
@@ -146,519 +610,134 @@ if (isset($_SESSION['user']['id'])) {
     }
 
     /* NEW: Improved time display containers - Horizontal layout */
+=======
+>>>>>>> change-process
     .time-display-container {
-        display: flex;
-        align-items: center;
-        background: rgba(255, 255, 255, 0.15);
-        padding: 0.6rem 1.2rem;
-        border-radius: 0.75rem;
-        margin-left: auto;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-left: 0;
+        align-self: flex-end;
     }
 
-    .staff-time-container {
-        background-color: rgba(255, 255, 255, 0.15);
+    .nav-tab-container {
+        justify-content: center;
     }
 
-    .user-time-container {
-        background-color: rgba(255, 255, 255, 0.15);
+    .search-input {
+        width: 200px;
     }
+}
 
-    .admin-time-container {
-        background-color: rgba(255, 255, 255, 0.15);
-    }
-
-    /* NEW: Horizontal time display styles */
-    .time-display-horizontal {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
+@media (max-width: 768px) {
+    .time-display-container {
+        padding: 0.5rem 1rem;
     }
 
     .date-display-horizontal {
-        display: flex;
-        align-items: center;
-        font-size: 0.9rem;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        white-space: nowrap;
+        font-size: 0.8rem;
     }
 
     .time-display-main-horizontal {
-        display: flex;
-        align-items: center;
-        font-size: 1rem;
-        font-weight: 700;
-        letter-spacing: 1px;
-        white-space: nowrap;
+        font-size: 0.9rem;
     }
 
-    .time-separator {
-        height: 24px;
-        width: 1px;
-        background: rgba(255, 255, 255, 0.4);
-        margin: 0 0.5rem;
+    .nav-tab {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+    }
+
+    .logout-btn {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
     }
 
     .time-zone {
+<<<<<<< HEAD
         font-size: 0.75rem;
         margin-left: 0.25rem;
         opacity: 0.9;
         font-family: 'Poppins', sans-serif;
         font-weight: 500;
+=======
+        display: none;
+>>>>>>> change-process
     }
 
-    /* Hidden refresh indicator */
-    .refresh-indicator {
-        position: absolute;
-        width: 0;
-        height: 0;
-        overflow: hidden;
-        opacity: 0;
-    }
-
-    /* Form validation styles */
-    .form-input:invalid {
-        border-color: #fca5a5;
-    }
-
-    .form-input:valid {
-        border-color: #74b4fdff;
-    }
-
-    /* Updated Registration Button Styles with Rounded XL Sides */
-    .continue-btn, .complete-btn {
-        width: 100%;
-        border-radius: 9999px !important; /* rounded-full equivalent */
-        padding: 0.75rem 1.5rem !important;
-        font-size: 1rem !important;
-        font-weight: 600 !important;
-        color: white !important;
-        transition: all 0.3s ease !important;
-        border: none !important;
-        cursor: pointer !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-        text-decoration: none !important; /* Remove underline for links */
-    }
-
-    /* First Registration Modal Button (Red) */
-    .continue-btn {
-        background-color: #4A90E2 !important;
-    }
-
-    .continue-btn:hover {
-        background-color: #337ed3ff !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 8px rgba(252, 86, 108, 0.3) !important;
-    }
-
-    /* Complete Registration, Login, and Book Appointment Buttons (Warm Blue) */
-    .complete-btn {
-        background-color: #4A90E2 !important;
-    }
-
-    .complete-btn:hover {
-        background-color: #357ABD !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 8px rgba(74, 144, 226, 0.3) !important;
-    }
-
-    .continue-btn:active, .complete-btn:active {
-        transform: scale(0.98) !important;
-    }
-
-    .continue-btn:disabled, .complete-btn:disabled {
-        cursor: not-allowed !important;
-        transform: none !important;
-        box-shadow: none !important;
-        opacity: 0.5 !important;
-    }
-
-    .continue-btn:disabled {
-        background-color: #4A90E2 !important;
-    }
-
-    .complete-btn:disabled {
-        background-color: #4A90E2 !important;
-    }
-
-    .continue-btn svg, .complete-btn svg {
-        width: 16px !important;
-        height: 16px !important;
-        margin-left: 8px !important;
-    }
-
-    .continue-btn:disabled:hover, .complete-btn:disabled:hover {
-        transform: none !important;
-        box-shadow: none !important;
-    }
-
-    /* Logo image styles */
     .logo-image {
-        width: 65px;
-        height: 65px;
-        border-radius: 50%;
-        object-fit: cover;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    /* Header title styles */
-    .header-title-container {
-        display: flex;
-        flex-direction: column;
+        width: 50px;
+        height: 50px;
     }
 
     .barangay-text {
-        font-size: 0.875rem;
-        font-weight: 500;
-        line-height: 1;
-        margin-bottom: 2px;
-        opacity: 0.9;
+        font-size: 0.8rem;
     }
 
     .main-title {
-        font-size: 1.5rem;
-        font-weight: bold;
-        line-height: 1.2;
+        font-size: 1.25rem;
     }
 
-    /* Profile section styles */
+    .search-input {
+        width: 180px;
+    }
+
     .profile-section {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding-left: 1rem;
-        border-left: 1px solid rgba(255, 255, 255, 0.3);
+        padding-left: 0.5rem;
     }
 
     .profile-avatar {
-        background-color: #d1d5db;
-        height: 32px;
-        width: 32px;
-        border-radius: 50%;
-        background-size: cover;
-        background-position: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        position: relative;
+        height: 28px;
+        width: 28px;
     }
+}
 
-    .profile-avatar:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    .profile-avatar.has-image::after {
-        content: 'Change';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.6rem;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-
-    .profile-avatar.has-image:hover::after {
-        opacity: 1;
-    }
-
-    .profile-info {
-        display: flex;
+@media (max-width: 640px) {
+    .time-display-horizontal {
         flex-direction: column;
-        align-items: flex-start;
+        gap: 0.2rem;
     }
 
-    .welcome-text {
-        color: white;
-        font-size: 0.875rem;
+    .time-separator {
+        display: none;
     }
 
-    .username-text {
+    .date-display-horizontal {
         font-size: 0.75rem;
     }
 
-    /* NEW: Enhanced Modal Styles */
-    .modal-overlay {
-        background: rgba(0, 0, 0, 0.5);
-        transition: opacity 0.3s ease-in-out;
+    .time-display-main-horizontal {
+        font-size: 0.85rem;
     }
 
-    .modal-content {
-        transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
-        transform: scale(0.95);
-        opacity: 0;
+    .nav-tab-container {
+        flex-wrap: wrap;
+        justify-content: center;
     }
 
-    .modal-content.open {
-        transform: scale(1);
-        opacity: 1;
+    .nav-tab {
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
     }
 
-    .modal-close-btn {
-        transition: all 0.3s ease;
-        padding: 0.5rem;
-        border-radius: 50%;
+    .logo-image {
+        width: 45px;
+        height: 45px;
     }
 
-    .modal-close-btn:hover {
-        background-color: rgba(0, 0, 0, 0.1);
-        transform: rotate(90deg);
+    .barangay-text {
+        font-size: 0.75rem;
     }
 
-    /* Profile Picture Upload Modal */
-    .profile-modal-content {
-        background: white;
-        border-radius: 0.75rem;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    .main-title {
+        font-size: 1.1rem;
     }
 
-    .profile-preview {
+    .search-input {
         width: 150px;
-        height: 150px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 4px solid #3C96E1;
-        margin: 0 auto;
+        font-size: 0.875rem;
     }
 
-    .profile-upload-btn {
-        background: #3C96E1;
-        color: white;
-        padding: 0.75rem 1.5rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        border: none;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
+    .profile-info {
+        display: none;
     }
-
-    .profile-upload-btn:hover {
-        background: #2B7CC9;
-        transform: translateY(-1px);
-    }
-
-    .profile-remove-btn {
-        background: #ef4444;
-        color: white;
-        padding: 0.75rem 1.5rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        border: none;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .profile-remove-btn:hover {
-        background: #dc2626;
-        transform: translateY(-1px);
-    }
-
-    /* Logout Modal Styles */
-    .logout-modal-content {
-        background: white;
-        border-radius: 0.75rem;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    }
-
-    .logout-modal-buttons {
-        display: flex;
-        gap: 0.75rem;
-        margin-top: 1.5rem;
-    }
-
-    .logout-cancel-btn {
-        flex: 1;
-        padding: 0.75rem 1.5rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        border: 2px solid #d1d5db;
-        background: white;
-        color: #4b5563;
-        cursor: pointer;
-    }
-
-    .logout-cancel-btn:hover {
-        background: #f3f4f6;
-        border-color: #9ca3af;
-    }
-
-    .logout-confirm-btn {
-        flex: 1;
-        padding: 0.75rem 1.5rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        border: none;
-        background: #ef4444;
-        color: white;
-        cursor: pointer;
-    }
-
-    .logout-confirm-btn:hover {
-        background: #dc2626;
-        transform: translateY(-1px);
-    }
-
-    /* Add these new styles for disabled buttons */
-    .continue-btn:disabled {
-        opacity: 0.5 !important;
-        cursor: not-allowed !important;
-        transform: none !important;
-        box-shadow: none !important;
-    }
-
-    .continue-btn:disabled:hover {
-        background-color: #4A90E2 !important;
-        transform: none !important;
-        box-shadow: none !important;
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 1024px) {
-
-        .staff-nav-container,
-        .user-nav-container,
-        .admin-nav-container {
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .time-display-container {
-            margin-left: 0;
-            align-self: flex-end;
-        }
-
-        .nav-tab-container {
-            justify-content: center;
-        }
-
-        .search-input {
-            width: 200px;
-        }
-    }
-
-    @media (max-width: 768px) {
-        .time-display-container {
-            padding: 0.5rem 1rem;
-        }
-
-        .date-display-horizontal {
-            font-size: 0.8rem;
-        }
-
-        .time-display-main-horizontal {
-            font-size: 0.9rem;
-        }
-
-        .nav-tab {
-            padding: 0.6rem 1.2rem;
-            font-size: 0.9rem;
-        }
-
-        .logout-btn {
-            padding: 0.6rem 1.2rem;
-            font-size: 0.9rem;
-        }
-
-        .time-zone {
-            display: none;
-        }
-
-        .logo-image {
-            width: 50px;
-            height: 50px;
-        }
-
-        .barangay-text {
-            font-size: 0.8rem;
-        }
-
-        .main-title {
-            font-size: 1.25rem;
-        }
-
-        .search-input {
-            width: 180px;
-        }
-
-        .profile-section {
-            padding-left: 0.5rem;
-        }
-
-        .profile-avatar {
-            height: 28px;
-            width: 28px;
-        }
-    }
-
-    @media (max-width: 640px) {
-        .time-display-horizontal {
-            flex-direction: column;
-            gap: 0.2rem;
-        }
-
-        .time-separator {
-            display: none;
-        }
-
-        .date-display-horizontal {
-            font-size: 0.75rem;
-        }
-
-        .time-display-main-horizontal {
-            font-size: 0.85rem;
-        }
-
-        .nav-tab-container {
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .nav-tab {
-            padding: 0.5rem 1rem;
-            font-size: 0.85rem;
-        }
-
-        .logo-image {
-            width: 45px;
-            height: 45px;
-        }
-
-        .barangay-text {
-            font-size: 0.75rem;
-        }
-
-        .main-title {
-            font-size: 1.1rem;
-        }
-
-        .search-input {
-            width: 150px;
-            font-size: 0.875rem;
-        }
-
-        .profile-info {
-            display: none;
-        }
-    }
+}
 </style>
 
 <body class="bg-[#F8F8F]">
@@ -1016,7 +1095,7 @@ if (isset($_SESSION['user']['id'])) {
                     <div class="hidden md:flex items-center">
                         <a href="#" onclick="openModal()"
                             class="complete-btn bg-[#4A90E2] mx-16 text-lg text-white rounded-full flex items-center justify-center shadow-md hover:shadow-lg">
-                            Book Appointment
+                            Schedule Appointment
                         </a>
                     </div>
                 </div>

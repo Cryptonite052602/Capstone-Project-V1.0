@@ -232,7 +232,7 @@ try {
                 <!-- LEFT -->
                 <div class="relative bg-white/90 backdrop-blur-sm w-full md:w-1/2 h-[22rem] md:h-auto flex items-center justify-center overflow-hidden p-6 sm:p-10">
                     <!-- IMAGE BACKGROUND -->
-                    <img src="asssets/images/hand-image.png" alt="Hand image"
+                    <img src="asssets/images/Medical.png" alt="Hand image"
                         class="absolute w-[18rem] sm:w-[24rem] md:w-[30rem] h-[18rem] sm:h-[24rem] md:h-[30rem] object-contain opacity-70 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
 
                     <!-- TEXT CONTENT -->
