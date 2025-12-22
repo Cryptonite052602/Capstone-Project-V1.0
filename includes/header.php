@@ -556,7 +556,6 @@ body,
         gap: 0.5rem;
     }
 
-<<<<<<< HEAD
     .nav-tab {
         position: relative;
         transition: all 0.3s ease;
@@ -610,8 +609,6 @@ body,
     }
 
     /* NEW: Improved time display containers - Horizontal layout */
-=======
->>>>>>> change-process
     .time-display-container {
         margin-left: 0;
         align-self: flex-end;
@@ -650,15 +647,12 @@ body,
     }
 
     .time-zone {
-<<<<<<< HEAD
         font-size: 0.75rem;
         margin-left: 0.25rem;
         opacity: 0.9;
         font-family: 'Poppins', sans-serif;
         font-weight: 500;
-=======
         display: none;
->>>>>>> change-process
     }
 
     .logo-image {
