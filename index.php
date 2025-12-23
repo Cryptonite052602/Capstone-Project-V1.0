@@ -519,25 +519,47 @@ try {
             </div>
         </div>
 
-        <!-- CTA Section -->
         <div class="bg-[#0073D3] relative">
-            <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:py-16 lg:px-8 lg:flex lg:items-center lg:justify-between">
-                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                    <span class="block">Ready to improve your community's health?</span>
-                    <span class="block text-blue-200">Get started today.</span>
-                </h2>
-                <div class="mt-8 flex lg:mt-0 lg:flex-shrink-0">
-                    <div class="inline-flex rounded-md shadow">
-                        <a href="/register.php"
-                            class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-[#4A90E2] bg-white hover:bg-blue-50 transition-colors">
-                            Sign up for free
-                        </a>
-                    </div>
-                </div>
+    <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:py-16 lg:px-8 lg:flex lg:items-center lg:justify-between">
+        <div>
+            <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                <span class="block">Ready to improve your community's health?</span>
+                <span class="block text-blue-200">Get started today.</span>
+            </h2>
+            
+            <div class="mt-4 flex items-center space-x-6">
+                <a href="https://twitter.com/yourcommunity" target="_blank" rel="noopener noreferrer" class="text-white hover:text-blue-200 transition-colors" aria-label="Twitter">
+                    <svg class="h-8 w-8" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                            d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.007-.531.801-.581 1.498-1.309 2.049-2.138-.745.33-1.558.552-2.396.653.859-.516 1.517-1.332 1.815-2.28-.79-.475-1.688-.823-2.622-1.018-.767-.621-1.854-1.28-3.033-1.28-2.26 0-4.09 1.83-4.09 4.09 0 .32.036.63.104.93-3.4-.17-6.42-1.79-8.44-4.25-.35.6-.55 1.29-.55 2.02 0 1.42.72 2.68 1.82 3.42-.67 0-1.3-.2-1.85-.5v.05c0 1.99 1.41 3.65 3.27 4.03-.34.09-.7.14-1.07.14-.26 0-.52-.02-.77-.07.51 1.62 2.02 2.8 3.79 2.83-1.39 1.09-3.14 1.74-5.05 1.74-.32 0-.64-.02-.95-.06 1.8 1.15 3.93 1.82 6.13 1.82"/>
+                    </svg>
+                </a>
+                <a href="https://facebook.com/yourcommunity" target="_blank" rel="noopener noreferrer" class="text-white hover:text-blue-200 transition-colors" aria-label="Facebook">
+                    <svg class="h-8 w-8" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                            d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h8v-7h-3v-3h3V9c0-3.32 1.54-5 5-5h3v3h-3c-1.1 0-1 0-1 1v2h4l-1 3h-3v7h6c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                </a>
+                <a href="https://instagram.com/yourcommunity" target="_blank" rel="noopener noreferrer" class="text-white hover:text-blue-200 transition-colors" aria-label="Instagram">
+                    <svg class="h-8 w-8" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                            d="M12 4.75c2.4 0 2.67.01 3.62.05a4.78 4.78 0 0 1 3.23 1.12c.98.98 1.12 2.08 1.12 3.23.04.95.05 1.22.05 3.62s-.01 2.67-.05 3.62a4.78 4.78 0 0 1-1.12 3.23c-.98.98-2.08 1.12-3.23 1.12-.95.04-1.22.05-3.62.05s-2.67-.01-3.62-.05a4.78 4.78 0 0 1-3.23-1.12c-.98-.98-1.12-2.08-1.12-3.23-.04-.95-.05-1.22-.05-3.62s.01-2.67.05-3.62a4.78 4.78 0 0 1 1.12-3.23c.98-.98 2.08-1.12 3.23-1.12.95-.04 1.22-.05 3.62-.05zm0-2c-2.48 0-2.82.01-3.79.05a6.78 6.78 0 0 0-4.79 1.66A6.78 6.78 0 0 0 2.05 8.21c-.04.97-.05 1.3-.05 3.79s.01 2.82.05 3.79a6.78 6.78 0 0 0 1.66 4.79 6.78 6.78 0 0 0 4.79 1.66c.97.04 1.3.05 3.79.05s2.82-.01 3.79-.05a6.78 6.78 0 0 0 4.79-1.66 6.78 6.78 0 0 0 1.66-4.79c.04-.97.05-1.3.05-3.79s-.01-2.82-.05-3.79a6.78 6.78 0 0 0-1.66-4.79A6.78 6.78 0 0 0 15.79 2.05c-.97-.04-1.3-.05-3.79-.05zm0 3.75a4.25 4.25 0 1 0 0 8.5 4.25 4.25 0 0 0 0-8.5zm0 6.5a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zm5.35-6.55a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+                    </svg>
+                </a>
             </div>
-            <div class="absolute bottom-6 right-10 text-white text-md opacity-80">Version 1.0</div>
+        </div>
+        
+        <div class="mt-8 flex lg:mt-0 lg:flex-shrink-0">
+            <div class="inline-flex rounded-md shadow">
+                <a href="/register.php"
+                    class="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-[#4A90E2] bg-white hover:bg-blue-50 transition-colors">
+                    Sign up for free
+                </a>
+            </div>
         </div>
     </div>
+    <div class="absolute bottom-6 right-10 text-white text-md opacity-80">Version 1.0</div>
+</div> 
 
     <!-- Learn More Modal -->
     <div id="learnMoreModal" class="fixed inset-0 hidden z-50 bg-black/30">
