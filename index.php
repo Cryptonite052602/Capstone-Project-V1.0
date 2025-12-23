@@ -534,7 +534,7 @@ try {
                             d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.007-.531.801-.581 1.498-1.309 2.049-2.138-.745.33-1.558.552-2.396.653.859-.516 1.517-1.332 1.815-2.28-.79-.475-1.688-.823-2.622-1.018-.767-.621-1.854-1.28-3.033-1.28-2.26 0-4.09 1.83-4.09 4.09 0 .32.036.63.104.93-3.4-.17-6.42-1.79-8.44-4.25-.35.6-.55 1.29-.55 2.02 0 1.42.72 2.68 1.82 3.42-.67 0-1.3-.2-1.85-.5v.05c0 1.99 1.41 3.65 3.27 4.03-.34.09-.7.14-1.07.14-.26 0-.52-.02-.77-.07.51 1.62 2.02 2.8 3.79 2.83-1.39 1.09-3.14 1.74-5.05 1.74-.32 0-.64-.02-.95-.06 1.8 1.15 3.93 1.82 6.13 1.82"/>
                     </svg>
                 </a>
-                <a href="https://facebook.com/yourcommunity" target="_blank" rel="noopener noreferrer" class="text-white hover:text-blue-200 transition-colors" aria-label="Facebook">
+                <a href="https://www.facebook.com/BarangayLuzCebuCity2023" target="_blank" rel="noopener noreferrer" class="text-white hover:text-blue-200 transition-colors" aria-label="Facebook">
                     <svg class="h-8 w-8" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path
                             d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h8v-7h-3v-3h3V9c0-3.32 1.54-5 5-5h3v3h-3c-1.1 0-1 0-1 1v2h4l-1 3h-3v7h6c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
