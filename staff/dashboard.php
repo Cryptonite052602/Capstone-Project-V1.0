@@ -2884,8 +2884,8 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
             Admin Dashboard
         </h1>
         <!-- Help Button -->
-        <button onclick="openHelpModal()" class="help-icon bg-gray-200 text-gray-600 p-2 rounded-full hover:bg-gray-300 transition">
-            <i class="fas fa-question-circle text-xl"></i>
+        <button onclick="openHelpModal()" class="help-icon p-2 rounded-full transition">
+            <i class="fa-solid fa-circle-info text-4xl text-blue-600"></i>
         </button>
     </div>
 

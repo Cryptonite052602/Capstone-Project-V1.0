@@ -157,7 +157,7 @@ try {
                     
                     <!-- Announcement icon with white color -->
                     <div class="relative">
-                        <i class="fas fa-bullhorn text-2xl text-white"></i>
+                        <i class="fa-solid fa-person-burst text-3xl text-white"></i>
                         
                         <?php if ($hasHighPriority): ?>
                             <!-- Exclamation mark overlay for high priority -->
