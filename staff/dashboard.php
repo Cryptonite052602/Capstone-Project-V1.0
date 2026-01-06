@@ -1,4 +1,5 @@
 <?php
+
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../vendor/autoload.php'; // For PHPMailer
@@ -2864,6 +2865,30 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
                 grid-template-columns: 1fr;
             }
         }
+        /* Add to your existing styles */
+#appointmentStatusChart,
+#monthlyTrendChart,
+#patientRegistrationChart,
+#completionRateChart {
+    display: block !important;
+    width: 100% !important;
+    height: 300px !important;
+    min-height: 300px !important;
+}
+
+.chart-wrapper {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    min-height: 300px;
+}
+
+.chart-container canvas {
+    display: block !important;
+    width: 100% !important;
+    height: 300px !important;
+    min-height: 300px !important;
+}
     </style>
 </head>
 <body class="bg-gray-100">
@@ -2890,50 +2915,327 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
     </div>
 
     <!-- Help/Guide Modal -->
-    <div id="helpModal" class="modal-overlay hidden">
-        <div class="modal-container max-w-4xl">
-            <div class="modal-header">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-2xl font-semibold text-gray-900">Staff Dashboard Guide</h3>
-                    <button onclick="closeHelpModal()" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
+<div id="helpModal" class="modal-overlay hidden">
+    <div class="modal-container max-w-4xl">
+        <!-- Header -->
+        <div class="modal-header bg-warmblue-600 text-white p-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="text-2xl font-bold mb-2">Staff Dashboard Guide</h3>
+                    <p class="text-warmblue-100">Barangay Luz Health Center • User Manual</p>
+                </div>
+                <button onclick="closeHelpModal()" class="text-white hover:text-warmblue-200 p-2 rounded-full hover:bg-white/10 transition">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Body -->
+        <div class="modal-body bg-white">
+            <!-- Welcome Message -->
+            <div class="p-6 border-b border-gray-100">
+                <div class="bg-warmblue-50 border-l-4 border-warmblue-500 p-5 rounded">
+                    <div class="flex items-start gap-4">
+                        <i class="fas fa-info-circle text-warmblue-600 text-xl mt-0.5 flex-shrink-0"></i>
+                        <div>
+                            <p class="text-gray-800"><strong>Welcome to the Community Health Tracker Staff Dashboard!</strong> This guide will help you understand how to use all the features available to you as a staff member.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <div class="modal-body">
-                <div class="bg-blue-50 p-4 rounded-lg mb-6">
-                    <p class="text-blue-800"><strong>Welcome to the Community Health Tracker Staff Dashboard!</strong> This guide will help you understand how to use all the features available to you as a staff member.</p>
+            <!-- Guide Sections -->
+            <div class="p-6 space-y-6">
+                <!-- Appointment Management -->
+                <div class="border border-gray-200 rounded-lg p-6 hover:border-warmblue-300 transition">
+                    <div class="flex items-center mb-4 gap-4">
+                        <div class="bg-warmblue-100 text-warmblue-600 p-3 rounded-lg flex-shrink-0">
+                            <i class="fas fa-calendar-alt text-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-semibold text-gray-800 mb-1">Appointment Management</h4>
+                            <p class="text-gray-600">Manage your available time slots, view pending appointments, and handle appointment approvals.</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        <span class="bg-warmblue-50 text-warmblue-600 px-3 py-1.5 rounded-full text-sm">✓ Schedule slots</span>
+                        <span class="bg-warmblue-50 text-warmblue-600 px-3 py-1.5 rounded-full text-sm">✓ Review appointments</span>
+                        <span class="bg-warmblue-50 text-warmblue-600 px-3 py-1.5 rounded-full text-sm">✓ Send reminders</span>
+                    </div>
                 </div>
                 
-                <!-- Guide content -->
-                <div class="space-y-4">
-                    <div class="border-l-4 border-blue-500 pl-4">
-                        <h4 class="font-semibold text-lg text-gray-800">Appointment Management</h4>
-                        <p class="text-gray-600">Manage your available time slots, view pending appointments, and handle appointment approvals.</p>
+                <!-- Account Approvals -->
+                <div class="border border-gray-200 rounded-lg p-6 hover:border-warmblue-300 transition">
+                    <div class="flex items-center mb-4 gap-4">
+                        <div class="bg-warmblue-100 text-warmblue-600 p-3 rounded-lg flex-shrink-0">
+                            <i class="fas fa-user-check text-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-semibold text-gray-800 mb-1">Account Approvals</h4>
+                            <p class="text-gray-600">Review and approve new patient registrations for system access.</p>
+                        </div>
                     </div>
-                    
-                    <div class="border-l-4 border-green-500 pl-4">
-                        <h4 class="font-semibold text-lg text-gray-800">Account Approvals</h4>
-                        <p class="text-gray-600">Review and approve new patient registrations for system access.</p>
-                    </div>
-
-                    <div class="border-l-4 border-purple-500 pl-4">
-                        <h4 class="font-semibold text-lg text-gray-800">Analytics Dashboard</h4>
-                        <p class="text-gray-600">View comprehensive analytics and insights about patients, appointments, and system usage.</p>
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        <span class="bg-warmblue-50 text-warmblue-600 px-3 py-1.5 rounded-full text-sm">✓ Verify details</span>
+                        <span class="bg-warmblue-50 text-warmblue-600 px-3 py-1.5 rounded-full text-sm">✓ Set access levels</span>
+                        <span class="bg-warmblue-50 text-warmblue-600 px-3 py-1.5 rounded-full text-sm">✓ Send notifications</span>
                     </div>
                 </div>
-            </div>
-            
-            <div class="modal-footer">
-                <div class="flex justify-end">
-                    <button type="button" onclick="closeHelpModal()" class="px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition font-medium">
-                        Got it, thanks!
-                    </button>
+                
+                <!-- Analytics Dashboard -->
+                <div class="border border-gray-200 rounded-lg p-6 hover:border-warmblue-300 transition">
+                    <div class="flex items-center mb-4 gap-4">
+                        <div class="bg-warmblue-100 text-warmblue-600 p-3 rounded-lg flex-shrink-0">
+                            <i class="fas fa-chart-bar text-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-semibold text-gray-800 mb-1">Analytics Dashboard</h4>
+                            <p class="text-gray-600">View comprehensive analytics and insights about patients, appointments, and system usage.</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        <span class="bg-warmblue-50 text-warmblue-600 px-3 py-1.5 rounded-full text-sm">✓ Patient statistics</span>
+                        <span class="bg-warmblue-50 text-warmblue-600 px-3 py-1.5 rounded-full text-sm">✓ Appointment trends</span>
+                        <span class="bg-warmblue-50 text-warmblue-600 px-3 py-1.5 rounded-full text-sm">✓ Usage reports</span>
+                    </div>
+                </div>
+                
+                <!-- Quick Tips -->
+                <div class="bg-warmblue-50 rounded-lg p-6">
+                    <h5 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-lightbulb text-warmblue-600"></i>
+                        Quick Tips for Success
+                    </h5>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-warmblue-500 text-xs mt-1 flex-shrink-0"></i>
+                            <span class="text-gray-700 text-sm">Check for pending approvals daily</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-warmblue-500 text-xs mt-1 flex-shrink-0"></i>
+                            <span class="text-gray-700 text-sm">Use the search feature to find patients quickly</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-warmblue-500 text-xs mt-1 flex-shrink-0"></i>
+                            <span class="text-gray-700 text-sm">Export reports at the end of each week</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-chevron-right text-warmblue-500 text-xs mt-1 flex-shrink-0"></i>
+                            <span class="text-gray-700 text-sm">Update your availability regularly</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+        
+        <!-- Footer -->
+        <div class="modal-footer bg-gray-50 border-t border-gray-200 p-6">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-2 text-gray-600 text-sm">
+                    <i class="fas fa-question-circle text-warmblue-500"></i>
+                    <span>Need assistance? Contact support@brgyluzcebucity.com</span>
+                </div>
+                <button onclick="closeHelpModal()" class="bg-warmblue-600 hover:bg-warmblue-700 text-white px-6 py-3 rounded-lg font-medium transition w-full sm:w-auto">
+                    Got It, Continue Working
+                </button>
+            </div>
+        </div>
     </div>
+</div>
+
+<style>
+/* Warm Blue Color Palette with consistent naming */
+:root {
+    --warmblue-50: #f0f7ff;
+    --warmblue-100: #e0efff;
+    --warmblue-200: #bae0ff;
+    --warmblue-300: #7cc4ff;
+    --warmblue-400: #36a9ff;
+    --warmblue-500: #008cff;
+    --warmblue-600: #0070d6;
+    --warmblue-700: #0058ad;
+    --warmblue-800: #00458a;
+    --warmblue-900: #003772;
+}
+
+/* Consistent padding classes */
+.p-2 { padding: 0.5rem; }
+.p-3 { padding: 0.75rem; }
+.p-4 { padding: 1rem; }
+.p-5 { padding: 1.25rem; }
+.p-6 { padding: 1.5rem; }
+
+/* Consistent margin classes */
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 0.75rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mb-5 { margin-bottom: 1.25rem; }
+.mb-6 { margin-bottom: 1.5rem; }
+
+/* Consistent gap classes */
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.gap-5 { gap: 1.25rem; }
+.gap-6 { gap: 1.5rem; }
+
+/* Consistent border-radius */
+.rounded { border-radius: 0.375rem; }
+.rounded-lg { border-radius: 0.5rem; }
+.rounded-full { border-radius: 9999px; }
+
+/* Color classes */
+.bg-warmblue-50 { background-color: var(--warmblue-50); }
+.bg-warmblue-100 { background-color: var(--warmblue-100); }
+.bg-warmblue-200 { background-color: var(--warmblue-200); }
+.bg-warmblue-300 { background-color: var(--warmblue-300); }
+.bg-warmblue-400 { background-color: var(--warmblue-400); }
+.bg-warmblue-500 { background-color: var(--warmblue-500); }
+.bg-warmblue-600 { background-color: var(--warmblue-600); }
+.bg-warmblue-700 { background-color: var(--warmblue-700); }
+.bg-warmblue-800 { background-color: var(--warmblue-800); }
+.bg-warmblue-900 { background-color: var(--warmblue-900); }
+
+.text-warmblue-50 { color: var(--warmblue-50); }
+.text-warmblue-100 { color: var(--warmblue-100); }
+.text-warmblue-200 { color: var(--warmblue-200); }
+.text-warmblue-300 { color: var(--warmblue-300); }
+.text-warmblue-400 { color: var(--warmblue-400); }
+.text-warmblue-500 { color: var(--warmblue-500); }
+.text-warmblue-600 { color: var(--warmblue-600); }
+.text-warmblue-700 { color: var(--warmblue-700); }
+.text-warmblue-800 { color: var(--warmblue-800); }
+.text-warmblue-900 { color: var(--warmblue-900); }
+
+.border-warmblue-300 { border-color: var(--warmblue-300); }
+.border-warmblue-500 { border-color: var(--warmblue-500); }
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    padding: 1rem;
+}
+
+.modal-container {
+    width: 100%;
+    max-width: 800px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+.modal-header {
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+.modal-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Consistent animations */
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Consistent transitions */
+.transition {
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+}
+
+/* Consistent scrollbar */
+.modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background: var(--warmblue-300);
+    border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background: var(--warmblue-400);
+}
+
+/* Consistent flex behavior */
+.flex-shrink-0 {
+    flex-shrink: 0;
+}
+
+/* Consistent typography */
+.text-lg { font-size: 1.125rem; }
+.text-xl { font-size: 1.25rem; }
+.text-2xl { font-size: 1.5rem; }
+.text-sm { font-size: 0.875rem; }
+.text-xs { font-size: 0.75rem; }
+
+.font-bold { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+.font-medium { font-weight: 500; }
+</style>
+
+<script>
+// Modal Functions
+function openHelpModal() {
+    document.getElementById('helpModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeHelpModal() {
+    document.getElementById('helpModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+// Close modal when clicking outside
+document.getElementById('helpModal').addEventListener('click', function(e) {
+    if (e.target.id === 'helpModal') {
+        closeHelpModal();
+    }
+});
+
+// Close with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeHelpModal();
+    }
+});
+</script>
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -3049,12 +3351,7 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
                     
                     
                     
-                    <button class="appointment-tab-button <?= $activeAppointmentTab === 'all' ? 'active' : '' ?>" 
-                            id="all-tab" data-tabs-target="#all" type="button" role="tab" aria-controls="all" aria-selected="<?= $activeAppointmentTab === 'all' ? 'true' : 'false' ?>">
-                        <i class="fas fa-history"></i>
-                        All Appointments
-                        <span class="count-badge"><?= count($allAppointments) ?></span>
-                    </button>
+                    
                 </div>
             </div>
             
@@ -4105,7 +4402,7 @@ function copyToClipboard(text) {
             <?php endif; ?>
         </div>
 
-        <!-- Analytics Dashboard Section -->
+        <!-- Analytics Dashboard Section - REDESIGNED -->
         <div class="<?= $activeTab === 'analytics' ? '' : 'hidden' ?> p-6 bg-white rounded-lg border border-gray-200" id="analytics" role="tabpanel" aria-labelledby="analytics-tab">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-semibold mb-6 text-blue-700">Analytics Dashboard</h2>
@@ -4114,12 +4411,177 @@ function copyToClipboard(text) {
                 </button>
             </div>
             
-            <!-- Overview Cards -->
+            <!-- Overview Cards - Updated with Professional Design -->
             <div id="analyticsCards" class="analytics-grid mb-8">
-                <!-- Cards will be loaded via AJAX -->
+                <!-- Analytics Cards will be loaded via AJAX -->
+                <div class="analytics-card">
+                    <div class="flex items-center mb-3">
+                        <div class="p-2 bg-blue-100 rounded-lg mr-3">
+                            <i class="fas fa-user-injured text-blue-600 text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-700">Total Patients</h3>
+                    </div>
+                    <div class="analytics-value"><?= number_format($analytics['total_patients']) ?></div>
+                    <div class="analytics-label">Registered in the system</div>
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Approved Patients</span>
+                            <span class="text-sm font-semibold text-green-600"><?= number_format($analytics['approved_patients']) ?></span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-sm text-gray-500">Regular Patients</span>
+                            <span class="text-sm font-semibold text-blue-600"><?= number_format($analytics['regular_patients']) ?></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="analytics-card">
+                    <div class="flex items-center mb-3">
+                        <div class="p-2 bg-green-100 rounded-lg mr-3">
+                            <i class="fas fa-calendar-check text-green-600 text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-700">Appointments</h3>
+                    </div>
+                    <div class="analytics-value"><?= number_format(array_sum(array_map(function($item) { return $item['count']; }, $analytics['appointment_status']))) ?></div>
+                    <div class="analytics-label">Total appointments processed</div>
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Approved</span>
+                            <span class="text-sm font-semibold text-green-600">
+                                <?php 
+                                    $approvedCount = 0;
+                                    foreach ($analytics['appointment_status'] as $item) {
+                                        if ($item['status'] === 'approved') {
+                                            $approvedCount = $item['count'];
+                                            break;
+                                        }
+                                    }
+                                    echo number_format($approvedCount);
+                                ?>
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-sm text-gray-500">Completed</span>
+                            <span class="text-sm font-semibold text-blue-600">
+                                <?php 
+                                    $completedCount = 0;
+                                    foreach ($analytics['appointment_status'] as $item) {
+                                        if ($item['status'] === 'completed') {
+                                            $completedCount = $item['count'];
+                                            break;
+                                        }
+                                    }
+                                    echo number_format($completedCount);
+                                ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="analytics-card">
+                    <div class="flex items-center mb-3">
+                        <div class="p-2 bg-purple-100 rounded-lg mr-3">
+                            <i class="fas fa-chart-line text-purple-600 text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-700">Monthly Trend</h3>
+                    </div>
+                    <div class="analytics-value">
+                        <?php 
+                            $lastMonthCount = 0;
+                            if (!empty($analytics['monthly_trend'])) {
+                                $lastMonth = end($analytics['monthly_trend']);
+                                $lastMonthCount = $lastMonth['count'];
+                            }
+                            echo number_format($lastMonthCount);
+                        ?>
+                    </div>
+                    <div class="analytics-label">Appointments last month</div>
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-500">6-month avg</span>
+                            <span class="text-sm font-semibold text-purple-600">
+                                <?php 
+                                    $avg = !empty($analytics['monthly_trend']) ? 
+                                        array_sum(array_map(function($item) { return $item['count']; }, $analytics['monthly_trend'])) / count($analytics['monthly_trend']) : 0;
+                                    echo number_format($avg, 1);
+                                ?>
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-sm text-gray-500">Peak month</span>
+                            <span class="text-sm font-semibold text-orange-600">
+                                <?php 
+                                    $peak = 0;
+                                    if (!empty($analytics['monthly_trend'])) {
+                                        $peak = max(array_map(function($item) { return $item['count']; }, $analytics['monthly_trend']));
+                                    }
+                                    echo number_format($peak);
+                                ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="analytics-card">
+                    <div class="flex items-center mb-3">
+                        <div class="p-2 bg-orange-100 rounded-lg mr-3">
+                            <i class="fas fa-tachometer-alt text-orange-600 text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-700">Completion Rate</h3>
+                    </div>
+                    <div class="analytics-value">
+                        <?php 
+                            $totalAppointments = array_sum(array_map(function($item) { return $item['count']; }, $analytics['appointment_status']));
+                            $completedCount = 0;
+                            foreach ($analytics['appointment_status'] as $item) {
+                                if ($item['status'] === 'completed') {
+                                    $completedCount = $item['count'];
+                                    break;
+                                }
+                            }
+                            $completionRate = $totalAppointments > 0 ? round(($completedCount / $totalAppointments) * 100) : 0;
+                            echo $completionRate . '%';
+                        ?>
+                    </div>
+                    <div class="analytics-label">Appointments successfully completed</div>
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Cancellation Rate</span>
+                            <span class="text-sm font-semibold text-red-600">
+                                <?php 
+                                    $cancelledCount = 0;
+                                    foreach ($analytics['appointment_status'] as $item) {
+                                        if ($item['status'] === 'cancelled') {
+                                            $cancelledCount = $item['count'];
+                                            break;
+                                        }
+                                    }
+                                    $cancellationRate = $totalAppointments > 0 ? round(($cancelledCount / $totalAppointments) * 100) : 0;
+                                    echo $cancellationRate . '%';
+                                ?>
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-sm text-gray-500">No-show Rate</span>
+                            <span class="text-sm font-semibold text-yellow-600">
+                                <?php 
+                                    $missedCount = 0;
+                                    foreach ($analytics['appointment_status'] as $item) {
+                                        if ($item['status'] === 'missed') {
+                                            $missedCount = $item['count'];
+                                            break;
+                                        }
+                                    }
+                                    $missedRate = $totalAppointments > 0 ? round(($missedCount / $totalAppointments) * 100) : 0;
+                                    echo $missedRate . '%';
+                                ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Charts Grid -->
+            <!-- Charts Grid - Updated with Professional Design -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <!-- Appointment Status Distribution -->
                 <div class="chart-container">
@@ -4127,7 +4589,9 @@ function copyToClipboard(text) {
                         <i class="fas fa-chart-pie"></i>
                         Appointment Status Distribution
                     </h3>
-                    <canvas id="appointmentStatusChart" height="300"></canvas>
+                    <div class="chart-wrapper">
+                        <canvas id="appointmentStatusChart" height="300"></canvas>
+                    </div>
                 </div>
                 
                 <!-- Monthly Appointments Trend -->
@@ -4136,7 +4600,9 @@ function copyToClipboard(text) {
                         <i class="fas fa-chart-line"></i>
                         Monthly Appointments Trend
                     </h3>
-                    <canvas id="monthlyTrendChart" height="300"></canvas>
+                    <div class="chart-wrapper">
+                        <canvas id="monthlyTrendChart" height="300"></canvas>
+                    </div>
                 </div>
             </div>
 
@@ -4148,16 +4614,20 @@ function copyToClipboard(text) {
                         <i class="fas fa-user-plus"></i>
                         Patient Registration Trend
                     </h3>
-                    <canvas id="patientRegistrationChart" height="300"></canvas>
+                    <div class="chart-wrapper">
+                        <canvas id="patientRegistrationChart" height="300"></canvas>
+                    </div>
                 </div>
                 
                 <!-- Appointment Completion Rate -->
                 <div class="chart-container">
                     <h3 class="chart-title">
                         <i class="fas fa-tasks"></i>
-                        Appointment Completion Rate
+                        Appointment Performance
                     </h3>
-                    <canvas id="completionRateChart" height="300"></canvas>
+                    <div class="chart-wrapper">
+                        <canvas id="completionRateChart" height="300"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -5533,6 +6003,14 @@ function switchTab(tabId) {
     
     const activeTabBtn = document.querySelector(`#dashboardTabs button[data-tabs-target="#${tabId}"]`);
     activeTabBtn.classList.add('active');
+    
+    // Initialize charts when switching to analytics tab
+    if (tabId === 'analytics') {
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+            initializeCharts();
+        }, 100);
+    }
 }
 
 function switchAppointmentTab(tabId) {
@@ -5887,11 +6365,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('statusFilter').addEventListener('change', applyFilters);
     document.getElementById('dateFilter').addEventListener('change', applyFilters);
     
+    // ALWAYS initialize charts if on analytics tab
     if (activeTab === 'analytics') {
-        initializeCharts();
+        // Small delay to ensure all DOM elements are ready
+        setTimeout(() => {
+            initializeCharts();
+        }, 200);
     }
     
-    // Show success message if exists
+    // Show success/error messages
     <?php if ($success): ?>
         showSuccessModal('<?= addslashes($success) ?>');
     <?php endif; ?>
@@ -5936,228 +6418,254 @@ function refreshAnalytics() {
     }, 1000);
 }
 
-// Chart initialization
+// Chart initialization with enhanced professional design
+// Chart initialization with enhanced professional design - ALWAYS INITIALIZE
 function initializeCharts() {
-    // Appointment Status Distribution Chart
-    const appointmentStatusCtx = document.getElementById('appointmentStatusChart').getContext('2d');
-    const appointmentStatusData = {
-        labels: <?= json_encode(array_map(function($item) { return ucfirst($item['status']); }, $analytics['appointment_status'])) ?>,
-        datasets: [{
-            data: <?= json_encode(array_map(function($item) { return $item['count']; }, $analytics['appointment_status'])) ?>,
-            backgroundColor: [
-                '#3B82F6', // Blue for approved
-                '#10B981', // Green for completed  
-                '#F59E0B', // Yellow for pending
-                '#EF4444', // Red for rejected
-                '#8B5CF6', // Purple for cancelled
-                '#F59E0B', // Yellow for missed (same as pending)
-                '#6B7280'  // Gray for others
-            ],
-            borderWidth: 2,
-            borderColor: '#fff'
-        }]
-    };
-
-    new Chart(appointmentStatusCtx, {
-        type: 'pie',
-        data: appointmentStatusData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 15,
-                        usePointStyle: true,
-                        boxWidth: 12,
-                        font: {
-                            size: 11
-                        }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.raw || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = Math.round((value / total) * 100);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    // Monthly Trend Chart
-    const monthlyTrendCtx = document.getElementById('monthlyTrendChart').getContext('2d');
-    const monthlyTrendData = {
-        labels: <?= json_encode(array_map(function($item) { 
-            return date('M Y', strtotime($item['month'] . '-01'));
-        }, $analytics['monthly_trend'])) ?>,
-        datasets: [{
-            label: 'Appointments',
-            data: <?= json_encode(array_map(function($item) { return $item['count']; }, $analytics['monthly_trend'])) ?>,
-            borderColor: '#3B82F6',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            borderWidth: 3,
-            fill: true,
-            tension: 0.4,
-            pointBackgroundColor: '#3B82F6',
-            pointBorderColor: '#fff',
-            pointBorderWidth: 2,
-            pointRadius: 4
-        }]
-    };
-
-    new Chart(monthlyTrendCtx, {
-        type: 'line',
-        data: monthlyTrendData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        drawBorder: false
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
-                        }
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    // Patient Registration Trend Chart
-    const patientRegCtx = document.getElementById('patientRegistrationChart').getContext('2d');
-    const patientRegData = {
-        labels: <?= json_encode(array_map(function($item) { 
-            return date('M Y', strtotime($item['month'] . '-01'));
-        }, $analytics['patient_registration_trend'])) ?>,
-        datasets: [{
-            label: 'New Patients',
-            data: <?= json_encode(array_map(function($item) { return $item['count']; }, $analytics['patient_registration_trend'])) ?>,
-            borderColor: '#10B981',
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            borderWidth: 3,
-            fill: true,
-            tension: 0.4,
-            pointBackgroundColor: '#10B981',
-            pointBorderColor: '#fff',
-            pointBorderWidth: 2,
-            pointRadius: 4
-        }]
-    };
-
-    new Chart(patientRegCtx, {
-        type: 'line',
-        data: patientRegData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                    }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        drawBorder: false
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
-                        }
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    // Completion Rate Chart
-    const completionRateCtx = document.getElementById('completionRateChart').getContext('2d');
-    const totalAppointments = <?= array_sum(array_map(function($item) { return $item['count']; }, $analytics['appointment_status'])) ?>;
-    const completedAppointments = <?= 
-        (function() use ($analytics) {
-            $completed = 0;
-            foreach ($analytics['appointment_status'] as $item) {
-                if ($item['status'] === 'completed') {
-                    $completed = $item['count'];
-                    break;
-                }
-            }
-            return $completed;
-        })() 
-    ?>;
-    const completionRate = totalAppointments > 0 ? Math.round((completedAppointments / totalAppointments) * 100) : 0;
-
-    new Chart(completionRateCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Completed', 'Remaining'],
+    console.log('Initializing charts...');
+    
+    // Check if chart elements exist
+    const appointmentStatusCanvas = document.getElementById('appointmentStatusChart');
+    const monthlyTrendCanvas = document.getElementById('monthlyTrendChart');
+    const patientRegistrationCanvas = document.getElementById('patientRegistrationChart');
+    const completionRateCanvas = document.getElementById('completionRateChart');
+    
+    if (!appointmentStatusCanvas) {
+        console.error('Appointment Status Chart canvas not found');
+        return;
+    }
+    
+    // Destroy existing charts if they exist
+    Chart.getChart(appointmentStatusCanvas)?.destroy();
+    Chart.getChart(monthlyTrendCanvas)?.destroy();
+    Chart.getChart(patientRegistrationCanvas)?.destroy();
+    Chart.getChart(completionRateCanvas)?.destroy();
+    
+    // 1. Appointment Status Distribution Chart
+    try {
+        const appointmentStatusCtx = appointmentStatusCanvas.getContext('2d');
+        const appointmentStatusData = {
+            labels: <?= json_encode(array_map(function($item) { return ucfirst($item['status']); }, $analytics['appointment_status'])) ?>,
             datasets: [{
-                data: [completionRate, 100 - completionRate],
-                backgroundColor: ['#10B981', '#E5E7EB'],
-                borderWidth: 0
+                data: <?= json_encode(array_map(function($item) { return $item['count']; }, $analytics['appointment_status'])) ?>,
+                backgroundColor: [
+                    '#10B981', // Green for completed
+                    '#3B82F6', // Blue for approved  
+                    '#F59E0B', // Yellow for pending
+                    '#EF4444', // Red for rejected
+                    '#8B5CF6', // Purple for cancelled
+                    '#F59E0B', // Yellow for missed
+                    '#6B7280'  // Gray for others
+                ],
+                borderWidth: 2,
+                borderColor: '#fff',
+                hoverOffset: 15
             }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '70%',
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    enabled: false
+        };
+        
+        const appointmentStatusChart = new Chart(appointmentStatusCtx, {
+            type: 'pie',
+            data: appointmentStatusData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            boxWidth: 12,
+                            font: {
+                                size: 11,
+                                family: "'Inter', 'Segoe UI', sans-serif"
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 24, 39, 0.9)',
+                        titleFont: { size: 12 },
+                        bodyFont: { size: 11 },
+                        padding: 12,
+                        cornerRadius: 6
+                    }
                 }
             }
+        });
+        console.log('Appointment Status Chart initialized');
+    } catch (error) {
+        console.error('Error initializing appointment status chart:', error);
+    }
+    
+    // 2. Monthly Trend Chart
+    try {
+        const monthlyTrendCtx = monthlyTrendCanvas.getContext('2d');
+        const monthlyData = <?= json_encode($analytics['monthly_trend']) ?>;
+        const monthlyLabels = monthlyData.map(item => {
+            const date = new Date(item.month + '-01');
+            return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        });
+        const monthlyValues = monthlyData.map(item => item.count);
+        
+        const monthlyTrendChart = new Chart(monthlyTrendCtx, {
+            type: 'line',
+            data: {
+                labels: monthlyLabels,
+                datasets: [{
+                    label: 'Appointments',
+                    data: monthlyValues,
+                    borderColor: '#3B82F6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#3B82F6',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { drawBorder: false, color: 'rgba(229, 231, 235, 0.5)' },
+                        ticks: { font: { size: 11 } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+        console.log('Monthly Trend Chart initialized');
+    } catch (error) {
+        console.error('Error initializing monthly trend chart:', error);
+    }
+    
+    // 3. Patient Registration Trend Chart
+    try {
+        const patientRegCtx = patientRegistrationCanvas.getContext('2d');
+        const patientData = <?= json_encode($analytics['patient_registration_trend']) ?>;
+        const patientLabels = patientData.map(item => {
+            const date = new Date(item.month + '-01');
+            return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        });
+        const patientValues = patientData.map(item => item.count);
+        
+        const patientRegChart = new Chart(patientRegCtx, {
+            type: 'line',
+            data: {
+                labels: patientLabels,
+                datasets: [{
+                    label: 'New Patients',
+                    data: patientValues,
+                    borderColor: '#10B981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#10B981',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { drawBorder: false, color: 'rgba(229, 231, 235, 0.5)' },
+                        ticks: { font: { size: 11 } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+        console.log('Patient Registration Chart initialized');
+    } catch (error) {
+        console.error('Error initializing patient registration chart:', error);
+    }
+    
+    // 4. Completion Rate Chart
+    try {
+        const completionRateCtx = completionRateCanvas.getContext('2d');
+        const totalAppointments = <?= array_sum(array_map(function($item) { return $item['count']; }, $analytics['appointment_status'])) ?>;
+        const completedAppointments = <?= 
+            (function() use ($analytics) {
+                $completed = 0;
+                foreach ($analytics['appointment_status'] as $item) {
+                    if ($item['status'] === 'completed') {
+                        $completed = $item['count'];
+                        break;
+                    }
+                }
+                return $completed;
+            })() 
+        ?>;
+        const completionRate = totalAppointments > 0 ? Math.round((completedAppointments / totalAppointments) * 100) : 0;
+        
+        // Create completion rate chart
+        const completionRateChart = new Chart(completionRateCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Completed', 'Remaining'],
+                datasets: [{
+                    data: [completionRate, 100 - completionRate],
+                    backgroundColor: ['#10B981', '#E5E7EB'],
+                    borderWidth: 0,
+                    hoverBackgroundColor: ['#059669', '#D1D5DB']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '75%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                }
+            }
+        });
+        
+        // Add completion rate text overlay
+        const chartContainer = completionRateCanvas.parentElement;
+        chartContainer.style.position = 'relative';
+        
+        // Remove existing text overlay if it exists
+        const existingOverlay = chartContainer.querySelector('.chart-overlay');
+        if (existingOverlay) {
+            existingOverlay.remove();
         }
-    });
-
-    // Add completion rate text in the center
-    const completionRateText = document.createElement('div');
-    completionRateText.className = 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center';
-    completionRateText.innerHTML = `
-        <div class="text-2xl font-bold text-gray-900">${completionRate}%</div>
-        <div class="text-sm text-gray-600">Completion Rate</div>
-    `;
-    document.getElementById('completionRateChart').parentNode.style.position = 'relative';
-    document.getElementById('completionRateChart').parentNode.appendChild(completionRateText);
+        
+        // Create new overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'chart-overlay';
+        overlay.style.position = 'absolute';
+        overlay.style.top = '50%';
+        overlay.style.left = '50%';
+        overlay.style.transform = 'translate(-50%, -50%)';
+        overlay.style.textAlign = 'center';
+        overlay.innerHTML = `
+            <div class="text-3xl font-bold text-gray-900">${completionRate}%</div>
+            <div class="text-sm text-gray-600 mt-1">Completion Rate</div>
+            <div class="text-xs text-gray-400 mt-2">${completedAppointments} of ${totalAppointments}</div>
+        `;
+        chartContainer.appendChild(overlay);
+        
+        console.log('Completion Rate Chart initialized');
+    } catch (error) {
+        console.error('Error initializing completion rate chart:', error);
+    }
 }
 </script>
 </body>

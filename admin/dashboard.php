@@ -969,8 +969,8 @@ try {
                             <i class="fas fa-user-plus text-white text-xl"></i>
                         </div>
                         <div>
-                            <h3 class="font-semibold text-gray-800">Add New Staff</h3>
-                            <p class="text-gray-500 text-sm">Register health personnel</p>
+                            <h3 class="font-semibold text-gray-800">Records Documentation</h3>
+                            <p class="text-gray-500 text-sm">Document records</p>
                         </div>
                     </a>
                     

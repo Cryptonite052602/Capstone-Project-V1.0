@@ -870,12 +870,11 @@ body,
 }
 
 .btn-primary {
-    background-color: white;
-    color: #3498db;
-    border: 2px solid #3498db;
+    background-color: #3498db;
+    color: #ffffffff;
     opacity: 1;
     border-radius: 8px;
-    padding: 12px 24px;
+    padding: 15px 30px;
     transition: all 0.3s ease;
     font-weight: 500;
     min-height: 55px;
@@ -886,7 +885,8 @@ body,
 }
 .btn-primary:hover {
     background-color: #f0f9ff;
-    border-color: #3498db;
+    border: #3498db 2px solid;
+    color: #3498db;
     opacity: 0.6;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
@@ -1567,7 +1567,7 @@ body,
 }
 
 #successModal .btn-primary:hover {
-    background-color: #f0fdf4;
+
     border-color: #2ecc71;
     opacity: 0.6;
     transform: translateY(-2px);
@@ -1607,7 +1607,6 @@ body,
 .btn-view::after { border: 2px solid #3498db; opacity: 1; }
 .btn-archive::after { border: 2px solid #e74c3c; opacity: 1; }
 .btn-add-patient::after { border: 2px solid #2ecc71; opacity: 1; }
-.btn-primary::after { border: 2px solid #3498db; opacity: 1; }
 .btn-success::after { border: 2px solid #2ecc71; opacity: 1; }
 .btn-gray::after { border: 2px solid #6b7280; opacity: 1; }
 .btn-print::after { border: 2px solid #3498db; opacity: 1; }
@@ -1682,28 +1681,48 @@ body,
                             </div>
                         </div>
                         
-                        <!-- Search Term Field with separated icon -->
-                        <div class="search-field-group flex-grow">
-                            <label for="search" class="block text-gray-700 mb-2 font-medium">Search Term</label>
-                            <div class="relative">
-                                
-                                <input type="text" id="search" name="search" value="<?= htmlspecialchars($searchTerm) ?>" 
-                                    class="search-input" 
-                                    placeholder="<?= $searchBy === 'unique_number' ? 'Enter Patients Name...' : 'Search patients by name...' ?>">
-                            </div>
-                        </div>
+                        <!-- Search Term Field with icon inside input -->
+<div class="search-field-group flex-grow">
+    <label for="search" class="block text-gray-700 mb-2 font-medium">
+        Search Term
+    </label>
+
+    <div class="relative">
+        <!-- Search Icon -->
+        <i class="fa-solid fa-magnifying-glass
+                  absolute left-7 top-1/2 -translate-y-1/2
+                  text-gray-500 pointer-events-none z-10"></i>
+
+        <!-- Input -->
+        <input type="text"
+               id="search"
+               name="search"
+               value="<?= htmlspecialchars($searchTerm) ?>"
+               placeholder="<?= $searchBy === 'unique_number' ? 'Enter Patients Name...' : 'Search patients by name...' ?>"
+               class="search-input w-full pl-11 pr-4 py-2 rounded-lg border
+                      focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+</div>
+
+
                         
                         <!-- Search Buttons -->
                         <div class="search-field-group flex flex-col sm:flex-row gap-2 mt-2 sm:mt-0">
-                            <button type="submit" class="btn-primary min-w-[120px]">
-                                <i class="fas fa-search mr-2"></i> Search
-                            </button>
-                            <?php if (!empty($searchTerm)): ?>
-                                <a href="existing_info_patients.php" class="btn-gray min-w-[120px] text-center">
-                                    <i class="fas fa-times mr-2"></i> Clear
-                                </a>
-                            <?php endif; ?>
-                        </div>
+
+    <?php if (empty($searchTerm)): ?>
+        <!-- Show Search button ONLY when there is NO search term -->
+        <button type="submit" class="btn-primary min-w-[120px]">
+            <i class="fas fa-search mr-2"></i> Search
+        </button>
+    <?php else: ?>
+        <!-- Show Clear button ONLY when search term EXISTS -->
+        <a href="existing_info_patients.php" class="btn-gray min-w-[120px] text-center">
+            <i class="fas fa-times mr-2"></i> Clear
+        </a>
+    <?php endif; ?>
+
+</div>
+
                     </div>
                 </form>
                 
@@ -1890,7 +1909,7 @@ body,
                     
                     <?php if (empty($allPatients)): ?>
                         <div class="text-center py-12 bg-gray-50 rounded-lg">
-                            <i class="fas fa-user-injured text-4xl text-gray-400 mb-4"></i>
+                            <i class="fa-solid fa-bed text-6xl mb-4 text-gray-300"></i>
                             <h3 class="text-lg font-medium text-gray-900">No patients found</h3>
                             <p class="mt-1 text-sm text-gray-500">Get started by adding a new patient.</p>
                             <div class="mt-6">
@@ -2180,8 +2199,8 @@ body,
                 <div class="text-center py-12">
                     <div class="max-w-md mx-auto">
                         <div class="section-bg p-8 mb-8">
-                            <div class="w-20 h-20 bg-white border-2 border-primary rounded-full flex items-center justify-center mx-auto mb-6">
-                                <i class="fas fa-user-plus text-primary text-3xl"></i>
+                            <div class="w-20 h-20 bg-white flex items-center justify-center mx-auto mb-6">
+                                <i class="fa-solid fa-fill text-8xl text-gray-300"></i>
                             </div>
                             <h2 class="text-2xl font-bold text-secondary mb-4">Register New Patient</h2>
                             <p class="text-gray-600 mb-8">
@@ -2191,7 +2210,7 @@ body,
                                 <i class="fas fa-plus-circle mr-3"></i>Add New Patient
                             </button>
                         </div>
-                        <div class="text-sm text-gray-500 mt-6">
+                        <!-- <div class="text-sm text-gray-500 mt-6">
                             <p class="flex items-center justify-center mb-2">
                                 <i class="fas fa-info-circle mr-2 text-primary"></i>
                                 All patient records are kept confidential and secure
@@ -2200,7 +2219,7 @@ body,
                                 <i class="fas fa-shield-alt mr-2 text-primary"></i>
                                 Compliant with Data Privacy Act of 2012 (RA 10173)
                             </p>
-                        </div>
+                        </div> -->
                     </div>
                 </div>
             </div>
@@ -2258,7 +2277,7 @@ body,
             <!-- Sticky Header -->
             <div class="modal-header p-8 flex justify-between items-center text-secondary rounded-t-2xl sticky top-0 z-10">
                 <h3 class="text-2xl font-bold flex items-center">
-                    <i class="fas fa-user-plus mr-3 text-primary"></i>Register New Patient
+                    <i class="fa-solid fa-address-card text-5xl text-blue-500 mr-4"></i>Register New Patient
                 </h3>
                 <button onclick="closeAddPatientModal()" class="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full w-10 h-10 flex items-center justify-center transition duration-200">
                     <i class="fas fa-times text-xl"></i>
@@ -2271,7 +2290,7 @@ body,
                     <!-- Personal Information Section - UPDATED ICON -->
                     <div class="section-bg p-8">
                         <h3 class="form-section-title-modal mb-6">
-                            <i class="fas fa-id-card mr-2"></i>Personal Information
+                            <i class="fa-solid fa-circle-info text-5xl mr-2"></i>Personal Information
                         </h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 modal-grid-gap">
                             <div class="modal-field-spacing">
@@ -2441,8 +2460,8 @@ body,
             <div class="p-8 border-t border-gray-200 bg-white rounded-b-2xl sticky bottom-0">
                 <div class="flex flex-wrap justify-between items-center gap-4">
                     <div class="flex items-center space-x-3">
-                        <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                            <i class="fas fa-info-circle mr-1"></i>All fields marked with * are required
+                        <span class="text-md text-gray-500 bg-gray-100 px-3 py-3 rounded-full">
+                            <i class="fa-solid fa-circle-info text-2xl mr-2"></i>All fields marked with * are required
                         </span>
                     </div>
                     <div class="flex flex-wrap gap-3">
