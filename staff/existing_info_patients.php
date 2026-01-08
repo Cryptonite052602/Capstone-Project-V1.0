@@ -804,11 +804,11 @@ body,
 
 /* UPDATED BUTTON STYLES - 100% opacity normally, 60% opacity on hover */
 .btn-view {
-    background-color: white;
-    color: #3498db;
+    background-color: #3498db;
+    color: #ffffffff;
     border: 2px solid #3498db;
     opacity: 1;
-    border-radius: 8px;
+    border-radius: 30px;
     padding: 10px 20px;
     transition: all 0.3s ease;
     font-weight: 500;
@@ -818,7 +818,7 @@ body,
     justify-content: center;
 }
 .btn-view:hover {
-    background-color: #f0f9ff;
+    background-color: #50a4dbff;
     border-color: #3498db;
     opacity: 0.6;
     transform: translateY(-2px);
@@ -826,11 +826,10 @@ body,
 }
 
 .btn-archive {
-    background-color: white;
-    color: #e74c3c;
-    border: 2px solid #e74c3c;
+    background-color: #e74c3c;
+    color: white;
     opacity: 1;
-    border-radius: 8px;
+    border-radius: 30px;
     padding: 10px 20px;
     transition: all 0.3s ease;
     font-weight: 500;
@@ -840,8 +839,7 @@ body,
     justify-content: center;
 }
 .btn-archive:hover {
-    background-color: #fef2f2;
-    border-color: #e74c3c;
+    background-color: #d86154ff;
     opacity: 0.6;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
@@ -873,7 +871,7 @@ body,
     background-color: #3498db;
     color: #ffffffff;
     opacity: 1;
-    border-radius: 8px;
+    border-radius: 30px;
     padding: 15px 30px;
     transition: all 0.3s ease;
     font-weight: 500;
@@ -884,9 +882,8 @@ body,
     font-size: 16px;
 }
 .btn-primary:hover {
-    background-color: #f0f9ff;
-    border: #3498db 2px solid;
-    color: #3498db;
+    background-color: #55a3d8ff;
+    color: #ffffffff;
     opacity: 0.6;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
@@ -917,10 +914,10 @@ body,
 
 .btn-gray {
     background-color: white;
-    color: #6b7280;
-    border: 2px solid #6b7280;
+    color: #36a9dfff;
+    border: 2px solid #36a9dfff;
     opacity: 1;
-    border-radius: 8px;
+    border-radius: 30px;
     padding: 12px 24px;
     transition: all 0.3s ease;
     font-weight: 500;
@@ -932,7 +929,7 @@ body,
 }
 .btn-gray:hover {
     background-color: #f9fafb;
-    border-color: #6b7280;
+    border-color: #36a9dfff;
     opacity: 0.6;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(107, 114, 128, 0.15);
@@ -940,12 +937,11 @@ body,
 
 /* NEW: Print Button - Bigger and Readable */
 .btn-print {
-    background-color: white;
-    color: #3498db;
-    border: 2px solid #3498db;
+    background-color: #3498db;
+    color: #ffffffff;
     opacity: 1;
-    border-radius: 8px;
-    padding: 14px 28px;
+    border-radius: 30px;
+    padding: 14px 30px;
     transition: all 0.3s ease;
     font-weight: 600;
     min-height: 60px;
@@ -953,13 +949,13 @@ body,
     align-items: center;
     justify-content: center;
     font-size: 18px;
-    width: 355px;
+    width: auto;
     margin: 8px 0;
 }
 .btn-print:hover {
-    background-color: #f0f9ff;
+    background-color: #3c9dddff;
     border-color: #3498db;
-    opacity: 0.6;
+    opacity: 0.8;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
 }
@@ -992,11 +988,10 @@ body,
 
 /* NEW: Save Medical Information Button - UPDATED with warmBlue border */
 .btn-save-medical {
-    background-color: white;
-    color: #3498db;
-    border: 3px solid #60acdfff;  /* Changed to warmBlue */
+    background-color: #50a4dbff;
+    color: #ffffffff;
     opacity: 1;
-    border-radius: 8px;
+    border-radius: 30px;
     padding: 14px 28px;
     transition: all 0.3s ease;
     font-weight: 600;
@@ -1005,15 +1000,15 @@ body,
     align-items: center;
     justify-content: center;
     font-size: 18px;
-    width: 355px;
+    line-height: 2px;
+    width: auto;
     margin: 8px 0;
 }
 .btn-save-medical:hover {
-    background-color: #f0f9ff;
-    border-color: #f0f9ff;  /* Changed to warmBlue */
+    background-color: #59ace4ff;
     opacity: 0.6;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+
 }
 
 #viewModal { backdrop-filter: blur(5px); transition: opacity 0.3s ease; }
@@ -1058,7 +1053,7 @@ body,
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.8rem;
     flex-grow: 1;
 }
 
@@ -1066,9 +1061,9 @@ body,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 8px;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 30px;
     background-color: white;
     border: 1px solid #3498db;
     opacity: 1;
@@ -1116,7 +1111,7 @@ body,
     color: #3498db;
     border: 2px solid #3498db;
     opacity: 1;
-    border-radius: 8px;
+    border-radius: 30px;
     padding: 12px 24px;
     transition: all 0.3s ease;
     text-decoration: none;
@@ -1128,11 +1123,11 @@ body,
 }
 
 .btn-view-all:hover {
-    background-color: #f0f9ff;
-    border-color: #3498db;
-    opacity: 0.6;
+    background-color: #ffffffff;
+    border: 2px solid #479ed8ff;
+    opacity: 0.8;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+    
 }
 
 .btn-back-to-pagination {
@@ -1451,16 +1446,15 @@ body,
 }
 
 /* Fix for browsers that don't support opacity */
-.btn-view, .btn-archive, .btn-add-patient, .btn-primary, .btn-success, .btn-gray,
-.btn-print, .btn-edit, .btn-save-medical, .btn-view-all, .btn-back-to-pagination, .pagination-btn,
+ .btn-add-patient, .btn-success,
+.btn-print, .btn-edit, .btn-view-all, .btn-back-to-pagination, 
 .search-input, .search-select {
     border-style: solid !important;
 }
 
 /* Hover state opacity */
-.btn-view:hover, .btn-archive:hover, .btn-add-patient:hover, .btn-primary:hover,
-.btn-success:hover, .btn-gray:hover, .btn-print:hover, .btn-edit:hover,
-.btn-save-medical:hover, .btn-view-all:hover, .btn-back-to-pagination:hover, .pagination-btn:hover,
+.btn-archive:hover, .btn-add-patient:hover,
+.btn-success:hover, .btn-edit:hover, .btn-back-to-pagination:hover,
 .search-input:focus, .search-select:focus {
     border-color: inherit !important;
 }
@@ -1522,7 +1516,7 @@ body,
 }
 
 /* Success Modal Button Styles */
-#successModal .btn-print {
+#successModal  {
     background-color: white;
     color: #3498db;
     border: 2px solid #3498db;
@@ -1538,7 +1532,7 @@ body,
     font-size: 14px;
 }
 
-#successModal .btn-print:hover {
+#successModal {
     background-color: #f0f9ff;
     border-color: #3498db;
     opacity: 0.6;
@@ -1551,7 +1545,7 @@ body,
     color: #2ecc71;
     border: 2px solid #2ecc71;
     opacity: 1;
-    border-radius: 8px;
+    border-radius: 30px;
     padding: 10px 24px;
     transition: all 0.3s ease;
     font-weight: 500;
@@ -1588,7 +1582,7 @@ body,
 
 .btn-view::after, .btn-archive::after, .btn-add-patient::after, .btn-primary::after,
 .btn-success::after, .btn-gray::after, .btn-print::after, .btn-edit::after,
-.btn-save-medical::after, .btn-view-all::after, .btn-back-to-pagination::after, .pagination-btn::after {
+.btn-view-all::after, .btn-back-to-pagination::after, {
     content: '';
     position: absolute;
     top: -2px;
@@ -1600,21 +1594,15 @@ body,
     transition: opacity 0.3s ease;
 }
 
-.btn-view::after { border: 2px solid #3498db; opacity: 1; }
-.btn-archive::after { border: 2px solid #e74c3c; opacity: 1; }
 .btn-add-patient::after { border: 2px solid #2ecc71; opacity: 1; }
 .btn-success::after { border: 2px solid #2ecc71; opacity: 1; }
-.btn-gray::after { border: 2px solid #6b7280; opacity: 1; }
-.btn-print::after { border: 2px solid #3498db; opacity: 1; }
 .btn-edit::after { border: 2px solid #f39c12; opacity: 1; }
-.btn-save-medical::after { border: 2px solid #f0f9ff; opacity: 1; } /* Changed to warmBlue */
-.btn-view-all::after { border: 2px solid #3498db; opacity: 1; }
 .btn-back-to-pagination::after { border: 2px solid #3498db; opacity: 1; }
 .pagination-btn::after { border: 1px solid #3498db; opacity: 1; }
 
 .btn-view:hover::after, .btn-archive:hover::after, .btn-add-patient:hover::after,
-.btn-primary:hover::after, .btn-success:hover::after, .btn-gray:hover::after,
-.btn-print:hover::after, .btn-edit:hover::after, .btn-save-medical:hover::after,
+ .btn-success:hover::after,
+ .btn-edit:hover::after,
 .btn-view-all:hover::after, .btn-back-to-pagination:hover::after, .pagination-btn:hover::after {
     opacity: 0.6;
 }
@@ -2202,7 +2190,7 @@ body,
                             <p class="text-gray-600 mb-8">
                                 Add a new patient record to the system. Fill out all required information including personal details and medical history.
                             </p>
-                            <button onclick="openAddPatientModal()" class="btn-primary px-8 py-4 text-lg font-semibold">
+                            <button onclick="openAddPatientModal()" class="btn-primary px-8 py-4 round-full text-lg font-semibold">
                                 <i class="fas fa-plus-circle mr-3"></i>Add New Patient
                             </button>
                         </div>
@@ -2227,9 +2215,13 @@ body,
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col border-2 border-primary">
             <!-- Sticky Header -->
             <div class="p-8 border-b border-primary flex justify-between items-center bg-white rounded-t-2xl sticky top-0 z-10">
-                <h3 class="text-2xl font-bold flex items-center text-secondary">
-                    <i class="fas fa-user-injured mr-3 text-primary"></i>Patient Health Information
-                </h3>
+                <h3 class="text-2xl font-semibold flex items-center  px-4 py-3 rounded-lg">
+    <i class="fa-solid fa-circle-info mr-4 text-5xl text-[#3498db]"></i>
+    <span class="text-[#3498db]">Patient Health Information</span>
+</h3>
+
+
+
                 <button onclick="closeViewModal()" class="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full w-10 h-10 flex items-center justify-center transition duration-200">
                     <i class="fas fa-times text-xl"></i>
                 </button>
@@ -2258,8 +2250,8 @@ body,
                         
                     </div>
                     <div class="flex items-center space-x-3">
-                        <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                            <i class="fas fa-info-circle mr-1"></i>View and edit patient information
+                        <span class="text-md text-gray-500 bg-gray-100 px-8 py-5 rounded-full">
+                            <i class="fas fa-info-circle mr-3 text-1xl"></i>View and edit patient information
                         </span>
                     </div>
                 </div>
@@ -2508,11 +2500,11 @@ body,
 
                 <div class="flex gap-3">
                     <button type="button" onclick="clearAddPatientForm()"
-                            class="px-6 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 font-semibold">
+                            class="px-6 py-4 rounded-full bg-gray-200 hover:bg-gray-200 font-semibold">
                         Clear Form
                     </button>
                     <button type="submit" name="add_patient" form="patientForm"
-                            class="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow">
+                            class="px-8 py-4 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold shadow">
                         <i class="fas fa-save mr-2"></i>Register Patient
                     </button>
                 </div>
