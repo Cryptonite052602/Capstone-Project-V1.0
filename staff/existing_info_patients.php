@@ -1329,10 +1329,10 @@ body,
 
 /* UPDATED Search box styling - Consistent height and width with warmBlue border */
 .search-input {
-    border: 2px solid #badff8ff !important;
+    border: 2px solid #55b2f0ff !important;
     background-color: white !important;
     transition: all 0.3s ease;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
     padding: 16px 20px 16px 55px !important;
     min-height: 55px !important;
     font-size: 16px;
@@ -1343,14 +1343,14 @@ body,
 
 .search-input:focus {
     border-color: #84c0e9ff !important;
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 0 0 3px #8acdfaff;
 }
 
 .search-select {
-    border: 2px solid #badff8ff !important;
+    border: 2px solid #55b2f0ff !important;
     background-color: white !important;
     transition: all 0.3s ease;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
     padding: 16px 20px !important;
     min-height: 55px !important;
     font-size: 16px;
@@ -1361,12 +1361,12 @@ body,
     background-repeat: no-repeat;
     background-size: 1.5em 1.5em;
     padding-right: 50px;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    
 }
 
 .search-select:focus {
-    border-color: #f0f9ff !important;
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    border-color: #84c0e9ff !important;
+    box-shadow: 0 0 0 3px #8acdfaff;
 }
 
 /* Search icon position */
@@ -1379,10 +1379,6 @@ body,
     pointer-events: none;
 }
 
-.search-icon {
-    color: #3498db;
-    font-size: 18px;
-}
 
 /* Table styling */
 .patient-table th {
@@ -2271,211 +2267,261 @@ body,
         </div>
     </div>
     
-    <!-- NEW: Add Patient Modal -->
-    <div id="addPatientModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 modal" style="display: none;">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col border-2 border-primary">
-            <!-- Sticky Header -->
-            <div class="modal-header p-8 flex justify-between items-center text-secondary rounded-t-2xl sticky top-0 z-10">
-                <h3 class="text-2xl font-bold flex items-center">
-                    <i class="fa-solid fa-address-card text-5xl text-blue-500 mr-4"></i>Register New Patient
-                </h3>
-                <button onclick="closeAddPatientModal()" class="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full w-10 h-10 flex items-center justify-center transition duration-200">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
-            </div>
-            
-            <!-- Scrollable Content with Form -->
-            <div class="p-8 bg-gray-50 flex-1 overflow-y-auto">
-                <form method="POST" action="" id="patientForm" enctype="multipart/form-data" class="space-y-8">
-                    <!-- Personal Information Section - UPDATED ICON -->
-                    <div class="section-bg p-8">
-                        <h3 class="form-section-title-modal mb-6">
-                            <i class="fa-solid fa-circle-info text-5xl mr-2"></i>Personal Information
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 modal-grid-gap">
-                            <div class="modal-field-spacing">
-                                <label for="modal_full_name" class="form-label-modal required-field">Full Name</label>
-                                <input type="text" id="modal_full_name" name="full_name" class="form-input-modal modal-form-field" required>
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_date_of_birth" class="form-label-modal required-field">Date of Birth</label>
-                                <input type="date" id="modal_date_of_birth" name="date_of_birth" class="form-input-modal modal-form-field" required max="<?= date('Y-m-d') ?>">
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_age" class="form-label-modal">Age (Auto-calculated)</label>
-                                <input type="number" id="modal_age" name="age" min="0" max="120" class="form-input-modal modal-form-field readonly-field" readonly>
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_gender" class="form-label-modal required-field">Gender</label>
-                                <select id="modal_gender" name="gender" class="form-select-modal modal-form-field" required>
-                                    <option value="">Select Gender</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            
-                            <?php if ($civilStatusExists): ?>
-                            <div class="modal-field-spacing">
-                                <label for="modal_civil_status" class="form-label-modal">Civil Status</label>
-                                <select id="modal_civil_status" name="civil_status" class="form-select-modal modal-form-field">
-                                    <option value="">Select Status</option>
-                                    <option value="Single">Single</option>
-                                    <option value="Married">Married</option>
-                                    <option value="Widowed">Widowed</option>
-                                    <option value="Separated">Separated</option>
-                                    <option value="Divorced">Divorced</option>
-                                </select>
-                            </div>
-                            <?php endif; ?>
-                            
-                            <?php if ($occupationExists): ?>
-                            <div class="modal-field-spacing">
-                                <label for="modal_occupation" class="form-label-modal">Occupation</label>
-                                <input type="text" id="modal_occupation" name="occupation" class="form-input-modal modal-form-field" placeholder="Current occupation">
-                            </div>
-                            <?php endif; ?>
-                            
-                            <?php if ($sitioExists): ?>
-                            <div class="modal-field-spacing">
-                                <label for="modal_sitio" class="form-label-modal">Sitio</label>
-                                <select id="modal_sitio" name="sitio" class="form-select-modal modal-form-field">
-                                    <option value="">Select Sitio</option>
-                            <option value="Proper Luz">Proper Luz</option>
-                            <option value="Lower Luz">Lower Luz</option>
-                            <option value="Upper Luz">Upper Luz</option>
-                            <option value="Luz Proper">Luz Proper</option>
-                            <option value="Luz Heights">Luz Heights</option>
-                            <option value="Panganiban">Panganiban</option>
-                            <option value="Balagtas">Balagtas</option>
-                            <option value="Carbon">Carbon</option>
-                                </select>
-                            </div>
-                            <?php endif; ?>
-                            
-                            <div class="md:col-span-2 modal-field-spacing">
-                                <label for="modal_address" class="form-label-modal">Complete Address</label>
-                                <input type="text" id="modal_address" name="address" class="form-input-modal modal-form-field" placeholder="House #, Street, Barangay">
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_contact" class="form-label-modal">Contact Number</label>
-                                <input type="text" id="modal_contact" name="contact" class="form-input-modal modal-form-field" placeholder="09XXXXXXXXX">
-                            </div>
+    <!-- NEW: Add Patient Modal (DESIGN ENHANCED – FUNCTIONALITY RETAINED) -->
+<div id="addPatientModal"
+     class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 modal"
+     style="display:none;">
+
+    <div class="bg-white rounded-lg shadow-2xl w-full max-w-7xl h-[92vh] overflow-hidden flex flex-col border border-blue-200">
+
+        <!-- ================= HEADER ================= -->
+        <div class="modal-header sticky top-0 z-20 bg-gradient-to-r from-blue-600 to-blue-500 px-10 py-6 flex justify-between items-center">
+            <h3 class="text-2xl  flex items-center text-white">
+                <i class="fa-solid fa-address-card text-4xl mr-4"></i>
+                Register New Patient
+            </h3>
+            <button onclick="closeAddPatientModal()"
+                    class="bg-white/20 hover:bg-white/30 rounded-full w-12 h-12 flex items-center justify-center transition">
+                <i class="fas fa-times text-xl text-white"></i>
+            </button>
+        </div>
+
+        <!-- ================= CONTENT ================= -->
+        <div class="p-10 bg-blue-50 flex-1 overflow-y-auto">
+            <form method="POST" action="" id="patientForm" enctype="multipart/form-data" class="space-y-10">
+
+                <!-- ================= PERSONAL INFORMATION ================= -->
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-blue-100">
+                    <h3 class="text-2xl font-bold text-blue-700 mb-8 flex items-center">
+                        <i class="fa-solid fa-circle-info text-4xl mr-3 text-blue-500"></i>
+                        Personal Information
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                        <div>
+                            <label for="modal_full_name" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Full Name <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="modal_full_name" name="full_name" required
+                                   class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                        </div>
+
+                        <div>
+                            <label for="modal_date_of_birth" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Date of Birth <span class="text-red-500">*</span>
+                            </label>
+                            <input type="date" id="modal_date_of_birth" name="date_of_birth"
+                                   required max="<?= date('Y-m-d') ?>"
+                                   class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                        </div>
+
+                        <div>
+                            <label for="modal_age" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Age (Auto-calculated)
+                            </label>
+                            <input type="number" id="modal_age" name="age" readonly
+                                   class="w-full rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 cursor-not-allowed">
+                        </div>
+
+                        <div>
+                            <label for="modal_gender" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Gender <span class="text-red-500">*</span>
+                            </label>
+                            <select id="modal_gender" name="gender" required
+                                    class="form-select-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <?php if ($civilStatusExists): ?>
+                        <div>
+                            <label for="modal_civil_status" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Civil Status
+                            </label>
+                            <select id="modal_civil_status" name="civil_status"
+                                    class="form-select-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                                <option value="">Select Status</option>
+                                <option>Single</option>
+                                <option>Married</option>
+                                <option>Widowed</option>
+                                <option>Separated</option>
+                                <option>Divorced</option>
+                            </select>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if ($occupationExists): ?>
+                        <div>
+                            <label for="modal_occupation" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Occupation
+                            </label>
+                            <input type="text" id="modal_occupation" name="occupation"
+                                   class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if ($sitioExists): ?>
+                        <div>
+                            <label for="modal_sitio" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Sitio
+                            </label>
+                            <select id="modal_sitio" name="sitio"
+                                    class="form-select-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                                <option value="">Select Sitio</option>
+                                <option value="Proper Luz">Proper Luz</option>
+                                <option value="Lower Luz">Lower Luz</option>
+                                <option value="Upper Luz">Upper Luz</option>
+                                <option value="Luz Proper">Luz Proper</option>
+                                <option value="Luz Heights">Luz Heights</option>
+                                <option value="Panganiban">Panganiban</option>
+                                <option value="Balagtas">Balagtas</option>
+                                <option value="Carbon">Carbon</option>
+                            </select>
+                        </div>
+                        <?php endif; ?>
+
+                        <div class="md:col-span-2">
+                            <label for="modal_address" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Complete Address
+                            </label>
+                            <input type="text" id="modal_address" name="address"
+                                   class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                        </div>
+
+                        <div>
+                            <label for="modal_contact" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Contact Number
+                            </label>
+                            <input type="text" id="modal_contact" name="contact"
+                                   class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= MEDICAL INFORMATION ================= -->
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-blue-100">
+                    <h3 class="text-2xl font-bold text-blue-700 mb-8 flex items-center">
+                        <i class="fas fa-stethoscope text-4xl mr-3 text-blue-500"></i>
+                        Medical Information
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                        <div>
+                            <label for="modal_height" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Height (cm) <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" id="modal_height" name="height" required
+                                   class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                        </div>
+
+                        <div>
+                            <label for="modal_weight" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Weight (kg) <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" id="modal_weight" name="weight" required
+                                   class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                        </div>
+
+                        <div>
+                            <label for="modal_temperature" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Temperature (°C)
+                            </label>
+                            <input type="number" id="modal_temperature" name="temperature"
+                                   class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                        </div>
+
+                        <div>
+                            <label for="modal_blood_pressure" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Blood Pressure
+                            </label>
+                            <input type="text" id="modal_blood_pressure" name="blood_pressure"
+                                   class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                        </div>
+
+                        <div>
+                            <label for="modal_blood_type" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Blood Type <span class="text-red-500">*</span>
+                            </label>
+                            <select id="modal_blood_type" name="blood_type" required
+                                    class="form-select-modal w-full rounded-xl border-blue-200 px-4 py-3">
+                                <option value="">Select Blood Type</option>
+                                <option>A+</option><option>A-</option>
+                                <option>B+</option><option>B-</option>
+                                <option>AB+</option><option>AB-</option>
+                                <option>O+</option><option>O-</option>
+                                <option>Unknown</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="modal_last_checkup" class="block text-sm font-semibold text-blue-700 mb-2">
+                                Last Check-up Date
+                            </label>
+                            <input type="date" id="modal_last_checkup" name="last_checkup"
+                                   class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
                         </div>
                     </div>
 
-                    <!-- Medical Information Section - UPDATED ICON -->
-                    <div class="section-bg p-8">
-                        <h3 class="form-section-title-modal mb-6">
-                            <i class="fas fa-stethoscope mr-2"></i>Medical Information
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 modal-grid-gap">
-                            <div class="modal-field-spacing">
-                                <label for="modal_height" class="form-label-modal required-field">Height (cm)</label>
-                                <input type="number" id="modal_height" name="height" step="0.1" min="0" class="form-input-modal modal-form-field" required>
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_weight" class="form-label-modal required-field">Weight (kg)</label>
-                                <input type="number" id="modal_weight" name="weight" step="0.1" min="0" class="form-input-modal modal-form-field" required>
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_temperature" class="form-label-modal">Temperature (°C)</label>
-                                <input type="number" id="modal_temperature" name="temperature" step="0.1" min="0" max="45" class="form-input-modal modal-form-field">
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_blood_pressure" class="form-label-modal">Blood Pressure</label>
-                                <input type="text" id="modal_blood_pressure" name="blood_pressure" class="form-input-modal modal-form-field" placeholder="120/80">
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_blood_type" class="form-label-modal required-field">Blood Type</label>
-                                <select id="modal_blood_type" name="blood_type" class="form-select-modal modal-form-field" required>
-                                    <option value="">Select Blood Type</option>
-                                    <option value="A+">A+</option>
-                                    <option value="A-">A-</option>
-                                    <option value="B+">B+</option>
-                                    <option value="B-">B-</option>
-                                    <option value="AB+">AB+</option>
-                                    <option value="AB-">AB-</option>
-                                    <option value="O+">O+</option>
-                                    <option value="O-">O-</option>
-                                    <option value="Unknown">Unknown</option>
-                                </select>
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_last_checkup" class="form-label-modal">Last Check-up Date</label>
-                                <input type="date" id="modal_last_checkup" name="last_checkup" class="form-input-modal modal-form-field">
-                            </div>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                            <div class="modal-field-spacing">
-                                <label for="modal_allergies" class="form-label-modal">Allergies</label>
-                                <textarea id="modal_allergies" name="allergies" rows="3" class="form-textarea-modal modal-form-field" placeholder="Food, drug, environmental allergies..."></textarea>
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_current_medications" class="form-label-modal">Current Medications</label>
-                                <textarea id="modal_current_medications" name="current_medications" rows="3" class="form-textarea-modal modal-form-field" placeholder="Medications with dosage and frequency..."></textarea>
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_immunization_record" class="form-label-modal">Immunization Record</label>
-                                <textarea id="modal_immunization_record" name="immunization_record" rows="3" class="form-textarea-modal modal-form-field" placeholder="Vaccinations received with dates..."></textarea>
-                            </div>
-                            
-                            <div class="modal-field-spacing">
-                                <label for="modal_chronic_conditions" class="form-label-modal">Chronic Conditions</label>
-                                <textarea id="modal_chronic_conditions" name="chronic_conditions" rows="3" class="form-textarea-modal modal-form-field" placeholder="Hypertension, diabetes, asthma, etc..."></textarea>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-6 modal-field-spacing">
-                            <label for="modal_medical_history" class="form-label-modal">Medical History</label>
-                            <textarea id="modal_medical_history" name="medical_history" rows="4" class="form-textarea-modal modal-form-field" placeholder="Past illnesses, surgeries, hospitalizations, chronic conditions..."></textarea>
-                        </div>
-                        
-                        <div class="mt-6 modal-field-spacing">
-                            <label for="modal_family_history" class="form-label-modal">Family Medical History</label>
-                            <textarea id="modal_family_history" name="family_history" rows="4" class="form-textarea-modal modal-form-field" placeholder="Family history of diseases (parents, siblings)..."></textarea>
-                        </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <textarea id="modal_allergies" name="allergies" rows="3"
+                                  class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
+                                  placeholder="Allergies"></textarea>
+
+                        <textarea id="modal_current_medications" name="current_medications" rows="3"
+                                  class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
+                                  placeholder="Current Medications"></textarea>
+
+                        <textarea id="modal_immunization_record" name="immunization_record" rows="3"
+                                  class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
+                                  placeholder="Immunization Record"></textarea>
+
+                        <textarea id="modal_chronic_conditions" name="chronic_conditions" rows="3"
+                                  class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
+                                  placeholder="Chronic Conditions"></textarea>
                     </div>
 
-                    <!-- REMOVED: Data Privacy Consent section -->
-                    
-                    <input type="hidden" name="add_patient" value="1">
-                    <input type="hidden" name="consent_given" value="1">
-                </form>
-            </div>
-            
-            <!-- Sticky Footer -->
-            <div class="p-8 border-t border-gray-200 bg-white rounded-b-2xl sticky bottom-0">
-                <div class="flex flex-wrap justify-between items-center gap-4">
-                    <div class="flex items-center space-x-3">
-                        <span class="text-md text-gray-500 bg-gray-100 px-3 py-3 rounded-full">
-                            <i class="fa-solid fa-circle-info text-2xl mr-2"></i>All fields marked with * are required
-                        </span>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                        <button type="button" onclick="clearAddPatientForm()" class="btn-gray px-6 py-3">
-                            <i class="fas fa-times mr-2"></i>Clear Form
-                        </button>
-                        <button type="submit" name="add_patient" form="patientForm" class="btn-success px-8 py-3" id="modalRegisterPatientBtn">
-                            <i class="fas fa-save mr-2"></i>Register Patient
-                        </button>
-                    </div>
+                    <textarea id="modal_medical_history" name="medical_history" rows="4"
+                              class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3 mt-6"
+                              placeholder="Medical History"></textarea>
+
+                    <textarea id="modal_family_history" name="family_history" rows="4"
+                              class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3 mt-6"
+                              placeholder="Family Medical History"></textarea>
+                </div>
+
+                <input type="hidden" name="add_patient" value="1">
+                <input type="hidden" name="consent_given" value="1">
+            </form>
+        </div>
+
+        <!-- ================= FOOTER ================= -->
+        <div class="sticky bottom-0 bg-white border-t border-blue-100 px-10 py-6">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <span class="text-sm text-blue-600 bg-blue-50 px-4 py-2 rounded-full">
+                    <i class="fa-solid fa-circle-info mr-2"></i>Fields marked with * are required
+                </span>
+
+                <div class="flex gap-3">
+                    <button type="button" onclick="clearAddPatientForm()"
+                            class="px-6 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 font-semibold">
+                        Clear Form
+                    </button>
+                    <button type="submit" name="add_patient" form="patientForm"
+                            class="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow">
+                        <i class="fas fa-save mr-2"></i>Register Patient
+                    </button>
                 </div>
             </div>
         </div>
+
     </div>
+</div>
+
 
     <script>
         // Form validation functionality for modal

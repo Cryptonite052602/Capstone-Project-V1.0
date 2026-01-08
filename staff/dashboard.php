@@ -2214,7 +2214,7 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
             background-color: #3C96E1 !important;
             color: white !important;
             border-radius: 9999px !important;
-            padding: 8px 16px !important;
+            padding: 16px 24px !important;
             font-weight: 600 !important;
             font-size: 14px !important;
             transition: all 0.3s ease !important;
@@ -3112,48 +3112,6 @@ $missedAppointmentsPaginated = array_slice($missedAppointments, ($missedPage - 1
 .border-warmblue-300 { border-color: var(--warmblue-300); }
 .border-warmblue-500 { border-color: var(--warmblue-500); }
 
-/* Modal Styles */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-    padding: 1rem;
-}
-
-.modal-container {
-    width: 100%;
-    max-width: 800px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    animation: modalSlideIn 0.3s ease-out;
-}
-
-.modal-header {
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-}
-
-.modal-body {
-    max-height: 60vh;
-    overflow-y: auto;
-}
-
-.modal-footer {
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
-}
-
-.hidden {
-    display: none !important;
-}
 
 /* Consistent animations */
 @keyframes modalSlideIn {
@@ -4762,208 +4720,360 @@ function copyToClipboard(text) {
     </div>
 </div>
 
-<!-- User Details Modal - Horizontal Layout -->
+<!-- User Details Modal - Final Wide Consistent Layout -->
 <div id="userDetailsModal" class="modal-overlay hidden">
-    <div class="modal-container modal-wide-desktop" style="max-height: 90vh;">
-        <div class="modal-header">
+    <div class="modal-container modal-xl">
+
+        <!-- Header -->
+        <div class="modal-header bg-warmblue text-white">
             <div class="flex justify-between items-center">
-                <h2 class="text-xl font-semibold text-gray-800">Patient Registration Details</h2>
-                <button onclick="closeUserDetailsModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                <h2 class="text-2xl font-semibold">
+                    <i class="fas fa-user-injured mr-2"></i> Patient Registration Details
+                </h2>
+                <button onclick="closeUserDetailsModal()" class="close-btn">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
         </div>
 
-        <div class="modal-body" style="overflow-y: auto;">
-            <div class="horizontal-user-details">
+        <!-- Body (Scrollable) -->
+        <div class="modal-body">
+            <div class="details-grid">
+
                 <!-- Personal Information -->
-                <div class="detail-section">
-                    <h4 class="text-lg font-semibold text-blue-600 mb-4">
+                <div class="details-card">
+                    <h4 class="section-title">
                         <i class="fas fa-user mr-2"></i> Personal Information
                     </h4>
-                    <div class="space-y-4">
-                        <div class="detail-item">
-                            <span class="detail-label">Full Name:</span>
-                            <span class="detail-value" id="userFullName">—</span>
+
+                    <div class="field-grid">
+                        <div class="field">
+                            <label>Full Name</label>
+                            <div class="value" id="userFullName">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Username:</span>
-                            <span class="detail-value" id="userUsername">—</span>
+                        <div class="field">
+                            <label>Username</label>
+                            <div class="value" id="userUsername">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Email:</span>
-                            <span class="detail-value" id="userEmail">—</span>
+                        <div class="field">
+                            <label>Email</label>
+                            <div class="value" id="userEmail">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Contact Number:</span>
-                            <span class="detail-value" id="userContact">—</span>
+                        <div class="field">
+                            <label>Contact Number</label>
+                            <div class="value" id="userContact">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Gender:</span>
-                            <span class="detail-value" id="userGender">—</span>
+                        <div class="field">
+                            <label>Gender</label>
+                            <div class="value" id="userGender">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Age:</span>
-                            <span class="detail-value" id="userAge">—</span>
+                        <div class="field">
+                            <label>Age</label>
+                            <div class="value" id="userAge">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Civil Status:</span>
-                            <span class="detail-value" id="userCivilStatus">—</span>
+                        <div class="field">
+                            <label>Civil Status</label>
+                            <div class="value" id="userCivilStatus">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Occupation:</span>
-                            <span class="detail-value" id="userOccupation">—</span>
+                        <div class="field">
+                            <label>Occupation</label>
+                            <div class="value" id="userOccupation">—</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Address & Account Information -->
-                <div class="detail-section">
-                    <h4 class="text-lg font-semibold text-green-600 mb-4">
+                <!-- Address & Account -->
+                <div class="details-card">
+                    <h4 class="section-title">
                         <i class="fas fa-map-marker-alt mr-2"></i> Address Information
                     </h4>
-                    <div class="space-y-4 mb-6">
-                        <div class="detail-item">
-                            <span class="detail-label">Complete Address:</span>
-                            <span class="detail-value" id="userAddress">—</span>
+
+                    <div class="field-grid">
+                        <div class="field col-span-2">
+                            <label>Complete Address</label>
+                            <div class="value" id="userAddress">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Sitio:</span>
-                            <span class="detail-value" id="userSitio">—</span>
+                        <div class="field">
+                            <label>Sitio</label>
+                            <div class="value" id="userSitio">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Date of Birth:</span>
-                            <span class="detail-value" id="userDateOfBirth">—</span>
+                        <div class="field">
+                            <label>Date of Birth</label>
+                            <div class="value" id="userDateOfBirth">—</div>
                         </div>
                     </div>
 
-                    <h4 class="text-lg font-semibold text-red-600 mb-4 mt-6">
+                    <h4 class="section-title mt-6">
                         <i class="fas fa-user-circle mr-2"></i> Account Information
                     </h4>
-                    <div class="space-y-4">
-                        <div class="detail-item">
-                            <span class="detail-label">Account Status:</span>
-                            <span class="detail-value" id="userStatus">—</span>
+
+                    <div class="field-grid">
+                        <div class="field">
+                            <label>Account Status</label>
+                            <div class="value" id="userStatus">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Approved:</span>
-                            <span class="detail-value" id="userApproved">—</span>
+                        <div class="field">
+                            <label>Approved</label>
+                            <div class="value" id="userApproved">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">User Role:</span>
-                            <span class="detail-value" id="userRole">—</span>
+                        <div class="field">
+                            <label>User Role</label>
+                            <div class="value" id="userRole">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Verification Method:</span>
-                            <span class="detail-value" id="userVerificationMethod">—</span>
+                        <div class="field">
+                            <label>Verification Method</label>
+                            <div class="value" id="userVerificationMethod">—</div>
                         </div>
-                        <div class="detail-item" id="uniqueNumberSection" style="display: none;">
-                            <span class="detail-label">Patient ID:</span>
-                            <span class="detail-value text-blue-600 font-semibold" id="userUniqueNumber">—</span>
+
+                        <div class="field col-span-2" id="uniqueNumberSection" style="display:none;">
+                            <label>Patient ID</label>
+                            <div class="value badge-blue" id="userUniqueNumber">—</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- ID Verification -->
-                <div class="detail-section">
-                    <h4 class="text-lg font-semibold text-purple-600 mb-4">
+                <div class="details-card">
+                    <h4 class="section-title">
                         <i class="fas fa-id-card mr-2"></i> ID Verification
                     </h4>
-                    <div class="space-y-4">
-                        <div class="detail-item">
-                            <span class="detail-label">ID Type:</span>
-                            <span class="detail-value" id="userIdType">—</span>
+
+                    <div class="field-grid">
+                        <div class="field">
+                            <label>ID Type</label>
+                            <div class="value" id="userIdType">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">ID Status:</span>
-                            <span class="detail-value">
-                                <span id="userIdValidationStatus" class="px-2 py-1 text-xs rounded-full" style="background: #f3f4f6; color: #6b7280;">—</span>
-                            </span>
+                        <div class="field">
+                            <label>ID Status</label>
+                            <div class="value badge-gray" id="userIdValidationStatus">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">ID Verified:</span>
-                            <span class="detail-value" id="userIdVerified">—</span>
+                        <div class="field">
+                            <label>ID Verified</label>
+                            <div class="value" id="userIdVerified">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Verification Consent:</span>
-                            <span class="detail-value" id="userVerificationConsent">—</span>
+                        <div class="field">
+                            <label>Verification Consent</label>
+                            <div class="value" id="userVerificationConsent">—</div>
                         </div>
-                        
-                        <!-- ID Image Preview -->
-                        <div class="mt-4">
-                            <h5 class="text-sm font-medium text-gray-700 mb-2">ID Document</h5>
-                            <div id="idImageSection" class="hidden">
-                                <div class="id-preview-container mb-3">
-                                    <img id="userIdImage" src="" alt="ID Image" class="w-full h-auto">
-                                </div>
-                                <div class="flex space-x-3">
-                                    <a id="userIdImageLink" href="#" target="_blank" class="btn-blue text-sm">
-                                        <i class="fas fa-external-link-alt mr-2"></i> View Original
-                                    </a>
-                                    <button onclick="openImageModal()" class="btn-blue text-sm">
-                                        <i class="fas fa-search mr-2"></i> Zoom Preview
-                                    </button>
-                                </div>
+                    </div>
+
+                    <!-- ID Image -->
+                    <div class="mt-6">
+                        <h5 class="sub-title">ID Document</h5>
+
+                        <div id="idImageSection" class="hidden">
+                            <div class="id-preview-container">
+                                <img id="userIdImage" src="" alt="ID Image">
                             </div>
-                            <div id="noIdImageSection" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                <p class="text-yellow-700 text-sm">
-                                    <i class="fas fa-exclamation-triangle mr-2"></i>
-                                    No ID image uploaded
-                                </p>
+
+                            <div class="flex gap-3 mt-3">
+                                <a id="userIdImageLink" target="_blank" class="btn-primary-sm">
+                                    <i class="fas fa-external-link-alt mr-2"></i> View Original
+                                </a>
+                                <button onclick="openImageModal()" class="btn-primary-sm">
+                                    <i class="fas fa-search mr-2"></i> Zoom Preview
+                                </button>
                             </div>
+                        </div>
+
+                        <div id="noIdImageSection" class="warning-box">
+                            <i class="fas fa-exclamation-triangle mr-2"></i> No ID image uploaded
                         </div>
                     </div>
                 </div>
 
-                <!-- Registration Timeline & Actions -->
-                <div class="detail-section">
-                    <h4 class="text-lg font-semibold text-indigo-600 mb-4">
+                <!-- Timeline -->
+                <div class="details-card">
+                    <h4 class="section-title">
                         <i class="fas fa-history mr-2"></i> Registration Timeline
                     </h4>
-                    <div class="space-y-4 mb-6">
-                        <div class="detail-item">
-                            <span class="detail-label">Registered Date:</span>
-                            <span class="detail-value" id="userRegisteredDate">—</span>
+
+                    <div class="field-grid">
+                        <div class="field">
+                            <label>Registered Date</label>
+                            <div class="value" id="userRegisteredDate">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Last Updated:</span>
-                            <span class="detail-value" id="userUpdatedDate">—</span>
+                        <div class="field">
+                            <label>Last Updated</label>
+                            <div class="value" id="userUpdatedDate">—</div>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Verified At:</span>
-                            <span class="detail-value" id="userVerifiedAt">—</span>
+                        <div class="field">
+                            <label>Verified At</label>
+                            <div class="value" id="userVerifiedAt">—</div>
                         </div>
                     </div>
 
-                    <!-- Verification Notes -->
-                    <div id="verificationNotesSection" class="hidden mb-6">
-                        <h4 class="text-lg font-semibold text-yellow-600 mb-4">
+                    <div id="verificationNotesSection" class="hidden mt-6">
+                        <h4 class="section-title">
                             <i class="fas fa-sticky-note mr-2"></i> Verification Notes
                         </h4>
-                        <div class="bg-yellow-50 border border-yellow-100 rounded-lg p-4">
-                            <p class="text-sm text-gray-700" id="userVerificationNotes">—</p>
-                        </div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <h4 class="text-lg font-semibold text-gray-600 mb-4">
-                        <i class="fas fa-cogs mr-2"></i> Actions
-                    </h4>
-                    <div class="grid grid-cols-1 gap-4">
-                        <button onclick="openApproveConfirmationModal()" 
-                                class="btn-approve-white w-full">
-                            <i class="fas fa-check mr-2"></i> Approve Registration
-                        </button>
-                        <button onclick="openDeclineModalFromDetails()" 
-                                class="btn-decline-white w-full">
-                            <i class="fas fa-times mr-2"></i> Decline Registration
-                        </button>
+                        <div class="notes-box" id="userVerificationNotes">—</div>
                     </div>
                 </div>
+
             </div>
         </div>
+
+        <!-- Sticky Footer -->
+        <div class="modal-footer-sticky">
+            <button onclick="openApproveConfirmationModal()" class="btn-primary btn-lg">
+                <i class="fas fa-check mr-2"></i> Approve Registration
+            </button>
+            <button onclick="openDeclineModalFromDetails()" class="btn-outline-danger btn-lg">
+                <i class="fas fa-times mr-2"></i> Decline Registration
+            </button>
+        </div>
+
     </div>
 </div>
+
+<style>
+    :root {
+    --warmblue: #2563eb;
+}
+
+/* Modal layout */
+.modal-xl {
+    width: 96%;
+    max-width: 1440px;
+    height: 94vh;
+    display: flex;
+    flex-direction: column;
+    background: #f8fafc;
+    border-radius: 16px;
+}
+
+/* Header */
+.bg-warmblue {
+    background: var(--warmblue);
+}
+.close-btn {
+    color: white;
+    padding: 8px;
+    border-radius: 50%;
+}
+.close-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+/* Body */
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px;
+    padding-bottom: 140px;
+}
+
+/* Grid */
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 24px;
+}
+
+/* Cards */
+.details-card {
+    background: white;
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+}
+
+/* Titles */
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--warmblue);
+    margin-bottom: 16px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #e0e7ff;
+}
+
+/* Fields */
+.field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+.field {
+    display: flex;
+    flex-direction: column;
+}
+.field label {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 4px;
+}
+.value {
+    min-height: 46px;
+    background: #f1f5f9;
+    padding: 10px 12px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+}
+
+.col-span-2 {
+    grid-column: span 2;
+}
+
+/* Badges */
+.badge-blue {
+    background: var(--warmblue);
+    color: white;
+    font-weight: 600;
+    justify-content: center;
+}
+.badge-gray {
+    background: #e5e7eb;
+    justify-content: center;
+}
+
+/* Footer */
+.modal-footer-sticky {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    padding: 18px 28px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+}
+
+/* Buttons */
+.btn-lg {
+    font-size: 1rem;
+    padding: 14px 26px;
+    min-width: 220px;
+    border-radius: 12px;
+}
+.btn-primary {
+    background: var(--warmblue);
+    color: white;
+}
+.btn-outline-danger {
+    border: 2px solid #dc2626;
+    color: #dc2626;
+    background: transparent;
+}
+
+/* Misc */
+.warning-box {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    padding: 12px;
+    border-radius: 8px;
+    color: #b45309;
+}
+.notes-box {
+    background: #fefce8;
+    padding: 12px;
+    border-radius: 8px;
+}
+
+</style>
 </div>
 
 <!-- Cancelled Appointment Details Modal - Wide Desktop -->

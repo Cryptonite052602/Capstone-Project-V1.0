@@ -1089,7 +1089,7 @@ body,
                     <div class="hidden md:flex items-center">
                         <a href="#" onclick="openModal()"
                             class="complete-btn bg-[#4A90E2] mx-16 text-lg text-white rounded-full flex items-center justify-center shadow-md hover:shadow-lg">
-                            Schedule Appointment
+                            Book Appointment
                         </a>
                     </div>
                 </div>
