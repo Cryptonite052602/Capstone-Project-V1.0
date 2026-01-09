@@ -39,7 +39,7 @@ echo <<<HTML
     <title>Logging Out</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100">
+<body>
     <div class="fixed inset-0 flex items-center justify-center">
         <div class="absolute inset-0 bg-black bg-opacity-20 backdrop-blur-sm"></div>
         <div class="relative bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl border border-gray-200 animate-fade-in">
@@ -69,6 +69,18 @@ echo <<<HTML
         }, 1500);
     </script>
     <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            width: 100%;
+            background: linear-gradient(rgba(66, 66, 66, 0.5), rgba(0, 0, 0, 0.5)),
+                        url('/community-health-tracker/asssets/images/Dev.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
         @keyframes fadeIn {
             from { 
                 opacity: 0; 

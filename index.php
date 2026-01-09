@@ -562,293 +562,102 @@ try {
 </div> 
 
     <!-- Learn More Modal -->
-    <div id="learnMoreModal" class="fixed inset-0 hidden z-50 bg-black/30">
-        <div class="absolute inset-0 flex items-center justify-center p-4">
-            <div class="relative bg-white rounded-lg shadow-xl w-full max-w-[90vw] h-[90vh] max-h-[90vh] flex flex-col">
-                <!-- Close Icon (X) -->
-                <button onclick="closeLearnMoreModal()"
-                    class="absolute top-4 right-4 z-50 text-gray-500 hover:text-gray-700 bg-white rounded-full p-2 shadow-md">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+<div id="learnMoreModal"
+    class="fixed inset-0 z-50 hidden bg-black/40 backdrop-blur-sm flex items-center justify-center px-4">
 
-                <div class="overflow-y-auto flex-1 p-8">
-                    <div class="text-center mb-8">
-                        <h2 class="text-3xl font-bold text-[#0073D3]">Community Health Essentials</h2>
-                        <p class="text-gray-600 mt-2">Comprehensive guide to maintaining your health and wellness</p>
-                    </div>
+    <div
+        class="relative w-full max-w-7xl h-[92vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden
+               animate-[fadeIn_0.3s_ease-out]">
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <!-- Health Tips -->
-                        <div class="bg-blue-50 rounded-xl p-6">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="bg-blue-100 p-2 rounded-lg">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                    </svg>
-                                </div>
-                                <h3 class="text-xl font-bold text-gray-800">Daily Health Tips</h3>
-                            </div>
-                            <ul class="space-y-3 text-gray-700">
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Get 7-9 hours of quality sleep nightly for optimal health</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Drink at least 8 glasses of water throughout the day</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Engage in 30 minutes of moderate exercise daily</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Eat 5-7 servings of fruits and vegetables each day</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Practice mindfulness or meditation for 10-15 minutes daily</span>
-                                </li>
-                            </ul>
-                        </div>
+        <!-- Header -->
+        <div
+            class="sticky top-0 z-20 bg-white border-b border-blue-100 px-10 py-6 flex items-center justify-between">
+            <div>
+                <h2 class="text-3xl font-bold text-blue-700">
+                    Community Health Essentials
+                </h2>
+                <p class="text-base text-gray-500 mt-1">
+                    A complete guide to wellness, prevention, and safety
+                </p>
+            </div>
 
-                        <!-- Preventive Care -->
-                        <div class="bg-green-50 rounded-xl p-6">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="bg-green-100 p-2 rounded-lg">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
-                                </div>
-                                <h3 class="text-xl font-bold text-gray-800">Preventive Care</h3>
-                            </div>
-                            <ul class="space-y-3 text-gray-700">
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Schedule annual physical exams with your primary care physician</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Stay current with recommended vaccinations and immunizations</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Complete age-appropriate cancer screenings (mammograms, colonoscopies)</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Monitor and manage chronic conditions with regular check-ups</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span>Maintain dental health with biannual cleanings and exams</span>
-                                </li>
-                            </ul>
-                        </div>
+            <button onclick="closeLearnMoreModal()"
+                class="w-12 h-12 flex items-center justify-center rounded-full
+                       bg-blue-50 text-blue-700 hover:bg-blue-100 transition text-xl">
+                ✕
+            </button>
+        </div>
 
-                        <!-- Community Resources -->
-                        <div class="bg-purple-50 rounded-xl p-6">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="bg-purple-100 p-2 rounded-lg">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-600" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
-                                </div>
-                                <h3 class="text-xl font-bold text-gray-800">Community Resources</h3>
-                            </div>
-                            <ul class="space-y-3 text-gray-700">
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-purple-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span><strong>Free Health Screenings:</strong> First Saturday of each month at Community Center (9am-1pm)</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-purple-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span><strong>Nutrition Workshops:</strong> Every Tuesday 6-7pm at the Public Library</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-purple-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span><strong>Mental Health Support:</strong> Confidential counseling available M-F 9am-5pm</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-purple-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span><strong>Fitness Programs:</strong> Free yoga and Zumba classes at Park Pavilion</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-purple-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span><strong>24/7 Nurse Hotline:</strong> Call (555) 123-4567 for medical advice</span>
-                                </li>
-                            </ul>
-                        </div>
+        <!-- Content -->
+        <div class="flex-1 overflow-y-auto px-10 py-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
 
-                        <!-- Emergency Preparedness -->
-                        <div class="bg-red-50 rounded-xl p-6">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="bg-red-100 p-2 rounded-lg">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                </div>
-                                <h3 class="text-xl font-bold text-gray-800">Emergency Preparedness</h3>
-                            </div>
-                            <ul class="space-y-3 text-gray-700">
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span><strong>Emergency Contacts:</strong> Post these numbers near your phone</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span><strong>First Aid Kits:</strong> Keep one at home, work, and in your car</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span><strong>CPR Training:</strong> Next class on 15th of each month at Fire Station #3</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span><strong>Emergency Signs:</strong> Learn to recognize stroke and heart attack symptoms</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                        class="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <span><strong>Disaster Plan:</strong> Create a family emergency meeting point and contacts</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+                <!-- Card -->
+                <div
+                    class="bg-blue-50 border border-blue-100 rounded-2xl p-8 shadow-sm hover:shadow-md transition">
+                    <h3 class="flex items-center gap-4 text-2xl font-semibold text-blue-700 mb-6">
+                        <span class="bg-blue-100 px-4 py-2 rounded-xl text-blue-700">✔</span>
+                        Daily Health Tips
+                    </h3>
+                    <ul class="space-y-4 text-gray-700 text-lg leading-relaxed">
+                        <li>• Get 7–9 hours of quality sleep</li>
+                        <li>• Drink at least 8 glasses of water</li>
+                        <li>• Exercise for 30 minutes daily</li>
+                        <li>• Eat fruits and vegetables daily</li>
+                        <li>• Practice mindfulness or meditation</li>
+                    </ul>
                 </div>
+
+                <div
+                    class="bg-blue-50 border border-blue-100 rounded-2xl p-8 shadow-sm hover:shadow-md transition">
+                    <h3 class="flex items-center gap-4 text-2xl font-semibold text-blue-700 mb-6">
+                        <span class="bg-blue-100 px-4 py-2 rounded-xl">🩺</span>
+                        Preventive Care
+                    </h3>
+                    <ul class="space-y-4 text-gray-700 text-lg">
+                        <li>• Annual physical checkups</li>
+                        <li>• Updated vaccinations</li>
+                        <li>• Age-appropriate screenings</li>
+                        <li>• Chronic condition monitoring</li>
+                        <li>• Dental exams twice a year</li>
+                    </ul>
+                </div>
+
+                <div
+                    class="bg-blue-50 border border-blue-100 rounded-2xl p-8 shadow-sm hover:shadow-md transition">
+                    <h3 class="flex items-center gap-4 text-2xl font-semibold text-blue-700 mb-6">
+                        <span class="bg-blue-100 px-4 py-2 rounded-xl">👥</span>
+                        Community Resources
+                    </h3>
+                    <ul class="space-y-4 text-gray-700 text-lg">
+                        <li><strong>Free Screenings:</strong> Monthly (Community Center)</li>
+                        <li><strong>Nutrition Workshops:</strong> Tuesdays</li>
+                        <li><strong>Mental Health:</strong> M–F, 9am–5pm</li>
+                        <li><strong>Fitness Programs:</strong> Yoga & Zumba</li>
+                        <li><strong>Nurse Hotline:</strong> (555) 123-4567</li>
+                    </ul>
+                </div>
+
+                <div
+                    class="bg-blue-50 border border-blue-100 rounded-2xl p-8 shadow-sm hover:shadow-md transition">
+                    <h3 class="flex items-center gap-4 text-2xl font-semibold text-blue-700 mb-6">
+                        <span class="bg-blue-100 px-4 py-2 rounded-xl">🚨</span>
+                        Emergency Preparedness
+                    </h3>
+                    <ul class="space-y-4 text-gray-700 text-lg">
+                        <li>• Keep emergency numbers visible</li>
+                        <li>• Maintain first-aid kits</li>
+                        <li>• Attend CPR training monthly</li>
+                        <li>• Learn emergency warning signs</li>
+                        <li>• Create a family disaster plan</li>
+                    </ul>
+                </div>
+
             </div>
         </div>
     </div>
+</div>
+
 
     <!-- Announcements Modal -->
     <div id="announcementsModal" class="fixed inset-0 hidden z-50 bg-black/30">
