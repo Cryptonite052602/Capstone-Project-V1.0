@@ -1609,8 +1609,8 @@ body,
     </style>
 </head>
 <body class="bg-gray-50">
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-6 text-secondary">Resident Patient Records</h1>
+    <div class="container mx-auto px-4 py-1">
+        <h1 class="text-3xl font-semibold mb-6 text-secondary">Resident Patient Records</h1>
         
         <?php if ($message): ?>
             <div id="successMessage" class="alert-success px-4 py-3 rounded mb-4 flex items-center">

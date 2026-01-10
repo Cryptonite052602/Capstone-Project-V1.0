@@ -1071,15 +1071,15 @@ body,
                                     class="nav-link text-gray-700 hover:text-[#4A90E2] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Home</a>
                             </li>
                             <li>
-                                <a href="#"
+                                <a href="#about"
                                     class="nav-link text-gray-700 hover:text-[#4A90E2] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">About</a>
                             </li>
                             <li>
-                                <a href="#"
+                                <a href="#services"
                                     class="nav-link text-gray-700 hover:text-[#4A90E2] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Services</a>
                             </li>
                             <li>
-                                <a href="#"
+                                <a href="#contact"
                                     class="nav-link text-gray-700 hover:text-[#4A90E2] hover:underline underline-offset-4 transition-all duration-300 ease-in-out">Contact</a>
                             </li>
                         </ul>

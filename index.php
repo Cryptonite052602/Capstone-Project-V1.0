@@ -38,6 +38,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barangay Toong - Health Monitoring and Tracking</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=update" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
@@ -224,14 +225,14 @@ try {
     <!-- Main Container -->
     <div class="flex-1">
         <!-- Hero Section -->
-        <div class="bg-[#0073D3] rounded-2xl -mt-20 mb-14 relative overflow-hidden mx-4 sm:mx-6 md:mx-14 md:h-[40rem]">
+        <div class=" -mt-20 mb-14 relative overflow-hidden mx-4 sm:mx-6 md:mx-14 md:h-[40rem]">
             <!-- Background Image -->
             <div class="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20" 
                  style="background-image: url('asssets/images/hero-background.jpg');"></div>
             
             <div class="flex flex-col md:flex-row h-full relative z-10">
                 <!-- LEFT -->
-                <div class="relative bg-white/90 backdrop-blur-sm w-full md:w-1/2 h-[22rem] md:h-auto flex items-center justify-center overflow-hidden p-6 sm:p-10">
+                <div class="relative w-full md:w-1/2 h-[22rem] md:h-auto flex items-center justify-center overflow-hidden p-6 sm:p-10">
                     <!-- IMAGE BACKGROUND -->
                     <img src="asssets/images/Medical.png" alt="Hand image"
                         class="absolute w-[18rem] sm:w-[24rem] md:w-[30rem] h-[18rem] sm:h-[24rem] md:h-[30rem] object-contain opacity-70 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -258,7 +259,7 @@ try {
         </div>
 
         <!-- Core Features Section -->
-        <div class="py-12 bg-white">
+        <div class="py-12 bg-white" id="services">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="text-center mb-12">
                     <h2 class="text-base text-[#4A90E2] font-semibold tracking-wide uppercase">Key Features</h2>
@@ -324,8 +325,8 @@ try {
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="text-center mb-12">
                     <div class="flex items-center justify-center gap-3 mb-4">
-                        <div class="bg-blue-100 p-3 rounded-full">
-                            <i class="fas fa-bullhorn text-2xl text-blue-600"></i>
+                        <div class=" p-3 rounded-full">
+                            <i class="fas fa-bullhorn text-5xl text-blue-600"></i>
                         </div>
                         <h2 class="text-3xl font-bold text-gray-900">Latest Announcements</h2>
                     </div>
@@ -338,7 +339,8 @@ try {
                     <!-- Empty State -->
                     <div class="bg-white rounded-2xl border-2 border-dashed border-blue-200 p-12 text-center">
                         <div class="mb-4">
-                            <i class="fas fa-bullhorn text-6xl text-blue-200"></i>
+                            <span class="material-symbols-outlined text-blue-200" style="font-size:70px;">update</span>
+
                         </div>
                         <h3 class="text-xl font-semibold text-gray-700 mb-2">No Announcements Yet</h3>
                         <p class="text-gray-500 max-w-md mx-auto">
@@ -440,7 +442,7 @@ try {
         </div>
 
         <!-- Testimonials Section -->
-        <div class="py-12 bg-gray-50">
+        <div class="py-12 bg-gray-50" id="about">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="text-center">
                     <h2 class="text-base text-[#4A90E2] font-semibold tracking-wide uppercase">Testimonials</h2>
