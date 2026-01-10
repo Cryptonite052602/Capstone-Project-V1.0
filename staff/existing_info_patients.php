@@ -736,6 +736,7 @@ if (!empty($selectedPatientId)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Patient Health Records - Barangay Luz Health Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/asssets/css/normalize.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
@@ -846,12 +847,12 @@ body,
 }
 
 .btn-add-patient {
-    background-color: white;
-    color: #2ecc71;
+    background-color: #2ecc71;
+    color: #ffffffff;
     border: 2px solid #2ecc71;
     opacity: 1;
-    border-radius: 8px;
-    padding: 10px 20px;
+    border-radius: 50px;
+    padding: 17px 25px;
     transition: all 0.3s ease;
     font-weight: 500;
     min-height: 45px;
@@ -860,8 +861,7 @@ body,
     justify-content: center;
 }
 .btn-add-patient:hover {
-    background-color: #f0fdf4;
-    border-color: #2ecc71;
+    background-color: #42d37eff;
     opacity: 0.6;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
@@ -1446,14 +1446,14 @@ body,
 }
 
 /* Fix for browsers that don't support opacity */
- .btn-add-patient, .btn-success,
+  .btn-success,
 .btn-print, .btn-edit, .btn-view-all, .btn-back-to-pagination, 
 .search-input, .search-select {
     border-style: solid !important;
 }
 
 /* Hover state opacity */
-.btn-archive:hover, .btn-add-patient:hover,
+.btn-archive:hover, 
 .btn-success:hover, .btn-edit:hover, .btn-back-to-pagination:hover,
 .search-input:focus, .search-select:focus {
     border-color: inherit !important;
@@ -1575,12 +1575,12 @@ body,
 }
 
 /* UPDATED: Added opacity support for borders */
-.btn-view, .btn-archive, .btn-add-patient, .btn-primary, .btn-success, .btn-gray,
+.btn-view, .btn-archive,  .btn-primary, .btn-success, .btn-gray,
 .btn-print, .btn-edit, .btn-save-medical, .btn-view-all, .btn-back-to-pagination, .pagination-btn {
     position: relative;
 }
 
-.btn-view::after, .btn-archive::after, .btn-add-patient::after, .btn-primary::after,
+.btn-view::after, .btn-archive::after, .btn-primary::after,
 .btn-success::after, .btn-gray::after, .btn-print::after, .btn-edit::after,
 .btn-view-all::after, .btn-back-to-pagination::after, {
     content: '';
@@ -1823,7 +1823,6 @@ body,
                                                     <th>Occupation</th>
                                                     <th>Sitio</th>
                                                     <th>Contact</th>
-                                                    <th>Unique Number</th>
                                                     <th>Actions</th>
                                                 </tr>
                                             </thead>
@@ -1859,10 +1858,10 @@ body,
                                                         <td><?= htmlspecialchars($user['occupation'] ?? 'N/A') ?></td>
                                                         <td><?= htmlspecialchars($user['sitio'] ?? 'N/A') ?></td>
                                                         <td><?= htmlspecialchars($user['contact'] ?? 'N/A') ?></td>
-                                                        <td class="font-semibold text-primary"><?= htmlspecialchars($user['unique_number'] ?? 'N/A') ?></td>
+                                                 
                                                         <td>
                                                             <a href="?convert_to_patient=<?= $user['id'] ?>" class="btn-add-patient inline-flex items-center" onclick="return confirm('Are you sure you want to add this user as a patient?')">
-                                                                <i class="fas fa-user-plus mr-1"></i> Add as Patient
+                                                            <i class="fa-solid fa-plus text-1xl mr-3"></i>Include Patient
                                                             </a>
                                                         </td>
                                                     </tr>

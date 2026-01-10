@@ -798,6 +798,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Dashboard - Community Health Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/asssets/css/normalize.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -2071,10 +2072,8 @@ try {
         
         <div class="w-full md:w-80 bg-blue-700 p-10 text-white flex flex-col justify-between">
             <div>
-                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-500 mb-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.516l2.257-1.13a1 1 0 00.502-1.21L9.281 3.684A1 1 0 008.588 3H5z" />
-                    </svg>
+                <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-blue-500 mb-8">
+                    <i class="fa-solid fa-address-book text-5xl"></i>
                 </div>
                 <h3 class="text-2xl font-semibold mb-2">Help Center</h3>
                 <p class="text-white text-sm font-light leading-relaxed mb-8">
@@ -2097,79 +2096,84 @@ try {
             </div>
         </div>
 
-        <div class="flex-1 bg-white flex flex-col">
-            <div class="flex items-center justify-between px-10 py-8">
-                <h4 class="text-xl font-bold text-slate-800 tracking-tight">Direct Contact Channels</h4>
-                <button onclick="closeContactModal()" class="text-slate-300 hover:text-slate-600 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+        <div class="flex-1 bg-white flex flex-col rounded-2xl shadow-xl overflow-hidden">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-8 py-6 bg-blue-50">
+        <h4 class="text-xl font-bold text-blue-700 tracking-tight">Direct Contact Channels</h4>
+        <button onclick="closeContactModal()" class="text-blue-400 hover:text-blue-700 transition-colors duration-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- Body -->
+    <div class="px-8 py-6 flex-1 overflow-y-auto custom-scrollbar space-y-6">
+        <!-- Support Line -->
+        <div class="group flex items-center p-5 rounded-2xl border border-blue-100 hover:border-blue-300 hover:bg-blue-50 transition-all duration-300 shadow-sm">
+            <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mr-5 shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
             </div>
+            <div class="flex-1">
+                <span class="block text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Support Line</span>
+                <span class="text-lg font-semibold text-blue-900 leading-none">(02) 1234-5678</span>
+            </div>
+            <button onclick="copyToClipboard('(02) 1234-5678', this)" class="text-xs font-bold text-blue-600 bg-white border border-blue-200 px-4 py-2 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                COPY
+            </button>
+        </div>
 
-            <div class="px-10 pb-10 overflow-y-auto flex-1 custom-scrollbar">
-                <div class="space-y-6">
-                    
-                    <div class="group flex items-center p-6 rounded-2xl border-2 border-slate-50 hover:border-blue-100 hover:bg-blue-50/20 transition-all duration-300">
-                        <div class="w-12 h-12 bg-blue-100/50 text-blue-600 rounded-xl flex items-center justify-center mr-6 shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                            </svg>
-                        </div>
-                        <div class="flex-1">
-                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Support Line</span>
-                            <span class="text-lg font-semibold text-slate-900 leading-none">(02) 1234-5678</span>
-                        </div>
-                        <button onclick="copyToClipboard('(02) 1234-5678', this)" class="text-xs font-bold text-blue-600 bg-white border border-blue-200 px-5 py-2.5 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-                            COPY
-                        </button>
-                    </div>
+        <!-- Email Inquiries -->
+        <div class="group flex items-center p-5 rounded-2xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/20 transition-all duration-300 shadow-sm">
+            <div class="w-14 h-14 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mr-5 shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+            </div>
+            <div class="flex-1 overflow-hidden">
+                <span class="block text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Email Inquiries</span>
+                <span class="text-base font-semibold text-blue-900 leading-none truncate block">support@brgyluzcebucity.com</span>
+            </div>
+            <button onclick="copyToClipboard('support@brgyluzcebucity.com', this)" class="text-xs font-bold text-blue-600 bg-white border border-blue-200 px-4 py-2 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                COPY
+            </button>
+        </div>
 
-                    <div class="group flex items-center p-6 rounded-2xl border-2 border-slate-50 hover:border-slate-200 hover:bg-slate-50/50 transition-all duration-300">
-                        <div class="w-12 h-12 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center mr-6 shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
-                        </div>
-                        <div class="flex-1 overflow-hidden">
-                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Email Inquiries</span>
-                            <span class="text-base font-semibold text-slate-900 leading-none truncate block">support@brgyluzcebucity.com</span>
-                        </div>
-                        <button onclick="copyToClipboard('support@brgyluzcebucity.com', this)" class="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-5 py-2.5 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm">
-                            COPY
-                        </button>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8 pt-6 border-t border-slate-100">
-                        <div class="flex items-start">
-                            <div class="p-2 bg-slate-50 rounded-lg mr-3 text-slate-500">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            </div>
-                            <div>
-                                <h5 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Office Hours</h5>
-                                <p class="text-xs font-semibold text-slate-700">Mon - Fri: 8 AM - 5 PM</p>
-                                <p class="text-[10px] text-slate-500 italic">Sat: 9 AM - 1 PM</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start">
-                            <div class="p-2 bg-slate-50 rounded-lg mr-3 text-slate-500">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            </div>
-                            <div>
-                                <h5 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Preparation</h5>
-                                <p class="text-xs font-semibold text-slate-700 leading-relaxed">Have your Reference # and ID ready before calling.</p>
-                            </div>
-                        </div>
-                    </div>
+        <!-- Info Section -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 pt-6 border-t border-blue-100">
+            <div class="flex items-start">
+                <div class="p-2 bg-blue-50 rounded-lg mr-3 text-blue-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div>
+                    <h5 class="text-[11px] font-bold text-blue-400 uppercase tracking-wider">Office Hours</h5>
+                    <p class="text-xs font-semibold text-blue-900">Mon - Fri: 8 AM - 5 PM</p>
+                    <p class="text-[10px] text-blue-500 italic">Sat: 9 AM - 1 PM</p>
                 </div>
             </div>
-
-            <div class="px-10 py-6 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
-                <button onclick="closeContactModal()" class="group relative px-10 py-3 bg-[#1e293b] text-white text-xs font-bold rounded-xl shadow-lg hover:bg-blue-600 transition-all duration-300 tracking-widest overflow-hidden">
-                    <span class="relative z-10 uppercase">Dismiss</span>
-                </button>
+            <div class="flex items-start">
+                <div class="p-2 bg-blue-50 rounded-lg mr-3 text-blue-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div>
+                    <h5 class="text-[11px] font-bold text-blue-400 uppercase tracking-wider">Preparation</h5>
+                    <p class="text-xs font-semibold text-blue-900 leading-relaxed">Have your Reference # and ID ready before calling.</p>
+                </div>
             </div>
         </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="px-8 py-6 bg-blue-50 border-t border-blue-100 flex items-center justify-end">
+        <button onclick="closeContactModal()" class="group relative px-12 py-4 bg-blue-600 text-white text-sm font-bold rounded-full shadow-lg hover:bg-blue-500 transition-all duration-300 tracking-widest overflow-hidden">
+    <span class="relative z-10 uppercase">Dismiss</span>
+</button>
+
+    </div>
+</div>
+
     </div>
 </div>
 
@@ -2194,7 +2198,7 @@ try {
             const originalClasses = [...btn.classList];
             
             btn.innerText = 'COPIED';
-            btn.classList.add('!bg-emerald-500', '!text-white', '!border-emerald-500');
+            btn.classList.add('!bg-white', '!text-blue-500', '!border-blue-500');
             
             setTimeout(() => {
                 btn.innerText = originalText;

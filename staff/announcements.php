@@ -215,6 +215,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Announcement Management - Barangay Luz Health Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/asssets/css/normalize.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
@@ -231,7 +232,7 @@ try {
         --primary: #3498db;
         --primary-dark: #2980b9;
         --secondary: #2c3e50;
-        --success: #2ecc71;
+        --success: #3994d1ff;
         --warning: #f39c12;
         --danger: #e74c3c;
         --light: #f8f9fa;
@@ -318,14 +319,15 @@ try {
     }
 
     .btn-success {
-        background: white;
-        color: var(--success);
-        border: 2px solid rgba(46, 204, 113, 1);
+        background: var(--success);
+        color: white;
+        border-radius: 30px;
+        
     }
 
     .btn-success:hover {
-        background: #f0fdf4;
-        border-color: rgba(46, 204, 113, 0.6);
+        background: #358cc7ff;
+        border-color: #2980b9;
         transform: translateY(-2px);
     }
 
@@ -356,7 +358,8 @@ try {
     .btn-secondary {
         background: white;
         color: var(--secondary);
-        border: 2px solid var(--border);
+        border: 2px solid #7e7e7eff;
+        border-radius: 30px;
     }
 
     .btn-secondary:hover {

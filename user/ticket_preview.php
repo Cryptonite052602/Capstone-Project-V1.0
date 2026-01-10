@@ -43,105 +43,132 @@ if (isset($_GET['appointment_id'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Appointment Ticket - Priority #<?= $appointment['priority_number'] ?></title>
+    <title>Appointment Ticket • Priority #<?= htmlspecialchars($appointment['priority_number']) ?></title>
+    <!-- Poppins Font -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+
     <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
-        @media print {
-            .no-print {
-                display: none !important;
-            }
-            body {
-                margin: 0;
-                padding: 0;
-            }
-            .ticket-container {
-                box-shadow: none !important;
-                border: 2px solid #000 !important;
-            }
+    body {
+        font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff; padding: 0; }
+        .ticket-card {
+            box-shadow: none !important;
+            border: 3px solid #2563eb !important;
         }
-        
-        .ticket-container {
-            border: 2px solid #3b82f6;
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-        }
-        
-        .priority-number {
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-        }
-    </style>
+    }
+</style>
+
 </head>
-<body class="bg-gray-100 p-4">
-    <div class="max-w-md mx-auto">
-        <!-- Print Button -->
-        <div class="no-print mb-4 text-center">
-            <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
-                📄 Print or Take Screenshot
-            </button>
-            <button onclick="window.close()" class="ml-2 bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition">
-                ❌ Close
-            </button>
+
+<body class="font-['Poppins'] bg-slate-100 min-h-screen p-6 flex items-center justify-center">
+
+
+<div class="w-full max-w-xl">
+
+    <!-- Actions -->
+    <div class="no-print flex justify-center gap-4 mb-6">
+        <button onclick="window.print()"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-7 py-3 rounded-xl text-base font-semibold shadow-lg transition">
+            🖨 Print / Save Ticket
+        </button>
+        <button onclick="window.close()"
+            class="bg-slate-600 hover:bg-slate-700 text-white px-7 py-3 rounded-xl text-base font-semibold shadow-lg transition">
+            ✖ Close
+        </button>
+    </div>
+
+    <!-- Ticket -->
+    <div class="ticket-card bg-white rounded-2xl shadow-2xl border border-blue-300 overflow-hidden">
+
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-8 py-6 text-center">
+            <h1 class="text-2xl font-bold tracking-wide">
+                Barangay Luz Health Appointment
+            </h1>
+            <p class="text-sm opacity-95 mt-2">
+                Official Appointment Ticket
+            </p>
         </div>
-        
-        <!-- Ticket -->
-        <div class="ticket-container rounded-lg p-6 shadow-lg">
-            <!-- Header -->
-            <div class="text-center mb-6">
-                <h1 class="text-2xl font-bold text-blue-600 mb-2">HEALTH APPOINTMENT TICKET</h1>
-                <div class="w-32 h-1 bg-blue-600 mx-auto"></div>
+
+        <!-- Priority Number -->
+        <div class="px-8 py-8 text-center border-b">
+            <p class="text-sm uppercase tracking-widest text-blue-700 font-bold mb-3">
+                Priority Number
+            </p>
+            <div class="text-7xl font-extrabold text-red-500 leading-none">
+                <?= htmlspecialchars($appointment['priority_number']) ?>
             </div>
-            
-            <!-- Priority Number -->
-            <div class="text-center mb-6 py-4 bg-red-50 border-2 border-red-200 rounded-lg">
-                <div class="text-sm text-red-600 font-semibold mb-1">PRIORITY NUMBER</div>
-                <div class="priority-number text-5xl font-bold text-red-600">
-                    <?= htmlspecialchars($appointment['priority_number']) ?>
-                </div>
-            </div>
-            
-            <!-- Appointment Details -->
-            <div class="space-y-3 mb-6">
-                <div class="grid grid-cols-2 gap-2">
-                    <div class="font-semibold text-gray-700">Patient Name:</div>
-                    <div><?= htmlspecialchars($appointment['patient_name']) ?></div>
-                    
-                    <div class="font-semibold text-gray-700">Health Worker:</div>
-                    <div><?= htmlspecialchars($appointment['staff_name']) ?></div>
-                    
-                    <?php if ($appointment['specialization']): ?>
-                    <div class="font-semibold text-gray-700">Specialization:</div>
-                    <div><?= htmlspecialchars($appointment['specialization']) ?></div>
-                    <?php endif; ?>
-                    
-                    <div class="font-semibold text-gray-700">Date:</div>
-                    <div><?= date('F j, Y', strtotime($appointment['date'])) ?></div>
-                    
-                    <div class="font-semibold text-gray-700">Time:</div>
-                    <div><?= date('h:i A', strtotime($appointment['start_time'])) ?> - <?= date('h:i A', strtotime($appointment['end_time'])) ?></div>
-                </div>
-                
-                <?php if (!empty($appointment['health_concerns'])): ?>
-                <div class="mt-3">
-                    <div class="font-semibold text-gray-700">Health Concerns:</div>
-                    <div class="text-sm text-gray-600 mt-1"><?= htmlspecialchars($appointment['health_concerns']) ?></div>
-                </div>
+        </div>
+
+        <!-- Details -->
+        <div class="px-8 py-7 space-y-5 text-base">
+
+            <div class="grid grid-cols-2 gap-y-4 gap-x-4">
+                <div class="font-semibold text-slate-600">Patient Name</div>
+                <div class="text-slate-900"><?= htmlspecialchars($appointment['patient_name']) ?></div>
+
+                <div class="font-semibold text-slate-600">Health Worker</div>
+                <div class="text-slate-900"><?= htmlspecialchars($appointment['staff_name']) ?></div>
+
+                <?php if (!empty($appointment['specialization'])): ?>
+                <div class="font-semibold text-slate-600">Specialization</div>
+                <div class="text-slate-900"><?= htmlspecialchars($appointment['specialization']) ?></div>
                 <?php endif; ?>
+
+                <div class="font-semibold text-slate-600">Appointment Date</div>
+                <div class="text-slate-900">
+                    <?= date('F j, Y', strtotime($appointment['date'])) ?>
+                </div>
+
+                <div class="font-semibold text-slate-600">Time Schedule</div>
+                <div class="text-slate-900">
+                    <?= date('h:i A', strtotime($appointment['start_time'])) ?>
+                    –
+                    <?= date('h:i A', strtotime($appointment['end_time'])) ?>
+                </div>
             </div>
-            
-            <!-- Footer -->
-            <div class="text-center text-xs text-gray-500 border-t pt-3">
-                <p>Generated on: <?= date('F j, Y g:i A') ?></p>
-                <p class="mt-1">Please arrive 15 minutes before your scheduled time</p>
-                <p>Bring valid ID and this ticket</p>
+
+            <?php if (!empty($appointment['health_concerns'])): ?>
+            <div class="pt-5 border-t">
+                <p class="font-semibold text-slate-600 mb-2">
+                    Health Concerns
+                </p>
+                <p class="text-slate-800 leading-relaxed">
+                    <?= htmlspecialchars($appointment['health_concerns']) ?>
+                </p>
             </div>
+            <?php endif; ?>
         </div>
-        
-        <!-- Screenshot Instructions -->
-        <div class="no-print mt-4 text-center text-sm text-gray-600">
-            <p>💡 <strong>Tip:</strong> Press Ctrl+P to print or use your browser's screenshot tool</p>
+
+        <!-- Footer -->
+        <div class="bg-slate-50 px-8 py-5 text-center text-sm text-slate-600 border-t">
+            <p>Generated on <?= date('F j, Y g:i A') ?></p>
+            <p class="mt-2 font-bold text-blue-700 text-base">
+                Please arrive at least 15 minutes early
+            </p>
+            <p class="mt-1">Bring a valid ID and this ticket</p>
         </div>
     </div>
+
+    <!-- Tip -->
+    <div class="no-print text-center text-sm text-slate-600 mt-5">
+        💡 You may print, save as PDF, or take a screenshot
+    </div>
+
+</div>
+
 </body>
 </html>
+
 <?php
     } catch (PDOException $e) {
         die('Error loading ticket: ' . $e->getMessage());
