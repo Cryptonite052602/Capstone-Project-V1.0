@@ -15,6 +15,7 @@ $endDate = $_GET['end_date'] ?? date('Y-m-d');
 $serviceType = $_GET['service_type'] ?? 'all';
 
 // Simple query using only the user_appointments table
+// Removed the 'missed_at' column from the SELECT statement
 $query = "SELECT 
             id,
             user_id,
@@ -31,8 +32,7 @@ $query = "SELECT
             created_at,
             processed_at,
             completed_at,
-            cancelled_at,
-            missed_at
+            cancelled_at
           FROM user_appointments 
           WHERE DATE(created_at) BETWEEN ? AND ?";
 
@@ -73,7 +73,7 @@ echo "<th>Date Created</th>";
 echo "<th>Date Processed</th>";
 echo "<th>Date Completed</th>";
 echo "<th>Cancelled Date</th>";
-echo "<th>Missed Date</th>";
+// Removed the "Missed Date" column header
 echo "</tr>";
 
 foreach ($appointments as $appointment) {
@@ -94,7 +94,7 @@ foreach ($appointments as $appointment) {
     echo "<td>" . ($appointment['processed_at'] ? date('Y-m-d H:i', strtotime($appointment['processed_at'])) : '') . "</td>";
     echo "<td>" . ($appointment['completed_at'] ? date('Y-m-d H:i', strtotime($appointment['completed_at'])) : '') . "</td>";
     echo "<td>" . ($appointment['cancelled_at'] ? date('Y-m-d H:i', strtotime($appointment['cancelled_at'])) : '') . "</td>";
-    echo "<td>" . ($appointment['missed_at'] ? date('Y-m-d H:i', strtotime($appointment['missed_at'])) : '') . "</td>";
+    // Removed the "Missed Date" column data
     echo "</tr>";
 }
 

@@ -172,7 +172,7 @@ try {
             background-color: white; 
             color: #3498db; 
             border: 2px solid #bae6fd; 
-            border-radius: 8px; 
+            border-radius: 30px; 
             padding: 12px 24px; 
             transition: all 0.3s ease; 
             font-weight: 500;

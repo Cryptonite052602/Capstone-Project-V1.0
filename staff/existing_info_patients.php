@@ -8,6 +8,12 @@ if (!isStaff()) {
     exit();
 }
 
+// Add PhpSpreadsheet for Excel export
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+
 $message = '';
 $error = '';
 
@@ -268,6 +274,215 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_patient'])) {
         $error = 'Full name and date of birth are required.';
     }
 }
+
+// Handle Excel Export - MODIFIED: Updated to match actual table structure
+if (isset($_GET['export']) && $_GET['export'] == 'excel') {
+    try {
+        $patientType = isset($_GET['patient_type']) ? $_GET['patient_type'] : 'all';
+        $searchTerm = isset($_GET['search']) ? trim($_GET['search']) : '';
+        $searchBy = isset($_GET['search_by']) ? trim($_GET['search_by']) : 'name';
+        
+        // Build query to get only the required columns from correct tables
+        $selectQuery = "SELECT 
+            p.id,
+            p.full_name,
+            p.date_of_birth,
+            p.age,
+            COALESCE(e.gender, p.gender) as gender,
+            p.sitio,
+            p.civil_status,
+            p.occupation,
+            e.blood_type,
+            CASE 
+                WHEN p.user_id IS NOT NULL THEN 'Registered Patient'
+                ELSE 'Regular Patient'
+            END as patient_type";
+        
+        $query = $selectQuery . " FROM sitio1_patients p
+                LEFT JOIN existing_info_patients e ON p.id = e.patient_id
+                WHERE p.added_by = ? AND p.deleted_at IS NULL";
+        
+        // Add search filters if search term exists
+        $params = [$_SESSION['user']['id']];
+        if (!empty($searchTerm)) {
+            if ($searchBy === 'unique_number') {
+                // Search by unique number from users table
+                $query .= " AND EXISTS (
+                    SELECT 1 FROM sitio1_users u 
+                    WHERE u.id = p.user_id AND u.unique_number LIKE ?
+                )";
+                $params[] = "%$searchTerm%";
+            } else {
+                $query .= " AND p.full_name LIKE ?";
+                $params[] = "%$searchTerm%";
+            }
+        }
+        
+        // Add patient type filter
+        if ($patientType == 'registered') {
+            $query .= " AND p.user_id IS NOT NULL";
+        } elseif ($patientType == 'regular') {
+            $query .= " AND p.user_id IS NULL";
+        }
+        
+        $query .= " ORDER BY p.full_name ASC";
+        
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Set filename based on patient type
+        $filename = 'patient_records_' . date('Y-m-d');
+        if ($patientType == 'registered') {
+            $filename = 'registered_patients_' . date('Y-m-d');
+        } elseif ($patientType == 'regular') {
+            $filename = 'regular_patients_' . date('Y-m-d');
+        }
+        if (!empty($searchTerm)) {
+            $filename .= '_search_' . substr($searchTerm, 0, 20);
+        }
+        
+        // Output as HTML table that Excel can open (simple format) - ONLY SHOWING SPECIFIED COLUMNS
+        header("Content-Type: application/vnd.ms-excel");
+        header("Content-Disposition: attachment; filename=\"$filename.xls\"");
+        
+        echo '<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: Arial, sans-serif; }
+                table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+                th { background-color: #3498db; color: white; font-weight: bold; padding: 12px; border: 1px solid #ddd; text-align: left; font-size: 14px; }
+                td { padding: 10px; border: 1px solid #ddd; font-size: 12px; }
+                tr:nth-child(even) { background-color: #f8fafc; }
+                .title { color: #2c3e50; font-size: 24px; margin-bottom: 5px; }
+                .subtitle { color: #666; font-size: 16px; margin-bottom: 20px; }
+                .header-info { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #3498db; }
+                .footer { margin-top: 30px; color: #666; font-size: 11px; padding-top: 10px; border-top: 1px solid #ddd; }
+            </style>
+        </head>
+        <body>
+            <div class="header-info">
+                <div class="title">Barangay Luz Health Center</div>
+                <div class="subtitle">Patient Records Export - ' . ucfirst($patientType) . ' Patients</div>
+                <div style="color: #666; font-size: 14px; margin-bottom: 5px;">
+                    Exported on: ' . date('F j, Y g:i A') . ' | 
+                    Total Records: ' . count($patients) . '
+                </div>';
+        
+        if (!empty($searchTerm)) {
+            echo '<div style="color: #666; font-size: 12px; margin-bottom: 5px;">
+                    Search Term: "' . htmlspecialchars($searchTerm) . '" | 
+                    Search By: ' . ucfirst(str_replace('_', ' ', $searchBy)) . '
+                  </div>';
+        }
+        
+        echo '</div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Date of Birth</th>
+                        <th>Age</th>
+                        <th>Gender</th>
+                        <th>Sitio</th>
+                        <th>Civil Status</th>
+                        <th>Occupation</th>
+                        <th>Blood Type</th>
+                        <th>Type</th>
+                    </tr>
+                </thead>
+                <tbody>';
+        
+        // Counter for ID
+        $counter = 1;
+        
+        foreach ($patients as $patient) {
+            // Format gender properly
+            $gender = 'N/A';
+            if (!empty($patient['gender'])) {
+                if (strtolower($patient['gender']) === 'male') $gender = 'Male';
+                elseif (strtolower($patient['gender']) === 'female') $gender = 'Female';
+                else $gender = htmlspecialchars($patient['gender']);
+            }
+            
+            // Format date of birth
+            $dob = 'N/A';
+            if (!empty($patient['date_of_birth'])) {
+                $dob = date('M d, Y', strtotime($patient['date_of_birth']));
+            }
+            
+            // Format sitios
+            $sitio = 'N/A';
+            if (!empty($patient['sitio'])) {
+                $sitioOptions = [
+                    'Proper Luz', 'Lower Luz', 'Upper Luz', 'Luz Proper', 
+                    'Luz Heights', 'Panganiban', 'Balagtas', 'Carbon'
+                ];
+                if (in_array($patient['sitio'], $sitioOptions)) {
+                    $sitio = $patient['sitio'];
+                } else {
+                    $sitio = htmlspecialchars($patient['sitio']);
+                }
+            }
+            
+            // Format civil status
+            $civilStatus = 'N/A';
+            if (!empty($patient['civil_status'])) {
+                $civilStatusOptions = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced'];
+                if (in_array($patient['civil_status'], $civilStatusOptions)) {
+                    $civilStatus = $patient['civil_status'];
+                } else {
+                    $civilStatus = htmlspecialchars($patient['civil_status']);
+                }
+            }
+            
+            echo '<tr>
+                <td>' . $counter . '</td>
+                <td>' . htmlspecialchars($patient['full_name']) . '</td>
+                <td>' . $dob . '</td>
+                <td>' . ($patient['age'] ? intval($patient['age']) : 'N/A') . '</td>
+                <td>' . $gender . '</td>
+                <td>' . $sitio . '</td>
+                <td>' . $civilStatus . '</td>
+                <td>' . htmlspecialchars($patient['occupation'] ? $patient['occupation'] : 'N/A') . '</td>
+                <td>' . ($patient['blood_type'] ? strtoupper($patient['blood_type']) : 'N/A') . '</td>
+                <td>' . $patient['patient_type'] . '</td>
+            </tr>';
+            
+            $counter++;
+        }
+        
+        // If no records found
+        if (empty($patients)) {
+            echo '<tr>
+                <td colspan="10" style="text-align: center; padding: 30px; color: #666;">
+                    No patient records found for the selected filter
+                </td>
+            </tr>';
+        }
+        
+        echo '  </tbody>
+            </table>
+            
+            <div class="footer">
+                <div>Generated by: ' . htmlspecialchars($_SESSION['user']['full_name'] ?? 'Staff') . '</div>
+                <div>Barangay Luz Health Center | ' . date('Y') . ' | Confidential Patient Data</div>
+            </div>
+        </body>
+        </html>';
+        exit;
+        
+    } catch (Exception $e) {
+        $error = "Error exporting to Excel: " . $e->getMessage();
+        // Log error but don't output to user to prevent breaking the Excel file
+        error_log("Excel Export Error: " . $e->getMessage());
+    }
+}
+
 
 // Check for success message from session
 if (isset($_SESSION['success_message'])) {
@@ -537,6 +752,9 @@ if (isset($_GET['convert_to_patient'])) {
 $searchTerm = isset($_GET['search']) ? trim($_GET['search']) : '';
 $searchBy = isset($_GET['search_by']) ? trim($_GET['search_by']) : 'name';
 
+// Get patient type filter
+$patientTypeFilter = isset($_GET['patient_type']) ? $_GET['patient_type'] : 'all';
+
 // Get patient ID if selected
 $selectedPatientId = isset($_GET['patient_id']) ? $_GET['patient_id'] : (isset($_POST['patient_id']) ? $_POST['patient_id'] : '');
 
@@ -545,43 +763,33 @@ $patients = [];
 $searchedUsers = [];
 if (!empty($searchTerm)) {
     try {
-        if ($searchBy === 'unique_number') {
-            // Search by unique number from sitio1_users table
-            $query = "SELECT id, full_name, email, date_of_birth, age, gender, ";
-            
-            // Check if columns exist before including them
-            $checkCols = $pdo->prepare("SHOW COLUMNS FROM sitio1_users LIKE 'civil_status'");
-            $checkCols->execute();
-            if ($checkCols->rowCount() > 0) {
-                $query .= "civil_status, ";
-            }
-            
-            $checkCols = $pdo->prepare("SHOW COLUMNS FROM sitio1_users LIKE 'occupation'");
-            $checkCols->execute();
-            if ($checkCols->rowCount() > 0) {
-                $query .= "occupation, ";
-            }
-            
-            $query .= "address, sitio, contact, unique_number, 'user' as type
-                     FROM sitio1_users 
-                     WHERE approved = 1 AND unique_number LIKE ? 
-                     ORDER BY full_name LIMIT 10";
-            
-            $stmt = $pdo->prepare($query);
-            $stmt->execute(["%$searchTerm%"]);
-            $searchedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } else {
-            // Search by name (default) - FIXED THE SQL SYNTAX ERROR
-            $selectQuery = "SELECT p.id, p.full_name, p.date_of_birth, p.age, p.gender, e.blood_type, e.height, e.weight, e.temperature, e.blood_pressure
-                     FROM sitio1_patients p 
-                     LEFT JOIN existing_info_patients e ON p.id = e.patient_id 
-                     WHERE p.added_by = ? AND p.full_name LIKE ? 
-                     ORDER BY p.full_name LIMIT 10";
-            
-            $stmt = $pdo->prepare($selectQuery);
-            $stmt->execute([$_SESSION['user']['id'], "%$searchTerm%"]);
-            $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
+        // Update the search query for unique_number (around line 536)
+if ($searchBy === 'unique_number') {
+    // Search by unique number from sitio1_users table
+    $query = "SELECT u.id, u.full_name, u.email, u.date_of_birth, u.age, u.gender,
+                     u.civil_status, u.occupation, u.address, u.sitio, u.contact, 
+                     u.unique_number, 'user' as type
+              FROM sitio1_users u 
+              WHERE u.approved = 1 AND u.unique_number LIKE ? 
+              ORDER BY u.full_name LIMIT 10";
+    
+    $stmt = $pdo->prepare($query);
+    $stmt->execute(["%$searchTerm%"]);
+    $searchedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    // Search by name (default) - using your table structure
+    $selectQuery = "SELECT p.id, p.full_name, p.date_of_birth, p.age, 
+                           p.gender, p.sitio, p.civil_status, p.occupation,
+                           e.blood_type, e.height, e.weight, e.temperature, e.blood_pressure
+                    FROM sitio1_patients p 
+                    LEFT JOIN existing_info_patients e ON p.id = e.patient_id 
+                    WHERE p.added_by = ? AND p.deleted_at IS NULL AND p.full_name LIKE ? 
+                    ORDER BY p.full_name LIMIT 10";
+    
+    $stmt = $pdo->prepare($selectQuery);
+    $stmt->execute([$_SESSION['user']['id'], "%$searchTerm%"]);
+    $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
     } catch (PDOException $e) {
         $error = "Error fetching patients: " . $e->getMessage();
     }
@@ -595,10 +803,18 @@ $recordsPerPage = 5;
 $currentPage = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($currentPage - 1) * $recordsPerPage;
 
-// Get total count of patients
+// Get total count of patients based on filter
 try {
     $countQuery = "SELECT COUNT(*) as total FROM sitio1_patients p 
                    WHERE p.added_by = ? AND p.deleted_at IS NULL";
+    
+    // Add patient type filter
+    if ($patientTypeFilter == 'registered') {
+        $countQuery .= " AND p.user_id IS NOT NULL";
+    } elseif ($patientTypeFilter == 'regular') {
+        $countQuery .= " AND p.user_id IS NULL";
+    }
+    
     $stmt = $pdo->prepare($countQuery);
     $stmt->execute([$_SESSION['user']['id']]);
     $totalRecords = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
@@ -611,54 +827,37 @@ try {
 
 // Get all patients with their medical info for the patient list with pagination or all records
 try {
-    // Build dynamic SELECT query - FIXED to properly handle registered user data
-    $selectQuery = "SELECT 
-                p.id,
-                p.full_name,
-                -- Use patient's date_of_birth if exists, otherwise use user's
-                COALESCE(p.date_of_birth, u.date_of_birth) as date_of_birth,
-                -- Use patient's age if exists, otherwise use user's
-                COALESCE(p.age, u.age) as age,
-                -- Use patient's gender if exists, otherwise use and convert user's gender
-                CASE 
-                    WHEN p.gender IS NOT NULL AND p.gender != '' THEN p.gender
-                    WHEN u.gender = 'male' THEN 'Male'
-                    WHEN u.gender = 'female' THEN 'Female'
-                    WHEN u.gender = 'other' THEN 'Other'
-                    ELSE p.gender
-                END as gender,
-                -- Use patient's address if exists, otherwise use user's
-                COALESCE(p.address, u.address) as address,
-                -- Use patient's contact if exists, otherwise use user's
-                COALESCE(p.contact, u.contact) as contact,
-                e.height, e.weight, e.temperature, e.blood_pressure, e.blood_type, 
-                e.allergies, e.immunization_record, e.chronic_conditions,
-                e.medical_history, e.current_medications, e.family_history,
-                u.unique_number, u.email as user_email, u.sitio as user_sitio,
-                u.id as user_id";
+    // Build SELECT query based on your table structure
+    // Update the main patient listing query (around line 588)
+$selectQuery = "SELECT 
+            p.id,
+            p.full_name,
+            p.date_of_birth,
+            p.age,
+            COALESCE(e.gender, p.gender) as gender,
+            p.sitio,
+            p.civil_status,
+            p.occupation,
+            e.blood_type,
+            e.height, e.weight, e.temperature, e.blood_pressure,
+            e.allergies, e.immunization_record, e.chronic_conditions,
+            e.medical_history, e.current_medications, e.family_history,
+            CASE 
+                WHEN p.user_id IS NOT NULL THEN 'Registered Patient'
+                ELSE 'Regular Patient'
+            END as patient_type
+        FROM sitio1_patients p
+        LEFT JOIN existing_info_patients e ON p.id = e.patient_id
+        WHERE p.added_by = ? AND p.deleted_at IS NULL";
     
-    // Add patient-specific columns if they exist
-    if ($sitioExists) {
-        $selectQuery .= ", p.sitio";
+    // Add patient type filter to main query
+    if ($patientTypeFilter == 'registered') {
+        $selectQuery .= " AND p.user_id IS NOT NULL";
+    } elseif ($patientTypeFilter == 'regular') {
+        $selectQuery .= " AND p.user_id IS NULL";
     }
     
-    if ($civilStatusExists) {
-        $selectQuery .= ", p.civil_status";
-    }
-    
-    if ($occupationExists) {
-        $selectQuery .= ", p.occupation";
-    }
-    
-    // Get user-specific columns if patient is a registered user
-    $selectQuery .= ", u.civil_status as user_civil_status,
-                     u.occupation as user_occupation";
-    
-    $selectQuery .= " FROM sitio1_patients p
-              LEFT JOIN existing_info_patients e ON p.id = e.patient_id
-              LEFT JOIN sitio1_users u ON p.user_id = u.id
-              WHERE p.added_by = ? AND p.deleted_at IS NULL
-              ORDER BY p.created_at DESC";
+    $selectQuery .= " ORDER BY p.created_at DESC";
     
     if (!$viewAll) {
         $selectQuery .= " LIMIT ? OFFSET ?";
@@ -686,24 +885,20 @@ try {
 if (!empty($selectedPatientId)) {
     try {
         // Get basic patient info - FIXED to include user data properly
-        $stmt = $pdo->prepare("SELECT 
-                p.*, 
-                u.unique_number, 
-                u.email as user_email, 
-                u.sitio as user_sitio,
-                u.date_of_birth as user_date_of_birth,
-                u.age as user_age,
-                CASE 
-                    WHEN u.gender = 'male' THEN 'Male'
-                    WHEN u.gender = 'female' THEN 'Female'
-                    WHEN u.gender = 'other' THEN 'Other'
-                    ELSE u.gender
-                END as user_gender,
-                u.civil_status as user_civil_status,
-                u.occupation as user_occupation
-              FROM sitio1_patients p 
-              LEFT JOIN sitio1_users u ON p.user_id = u.id
-              WHERE p.id = ? AND p.added_by = ?");
+        // Update patient details query (around line 643)
+$stmt = $pdo->prepare("SELECT 
+        p.*, 
+        u.unique_number, 
+        u.email as user_email,
+        CASE 
+            WHEN u.gender = 'male' THEN 'Male'
+            WHEN u.gender = 'female' THEN 'Female'
+            WHEN u.gender = 'other' THEN 'Other'
+            ELSE u.gender
+        END as user_gender
+      FROM sitio1_patients p 
+      LEFT JOIN sitio1_users u ON p.user_id = u.id
+      WHERE p.id = ? AND p.added_by = ?");
         $stmt->execute([$selectedPatientId, $_SESSION['user']['id']]);
         $patient_details = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -802,6 +997,47 @@ body,
 .patient-table tr:hover { background-color: #f1f5f9; }
 .patient-id { font-weight: bold; color: #3498db; }
 .user-badge { background-color: #e0e7ff; color: #3730a3; display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+.regular-badge { background-color: #f0fdf4; color: #065f46; display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+
+/* Export Button */
+.btn-export {
+    background-color: #10b981;
+    color: #ffffffff;
+    border: 2px solid #10b981;
+    opacity: 1;
+    border-radius: 8px;
+    padding: 10px 20px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    min-height: 45px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-export:hover {
+    background-color: #34d399;
+    border-color: #10b981;
+    opacity: 0.6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+/* Patient Type Filter */
+.patient-type-filter {
+    border: 2px solid #55b2f0ff;
+    background-color: white;
+    border-radius: 10px;
+    padding: 12px 20px;
+    min-height: 55px;
+    font-size: 16px;
+    width: 100%;
+    max-width: 355px;
+}
+.patient-type-filter:focus {
+    border-color: #84c0e9ff;
+    box-shadow: 0 0 0 3px #8acdfaff;
+    outline: none;
+}
 
 /* UPDATED BUTTON STYLES - 100% opacity normally, 60% opacity on hover */
 .btn-view {
@@ -1606,6 +1842,60 @@ body,
 .btn-view-all:hover::after, .btn-back-to-pagination:hover::after, .pagination-btn:hover::after {
     opacity: 0.6;
 }
+
+/* Export button group */
+.export-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    min-width: 220px;
+    z-index: 100;
+    margin-top: 5px;
+}
+
+.export-options.show {
+    display: block;
+    animation: fadeIn 0.2s ease;
+}
+
+.export-option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 12px 16px;
+    border: none;
+    background: none;
+    color: #374151;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.export-option:last-child {
+    border-bottom: none;
+}
+
+.export-option:hover {
+    background-color: #f0f9ff;
+    color: #3498db;
+}
+
+.export-option i {
+    margin-right: 8px;
+    width: 20px;
+}
+
+/* Export button wrapper */
+.export-btn-wrapper {
+    position: relative;
+    display: inline-block;
+}
     </style>
 </head>
 <body class="bg-gray-50">
@@ -1877,17 +2167,35 @@ body,
                 
                 <?php if (empty($searchTerm)): ?>
                 <div class="section-bg overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <h3 class="text-lg font-medium text-secondary">
-                            <?= $viewAll ? 'All Patient Records' : 'Patient Records' ?>
-                        </h3>
-                        <p class="text-sm text-gray-500 mt-1">
-                            <?php if ($viewAll): ?>
-                                Showing all <?= count($allPatients) ?> records
-                            <?php else: ?>
-                                Showing <?= count($allPatients) ?> of <?= $totalRecords ?> records
-                            <?php endif; ?>
-                        </p>
+                    <!-- UPDATED: Added Export Button and Filter -->
+                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-medium text-secondary">
+                                <?= $viewAll ? 'All Patient Records' : 'Patient Records' ?>
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">
+                                <?php if ($viewAll): ?>
+                                    Showing all <?= count($allPatients) ?> records
+                                <?php else: ?>
+                                    Showing <?= count($allPatients) ?> of <?= $totalRecords ?> records
+                                <?php endif; ?>
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <!-- Patient Type Filter -->
+                            <form method="get" action="" class="flex items-center gap-2">
+                                <input type="hidden" name="tab" value="patients-tab">
+                                <?php if ($viewAll): ?>
+                                    <input type="hidden" name="view_all" value="true">
+                                <?php endif; ?>
+                                <select name="patient_type" onchange="this.form.submit()" class="patient-type-filter">
+                                    <option value="all" <?= $patientTypeFilter === 'all' ? 'selected' : '' ?>>All Patient Types</option>
+                                    <option value="registered" <?= $patientTypeFilter === 'registered' ? 'selected' : '' ?>>Registered Patient</option>
+                                    <option value="regular" <?= $patientTypeFilter === 'regular' ? 'selected' : '' ?>>Regular Patient</option>
+                                </select>
+                            </form>
+                            
+                        </div>
                     </div>
                     
                     <?php if (empty($allPatients)): ?>
@@ -2000,13 +2308,13 @@ body,
                                                     <?php endif; ?>
                                                     <td class="font-semibold text-primary"><?= htmlspecialchars($patient['blood_type'] ?? 'N/A') ?></td>
                                                     <td>
-                                                        <?php if (!empty($patient['unique_number'])): ?>
-                                                            <span class="user-badge">Registered User</span>
+                                                        <?php if ($patient['patient_type'] === 'Registered Patient'): ?>
+                                                            <span class="user-badge">Registered Patient</span>
                                                             <?php if (!empty($patient['user_sitio'])): ?>
                                                                 <br><small class="text-gray-500"><?= htmlspecialchars($patient['user_sitio']) ?></small>
                                                             <?php endif; ?>
                                                         <?php else: ?>
-                                                            <span class="text-gray-500">Regular Patient</span>
+                                                            <span class="regular-badge">Regular Patient</span>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
@@ -2117,13 +2425,13 @@ body,
                                                 <?php endif; ?>
                                                 <td class="font-semibold text-primary"><?= htmlspecialchars($patient['blood_type'] ?? 'N/A') ?></td>
                                                 <td>
-                                                    <?php if (!empty($patient['unique_number'])): ?>
-                                                        <span class="user-badge">Registered User</span>
+                                                    <?php if ($patient['patient_type'] === 'Registered Patient'): ?>
+                                                        <span class="user-badge">Registered Patient</span>
                                                         <?php if (!empty($patient['user_sitio'])): ?>
                                                             <br><small class="text-gray-500"><?= htmlspecialchars($patient['user_sitio']) ?></small>
                                                         <?php endif; ?>
                                                     <?php else: ?>
-                                                        <span class="text-gray-500">Regular Patient</span>
+                                                        <span class="regular-badge">Regular Patient</span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
@@ -2144,14 +2452,14 @@ body,
                             <div class="pagination-container">
                                 <div class="pagination">
                                     <!-- Previous Button -->
-                                    <a href="?tab=patients-tab&page=<?= $currentPage - 1 ?>" class="pagination-btn <?= $currentPage <= 1 ? 'disabled' : '' ?>">
+                                    <a href="?tab=patients-tab&page=<?= $currentPage - 1 ?>&patient_type=<?= $patientTypeFilter ?>" class="pagination-btn <?= $currentPage <= 1 ? 'disabled' : '' ?>">
                                         <i class="fas fa-chevron-left"></i>
                                     </a>
                                     
                                     <!-- Page Numbers -->
                                     <?php for ($i = 1; $i <= $totalPages; $i++): ?>
                                         <?php if ($i == 1 || $i == $totalPages || ($i >= $currentPage - 1 && $i <= $currentPage + 1)): ?>
-                                            <a href="?tab=patients-tab&page=<?= $i ?>" class="pagination-btn <?= $i == $currentPage ? 'active' : '' ?>">
+                                            <a href="?tab=patients-tab&page=<?= $i ?>&patient_type=<?= $patientTypeFilter ?>" class="pagination-btn <?= $i == $currentPage ? 'active' : '' ?>">
                                                 <?= $i ?>
                                             </a>
                                         <?php elseif ($i == $currentPage - 2 || $i == $currentPage + 2): ?>
@@ -2160,13 +2468,13 @@ body,
                                     <?php endfor; ?>
                                     
                                     <!-- Next Button -->
-                                    <a href="?tab=patients-tab&page=<?= $currentPage + 1 ?>" class="pagination-btn <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
+                                    <a href="?tab=patients-tab&page=<?= $currentPage + 1 ?>&patient_type=<?= $patientTypeFilter ?>" class="pagination-btn <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
                                         <i class="fas fa-chevron-right"></i>
                                     </a>
                                 </div>
                                 
                                 <div class="pagination-actions">
-                                    <a href="?tab=patients-tab&view_all=true" class="btn-view-all">
+                                    <a href="?tab=patients-tab&view_all=true&patient_type=<?= $patientTypeFilter ?>" class="btn-view-all">
                                         <i class="fas fa-list mr-2"></i>View All Patients
                                     </a>
                                 </div>
@@ -2513,475 +2821,554 @@ body,
     </div>
 </div>
 
-
     <script>
-        // Form validation functionality for modal
-        document.addEventListener('DOMContentLoaded', function() {
-            const modalFormFields = document.querySelectorAll('.modal-form-field');
-            const modalRegisterBtn = document.getElementById('modalRegisterPatientBtn');
-            const modalDateOfBirth = document.getElementById('modal_date_of_birth');
-            const modalAge = document.getElementById('modal_age');
+// Enhanced Export functionality
+function toggleExportOptions() {
+    const exportOptions = document.getElementById('exportOptions');
+    exportOptions.classList.toggle('show');
+}
 
-            // Initialize modal field validation
-            modalFormFields.forEach(field => {
-                // Set initial state
-                updateModalFieldState(field);
-                
-                // Add event listeners
-                field.addEventListener('input', function() {
-                    updateModalFieldState(this);
-                    checkModalFormValidity();
-                });
-                
-                field.addEventListener('change', function() {
-                    updateModalFieldState(this);
-                    checkModalFormValidity();
-                });
-                
-                field.addEventListener('blur', function() {
-                    updateModalFieldState(this);
-                });
-            });
+// Fixed exportExcel function that respects current filter
+function exportExcel(exportOption) {
+    // Close dropdown
+    const exportOptions = document.getElementById('exportOptions');
+    exportOptions.classList.remove('show');
+    
+    // Get current URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Get current patient type filter
+    const patientTypeSelect = document.querySelector('select[name="patient_type"]');
+    const currentPatientType = patientTypeSelect ? patientTypeSelect.value : 'all';
+    
+    // Determine export type
+    let exportPatientType = currentPatientType; // Default to current filter
+    
+    if (exportOption === 'all') {
+        // Export ALL records regardless of current filter
+        exportPatientType = 'all';
+    } else if (exportOption === 'registered') {
+        exportPatientType = 'registered';
+    } else if (exportOption === 'regular') {
+        exportPatientType = 'regular';
+    }
+    
+    // Build export URL
+    let url = `existing_info_patients.php?export=excel&patient_type=${exportPatientType}`;
+    
+    // Add current search parameters
+    const tab = urlParams.get('tab');
+    const search = urlParams.get('search');
+    const searchBy = urlParams.get('search_by');
+    
+    if (tab) url += `&tab=${tab}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (searchBy) url += `&search_by=${searchBy}`;
+    
+    // Show loading message with appropriate label
+    const typeLabels = {
+        'all': 'All Patients',
+        'registered': 'Registered Patients',
+        'regular': 'Regular Patients'
+    };
+    showNotification('info', `Preparing export for ${typeLabels[exportPatientType] || 'All Patients'}...`);
+    
+    // Open export URL in new tab
+    const exportWindow = window.open(url, '_blank');
+    
+    // Check if popup was blocked
+    if (!exportWindow || exportWindow.closed || typeof exportWindow.closed == 'undefined') {
+        showNotification('error', 'Pop-up blocked! Please allow pop-ups for this site to export.');
+        
+        // Alternative: Use form submission
+        const form = document.createElement('form');
+        form.method = 'GET';
+        form.action = url;
+        form.target = '_blank';
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
+}
 
-            // Age calculation from date of birth in modal
-            if (modalDateOfBirth && modalAge) {
-                modalDateOfBirth.addEventListener('change', function() {
-                    calculateModalAge(this.value);
-                });
-            }
+// Close export dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    const exportBtn = document.querySelector('.btn-export');
+    const exportOptions = document.getElementById('exportOptions');
+    
+    if (exportBtn && !exportBtn.contains(event.target) && 
+        exportOptions && !exportOptions.contains(event.target)) {
+        exportOptions.classList.remove('show');
+    }
+});
 
-            // Calculate age function for modal
-            function calculateModalAge(dateOfBirth) {
-                if (!dateOfBirth) return;
-                
-                const birthDate = new Date(dateOfBirth);
-                const today = new Date();
-                
-                let age = today.getFullYear() - birthDate.getFullYear();
-                const monthDiff = today.getMonth() - birthDate.getMonth();
-                
-                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-                    age--;
-                }
-                
-                modalAge.value = age;
-                
-                // Update form validation state
-                updateModalFieldState(modalAge);
-                checkModalFormValidity();
-            }
+// Form validation functionality for modal
+document.addEventListener('DOMContentLoaded', function() {
+    const modalFormFields = document.querySelectorAll('.modal-form-field');
+    const modalRegisterBtn = document.getElementById('modalRegisterPatientBtn');
+    const modalDateOfBirth = document.getElementById('modal_date_of_birth');
+    const modalAge = document.getElementById('modal_age');
 
-            // Update modal field background color
-            function updateModalFieldState(field) {
-                if (!field) return;
-                
-                const value = field.type === 'checkbox' ? field.checked : field.value.trim();
-                const isRequired = field.hasAttribute('required');
-                
-                if (isRequired && !value) {
-                    field.classList.add('field-empty');
-                    field.classList.remove('field-filled');
-                } else if (value) {
-                    field.classList.add('field-filled');
-                    field.classList.remove('field-empty');
-                } else {
-                    field.classList.remove('field-filled', 'field-empty');
-                }
-            }
-
-            // Check if all required modal fields are filled
-            function checkModalFormValidity() {
-                if (!modalRegisterBtn) return;
-                
-                let allRequiredFilled = true;
-                
-                // Check required form fields
-                modalFormFields.forEach(field => {
-                    if (field.hasAttribute('required')) {
-                        const value = field.type === 'checkbox' ? field.checked : field.value.trim();
-                        if (!value) {
-                            allRequiredFilled = false;
-                        }
-                    }
-                });
-
-                // Enable/disable register button
-                if (allRequiredFilled) {
-                    modalRegisterBtn.disabled = false;
-                    modalRegisterBtn.classList.remove('btn-disabled');
-                } else {
-                    modalRegisterBtn.disabled = true;
-                    modalRegisterBtn.classList.add('btn-disabled');
-                }
-            }
-
-            // Initialize modal form state
+    // Initialize modal field validation
+    modalFormFields.forEach(field => {
+        // Set initial state
+        updateModalFieldState(field);
+        
+        // Add event listeners
+        field.addEventListener('input', function() {
+            updateModalFieldState(this);
             checkModalFormValidity();
         });
+        
+        field.addEventListener('change', function() {
+            updateModalFieldState(this);
+            checkModalFormValidity();
+        });
+        
+        field.addEventListener('blur', function() {
+            updateModalFieldState(this);
+        });
+    });
 
-        // Modal functions
-        function openAddPatientModal() {
-            const modal = document.getElementById('addPatientModal');
-            modal.style.display = 'flex';
-            modal.style.opacity = '0';
-            
-            setTimeout(() => {
-                modal.style.opacity = '1';
-                modal.style.transition = 'opacity 0.3s ease';
-            }, 10);
-        }
-        
-        function closeAddPatientModal() {
-            const modal = document.getElementById('addPatientModal');
-            modal.style.opacity = '0';
-            setTimeout(() => {
-                modal.style.display = 'none';
-            }, 300);
-        }
-        
-        function clearAddPatientForm() {
-            const form = document.getElementById('patientForm');
-            if (form) {
-                form.reset();
-                
-                // Reset all form field states
-                const modalFormFields = document.querySelectorAll('.modal-form-field');
-                modalFormFields.forEach(field => {
-                    field.classList.remove('field-filled', 'field-empty');
-                });
-                
-                // Re-check form validity
-                setTimeout(() => {
-                    checkModalFormValidity();
-                }, 100);
-            }
-        }
+    // Age calculation from date of birth in modal
+    if (modalDateOfBirth && modalAge) {
+        modalDateOfBirth.addEventListener('change', function() {
+            calculateModalAge(this.value);
+        });
+    }
 
-        // Enhanced modal functions for viewing patient info
-        function openViewModal(patientId) {
-            // Show loading state
-            document.getElementById('modalContent').innerHTML = `
-                <div class="flex justify-center items-center py-20">
-                    <div class="text-center">
-                        <i class="fas fa-spinner fa-spin text-5xl text-primary mb-4"></i>
-                        <p class="text-lg text-gray-600 font-medium">Loading patient data...</p>
-                        <p class="text-sm text-gray-500 mt-2">Please wait while we retrieve the information</p>
-                    </div>
-                </div>
-            `;
-            
-            // Show modal with smooth animation
-            const modal = document.getElementById('viewModal');
-            modal.style.display = 'flex';
-            modal.style.opacity = '0';
-            
-            // Animate modal appearance
-            setTimeout(() => {
-                modal.style.opacity = '1';
-                modal.style.transition = 'opacity 0.3s ease';
-            }, 10);
-            
-            // Load patient data via AJAX
-            fetch(`./get_patient_data.php?id=${patientId}`)
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('modalContent').innerHTML = data;
-                    
-                    // Add custom styling for the loaded content
-                    const modalContent = document.getElementById('modalContent');
-                    const forms = modalContent.querySelectorAll('form');
-                    forms.forEach(form => {
-                        form.classList.add('w-full', 'max-w-full');
-                        
-                        // Make form containers wider
-                        const containers = form.querySelectorAll('.grid, .flex');
-                        containers.forEach(container => {
-                            container.classList.add('w-full');
-                        });
-                        
-                        // Make input fields larger and more visible
-                        const inputs = form.querySelectorAll('input, select, textarea');
-                        inputs.forEach(input => {
-                            if (!input.classList.contains('readonly-field')) {
-                                input.classList.add('text-lg', 'px-4', 'py-3');
-                            }
-                        });
-                    });
-                    
-                    // Set up the Save Medical Information button
-                    setupMedicalForm();
-                })
-                .catch(error => {
-                    document.getElementById('modalContent').innerHTML = `
-                        <div class="text-center py-12 bg-red-50 rounded-xl border-2 border-red-200">
-                            <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-4"></i>
-                            <h3 class="text-xl font-semibold text-red-700 mb-2">Error Loading Patient Data</h3>
-                            <p class="text-red-600 mb-4">Unable to load patient information. Please try again.</p>
-                            <button onclick="openViewModal(${patientId})" class="btn-primary px-6 py-3">
-                                <i class="fas fa-redo mr-2"></i>Retry
-                            </button>
-                        </div>
-                    `;
-                });
+    // Calculate age function for modal
+    function calculateModalAge(dateOfBirth) {
+        if (!dateOfBirth) return;
+        
+        const birthDate = new Date(dateOfBirth);
+        const today = new Date();
+        
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
         }
         
-        function closeViewModal() {
-            const modal = document.getElementById('viewModal');
-            modal.style.opacity = '0';
-            setTimeout(() => {
-                modal.style.display = 'none';
-            }, 300);
-        }
+        modalAge.value = age;
         
-        // Function to set up medical form when modal content loads
-        function setupMedicalForm() {
-            const healthInfoForm = document.getElementById('healthInfoForm');
-            
-            if (healthInfoForm) {
-                // Find the Save Medical Information button and update its class
-                const saveBtn = healthInfoForm.querySelector('button[name="save_health_info"]');
-                if (saveBtn) {
-                    saveBtn.classList.remove('btn-primary', 'bg-primary', 'text-white');
-                    saveBtn.classList.add('btn-save-medical');
-                    saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i> Save Medical Information';
-                }
-                
-                // Set up form submission
-                healthInfoForm.addEventListener('submit', async function(e) {
-                    e.preventDefault();
-                    
-                    // Show loading state
-                    const submitBtn = this.querySelector('button[name="save_health_info"]');
-                    const originalBtnText = submitBtn.innerHTML;
-                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
-                    submitBtn.disabled = true;
-                    
-                    try {
-                        const formData = new FormData(this);
-                        const response = await fetch(this.action, {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        if (response.ok) {
-                            // Show success message
-                            showNotification('success', 'Medical information saved successfully!');
-                            
-                            // Reload the modal content to show updated data
-                            const patientId = formData.get('patient_id');
-                            if (patientId) {
-                                setTimeout(() => {
-                                    openViewModal(patientId);
-                                }, 1500);
-                            }
-                        } else {
-                            showNotification('error', 'Error saving medical information');
-                        }
-                        
-                    } catch (error) {
-                        showNotification('error', 'Network error: ' + error.message);
-                        console.error('Form submission error:', error);
-                    } finally {
-                        // Restore button
-                        submitBtn.innerHTML = originalBtnText;
-                        submitBtn.disabled = false;
-                    }
-                });
-            }
-        }
-        
-        // NEW: Print Patient Record Function
-        function printPatientRecord() {
-            const patientId = getPatientId();
-            if (patientId) {
-                // Open the print patient page in a new window
-                const printWindow = window.open(`/community-health-tracker/api/print_patient.php?id=${patientId}`, '_blank', 'width=1200,height=800');
-                if (printWindow) {
-                    printWindow.focus();
-                    // Listen for the window to load and trigger print
-                    printWindow.onload = function() {
-                        // Give a small delay for everything to load
-                        setTimeout(() => {
-                            printWindow.print();
-                        }, 1000);
-                    };
-                } else {
-                    showNotification('error', 'Please allow pop-ups for this site to print');
-                }
-            } else {
-                showNotification('error', 'No patient selected for printing');
-            }
-        }
+        // Update form validation state
+        updateModalFieldState(modalAge);
+        checkModalFormValidity();
+    }
 
-        function getPatientId() {
-            const selectors = [
-                '#healthInfoForm input[name="patient_id"]',
-                'input[name="patient_id"]',
-                '[name="patient_id"]',
-                '#patient_id',
-                '.patient-id-input'
-            ];
-            
-            for (const selector of selectors) {
-                const element = document.querySelector(selector);
-                if (element && element.value) {
-                    return element.value;
+    // Update modal field background color
+    function updateModalFieldState(field) {
+        if (!field) return;
+        
+        const value = field.type === 'checkbox' ? field.checked : field.value.trim();
+        const isRequired = field.hasAttribute('required');
+        
+        if (isRequired && !value) {
+            field.classList.add('field-empty');
+            field.classList.remove('field-filled');
+        } else if (value) {
+            field.classList.add('field-filled');
+            field.classList.remove('field-empty');
+        } else {
+            field.classList.remove('field-filled', 'field-empty');
+        }
+    }
+
+    // Check if all required modal fields are filled
+    function checkModalFormValidity() {
+        if (!modalRegisterBtn) return;
+        
+        let allRequiredFilled = true;
+        
+        // Check required form fields
+        modalFormFields.forEach(field => {
+            if (field.hasAttribute('required')) {
+                const value = field.type === 'checkbox' ? field.checked : field.value.trim();
+                if (!value) {
+                    allRequiredFilled = false;
                 }
             }
+        });
+
+        // Enable/disable register button
+        if (allRequiredFilled) {
+            modalRegisterBtn.disabled = false;
+            modalRegisterBtn.classList.remove('btn-disabled');
+        } else {
+            modalRegisterBtn.disabled = true;
+            modalRegisterBtn.classList.add('btn-disabled');
+        }
+    }
+
+    // Initialize modal form state
+    checkModalFormValidity();
+});
+
+// Modal functions
+function openAddPatientModal() {
+    const modal = document.getElementById('addPatientModal');
+    modal.style.display = 'flex';
+    modal.style.opacity = '0';
+    
+    setTimeout(() => {
+        modal.style.opacity = '1';
+        modal.style.transition = 'opacity 0.3s ease';
+    }, 10);
+}
+
+function closeAddPatientModal() {
+    const modal = document.getElementById('addPatientModal');
+    modal.style.opacity = '0';
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+}
+
+function clearAddPatientForm() {
+    const form = document.getElementById('patientForm');
+    if (form) {
+        form.reset();
+        
+        // Reset all form field states
+        const modalFormFields = document.querySelectorAll('.modal-form-field');
+        modalFormFields.forEach(field => {
+            field.classList.remove('field-filled', 'field-empty');
+        });
+        
+        // Re-check form validity
+        setTimeout(() => {
+            checkModalFormValidity();
+        }, 100);
+    }
+}
+
+// Enhanced modal functions for viewing patient info
+function openViewModal(patientId) {
+    // Show loading state
+    document.getElementById('modalContent').innerHTML = `
+        <div class="flex justify-center items-center py-20">
+            <div class="text-center">
+                <i class="fas fa-spinner fa-spin text-5xl text-primary mb-4"></i>
+                <p class="text-lg text-gray-600 font-medium">Loading patient data...</p>
+                <p class="text-sm text-gray-500 mt-2">Please wait while we retrieve the information</p>
+            </div>
+        </div>
+    `;
+    
+    // Show modal with smooth animation
+    const modal = document.getElementById('viewModal');
+    modal.style.display = 'flex';
+    modal.style.opacity = '0';
+    
+    // Animate modal appearance
+    setTimeout(() => {
+        modal.style.opacity = '1';
+        modal.style.transition = 'opacity 0.3s ease';
+    }, 10);
+    
+    // Load patient data via AJAX
+    fetch(`./get_patient_data.php?id=${patientId}`)
+        .then(response => response.text())
+        .then(data => {
+            document.getElementById('modalContent').innerHTML = data;
             
+            // Add custom styling for the loaded content
             const modalContent = document.getElementById('modalContent');
-            if (modalContent) {
-                const hiddenInputs = modalContent.querySelectorAll('input[type="hidden"]');
-                for (const input of hiddenInputs) {
-                    if (input.name === 'patient_id' && input.value) {
-                        return input.value;
+            const forms = modalContent.querySelectorAll('form');
+            forms.forEach(form => {
+                form.classList.add('w-full', 'max-w-full');
+                
+                // Make form containers wider
+                const containers = form.querySelectorAll('.grid, .flex');
+                containers.forEach(container => {
+                    container.classList.add('w-full');
+                });
+                
+                // Make input fields larger and more visible
+                const inputs = form.querySelectorAll('input, select, textarea');
+                inputs.forEach(input => {
+                    if (!input.classList.contains('readonly-field')) {
+                        input.classList.add('text-lg', 'px-4', 'py-3');
                     }
-                }
-            }
+                });
+            });
             
-            return null;
-        }
-
-        function showNotification(type, message) {
-            const existingNotifications = document.querySelectorAll('.custom-notification');
-            existingNotifications.forEach(notification => notification.remove());
-            
-            const notification = document.createElement('div');
-            notification.className = `custom-notification fixed top-6 right-6 z-50 px-6 py-4 rounded-xl shadow-lg border-2 ${
-                type === 'error' ? 'alert-error' :
-                type === 'success' ? 'alert-success' :
-                'bg-blue-100 text-blue-800 border-blue-200'
-            }`;
-            
-            const icon = type === 'error' ? 'fa-exclamation-circle' :
-                       type === 'success' ? 'fa-check-circle' : 'fa-info-circle';
-            
-            notification.innerHTML = `
-                <div class="flex items-center">
-                    <i class="fas ${icon} mr-3 text-xl"></i>
-                    <span class="font-semibold">${message}</span>
+            // Set up the Save Medical Information button
+            setupMedicalForm();
+        })
+        .catch(error => {
+            document.getElementById('modalContent').innerHTML = `
+                <div class="text-center py-12 bg-red-50 rounded-xl border-2 border-red-200">
+                    <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-red-700 mb-2">Error Loading Patient Data</h3>
+                    <p class="text-red-600 mb-4">Unable to load patient information. Please try again.</p>
+                    <button onclick="openViewModal(${patientId})" class="btn-primary px-6 py-3">
+                        <i class="fas fa-redo mr-2"></i>Retry
+                    </button>
                 </div>
             `;
-            
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 5000);
-        }
-
-        // Enhanced modal close on outside click
-        window.onclick = function(event) {
-            const viewModal = document.getElementById('viewModal');
-            const addPatientModal = document.getElementById('addPatientModal');
-            
-            if (event.target === viewModal) {
-                closeViewModal();
-            }
-            if (event.target === addPatientModal) {
-                closeAddPatientModal();
-            }
-        };
-
-        // Add keyboard support for modals
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                closeViewModal();
-                closeAddPatientModal();
-            }
         });
+}
 
-        // Auto-hide messages after 3 seconds
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(function() {
-                var successMessage = document.getElementById('successMessage');
-                var errorMessage = document.querySelector('.alert-error');
-                
-                if (successMessage) {
-                    successMessage.style.display = 'none';
-                }
-                
-                if (errorMessage) {
-                    errorMessage.style.display = 'none';
-                }
-            }, 3000);
-        });
-        
-        // Tab functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const tabButtons = document.querySelectorAll('.tab-btn');
-            const tabContents = document.querySelectorAll('.tab-content');
-            const tabTriggers = document.querySelectorAll('.tab-trigger');
-            
-            // Handle tab button clicks
-            tabButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    const tabId = button.getAttribute('data-tab');
-                    
-                    // Update active tab button
-                    tabButtons.forEach(btn => btn.classList.remove('border-primary', 'text-primary', 'active'));
-                    button.classList.add('border-primary', 'text-primary', 'active');
-                    
-                    // Show active tab content
-                    tabContents.forEach(content => content.classList.remove('active'));
-                    document.getElementById(tabId).classList.add('active');
-                    
-                    // Update URL with tab parameter
-                    const url = new URL(window.location);
-                    url.searchParams.set('tab', tabId);
-                    window.history.replaceState({}, '', url);
-                });
-            });
-            
-            // Handle external tab triggers
-            tabTriggers.forEach(trigger => {
-                trigger.addEventListener('click', () => {
-                    const tabId = trigger.getAttribute('data-tab');
-                    
-                    // Update active tab button
-                    tabButtons.forEach(btn => {
-                        if (btn.getAttribute('data-tab') === tabId) {
-                            btn.classList.add('border-primary', 'text-primary', 'active');
-                        } else {
-                            btn.classList.remove('border-primary', 'text-primary', 'active');
-                        }
-                    });
-                    
-                    // Show active tab content
-                    tabContents.forEach(content => content.classList.remove('active'));
-                    document.getElementById(tabId).classList.add('active');
-                    
-                    // Update URL with tab parameter
-                    const url = new URL(window.location);
-                    url.searchParams.set('tab', tabId);
-                    window.history.replaceState({}, '', url);
-                });
-            });
-            
-            // Check if URL has tab parameter
-            const urlParams = new URLSearchParams(window.location.search);
-            const tabParam = urlParams.get('tab');
-            if (tabParam) {
-                const tabButton = document.querySelector(`.tab-btn[data-tab="${tabParam}"]`);
-                if (tabButton) tabButton.click();
-            }
-        });
-        
-        // Clear search on page refresh
-        if (window.history.replaceState && !window.location.search.includes('search=')) {
-            window.history.replaceState({}, document.title, window.location.pathname);
+function closeViewModal() {
+    const modal = document.getElementById('viewModal');
+    modal.style.opacity = '0';
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+}
+
+// Function to set up medical form when modal content loads
+function setupMedicalForm() {
+    const healthInfoForm = document.getElementById('healthInfoForm');
+    
+    if (healthInfoForm) {
+        // Find the Save Medical Information button and update its class
+        const saveBtn = healthInfoForm.querySelector('button[name="save_health_info"]');
+        if (saveBtn) {
+            saveBtn.classList.remove('btn-primary', 'bg-primary', 'text-white');
+            saveBtn.classList.add('btn-save-medical');
+            saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i> Save Medical Information';
         }
         
-        // Ensure buttons have proper opacity styling
-        document.addEventListener('DOMContentLoaded', function() {
-            const buttons = document.querySelectorAll('.btn-view, .btn-archive, .btn-add-patient, .btn-primary, .btn-success, .btn-gray, .btn-print, .btn-edit, .btn-save-medical, .btn-view-all, .btn-back-to-pagination, .pagination-btn');
-            buttons.forEach(button => {
-                button.style.borderStyle = 'solid';
-            });
+        // Set up form submission
+        healthInfoForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Show loading state
+            const submitBtn = this.querySelector('button[name="save_health_info"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+            submitBtn.disabled = true;
+            
+            try {
+                const formData = new FormData(this);
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    // Show success message
+                    showNotification('success', 'Medical information saved successfully!');
+                    
+                    // Reload the modal content to show updated data
+                    const patientId = formData.get('patient_id');
+                    if (patientId) {
+                        setTimeout(() => {
+                            openViewModal(patientId);
+                        }, 1500);
+                    }
+                } else {
+                    showNotification('error', 'Error saving medical information');
+                }
+                
+            } catch (error) {
+                showNotification('error', 'Network error: ' + error.message);
+                console.error('Form submission error:', error);
+            } finally {
+                // Restore button
+                submitBtn.innerHTML = originalBtnText;
+                submitBtn.disabled = false;
+            }
         });
-    </script>
+    }
+}
+
+// Print Patient Record Function
+function printPatientRecord() {
+    const patientId = getPatientId();
+    if (patientId) {
+        // Open the print patient page in a new window
+        const printWindow = window.open(`/community-health-tracker/api/print_patient.php?id=${patientId}`, '_blank', 'width=1200,height=800');
+        if (printWindow) {
+            printWindow.focus();
+            // Listen for the window to load and trigger print
+            printWindow.onload = function() {
+                // Give a small delay for everything to load
+                setTimeout(() => {
+                    printWindow.print();
+                }, 1000);
+            };
+        } else {
+            showNotification('error', 'Please allow pop-ups for this site to print');
+        }
+    } else {
+        showNotification('error', 'No patient selected for printing');
+    }
+}
+
+function getPatientId() {
+    const selectors = [
+        '#healthInfoForm input[name="patient_id"]',
+        'input[name="patient_id"]',
+        '[name="patient_id"]',
+        '#patient_id',
+        '.patient-id-input'
+    ];
+    
+    for (const selector of selectors) {
+        const element = document.querySelector(selector);
+        if (element && element.value) {
+            return element.value;
+        }
+    }
+    
+    const modalContent = document.getElementById('modalContent');
+    if (modalContent) {
+        const hiddenInputs = modalContent.querySelectorAll('input[type="hidden"]');
+        for (const input of hiddenInputs) {
+            if (input.name === 'patient_id' && input.value) {
+                return input.value;
+            }
+        }
+    }
+    
+    return null;
+}
+
+function showNotification(type, message) {
+    const existingNotifications = document.querySelectorAll('.custom-notification');
+    existingNotifications.forEach(notification => notification.remove());
+    
+    const notification = document.createElement('div');
+    notification.className = `custom-notification fixed top-6 right-6 z-50 px-6 py-4 rounded-xl shadow-lg border-2 ${
+        type === 'error' ? 'alert-error' :
+        type === 'success' ? 'alert-success' :
+        'bg-blue-100 text-blue-800 border-blue-200'
+    }`;
+    
+    const icon = type === 'error' ? 'fa-exclamation-circle' :
+               type === 'success' ? 'fa-check-circle' : 'fa-info-circle';
+    
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${icon} mr-3 text-xl"></i>
+            <span class="font-semibold">${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 5000);
+}
+
+// Enhanced modal close on outside click
+window.onclick = function(event) {
+    const viewModal = document.getElementById('viewModal');
+    const addPatientModal = document.getElementById('addPatientModal');
+    
+    if (event.target === viewModal) {
+        closeViewModal();
+    }
+    if (event.target === addPatientModal) {
+        closeAddPatientModal();
+    }
+};
+
+// Add keyboard support for modals
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeViewModal();
+        closeAddPatientModal();
+    }
+});
+
+// Auto-hide messages after 3 seconds
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        var successMessage = document.getElementById('successMessage');
+        var errorMessage = document.querySelector('.alert-error');
+        
+        if (successMessage) {
+            successMessage.style.display = 'none';
+        }
+        
+        if (errorMessage) {
+            errorMessage.style.display = 'none';
+        }
+    }, 3000);
+});
+
+// Tab functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const tabTriggers = document.querySelectorAll('.tab-trigger');
+    
+    // Handle tab button clicks
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const tabId = button.getAttribute('data-tab');
+            
+            // Update active tab button
+            tabButtons.forEach(btn => btn.classList.remove('border-primary', 'text-primary', 'active'));
+            button.classList.add('border-primary', 'text-primary', 'active');
+            
+            // Show active tab content
+            tabContents.forEach(content => content.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            
+            // Update URL with tab parameter
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tabId);
+            window.history.replaceState({}, '', url);
+        });
+    });
+    
+    // Handle external tab triggers
+    tabTriggers.forEach(trigger => {
+        trigger.addEventListener('click', () => {
+            const tabId = trigger.getAttribute('data-tab');
+            
+            // Update active tab button
+            tabButtons.forEach(btn => {
+                if (btn.getAttribute('data-tab') === tabId) {
+                    btn.classList.add('border-primary', 'text-primary', 'active');
+                } else {
+                    btn.classList.remove('border-primary', 'text-primary', 'active');
+                }
+            });
+            
+            // Show active tab content
+            tabContents.forEach(content => content.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            
+            // Update URL with tab parameter
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tabId);
+            window.history.replaceState({}, '', url);
+        });
+    });
+    
+    // Check if URL has tab parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam) {
+        const tabButton = document.querySelector(`.tab-btn[data-tab="${tabParam}"]`);
+        if (tabButton) tabButton.click();
+    }
+});
+
+// Clear search on page refresh
+if (window.history.replaceState && !window.location.search.includes('search=')) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+// Ensure buttons have proper opacity styling
+document.addEventListener('DOMContentLoaded', function() {
+    const buttons = document.querySelectorAll('.btn-view, .btn-archive, .btn-add-patient, .btn-primary, .btn-success, .btn-gray, .btn-print, .btn-edit, .btn-save-medical, .btn-view-all, .btn-back-to-pagination, .pagination-btn');
+    buttons.forEach(button => {
+        button.style.borderStyle = 'solid';
+    });
+});
+</script>
 
     <script>
         // Enhanced form submission with success modal
@@ -3369,6 +3756,60 @@ body,
                 closeSuccessModal();
             }
         });
+    </script>
+
+    <script>
+        // Export based on current filter selection
+function exportCurrentFilter() {
+    const exportOptions = document.getElementById('exportOptions');
+    exportOptions.classList.remove('show');
+    
+    // Get current URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Get current patient type filter
+    const patientTypeSelect = document.querySelector('select[name="patient_type"]');
+    const currentPatientType = patientTypeSelect ? patientTypeSelect.value : 'all';
+    
+    // Build export URL with current filter
+    let url = `existing_info_patients.php?export=excel&patient_type=${currentPatientType}`;
+    
+    // Add current search parameters
+    const tab = urlParams.get('tab');
+    const search = urlParams.get('search');
+    const searchBy = urlParams.get('search_by');
+    const viewAll = urlParams.get('view_all');
+    
+    if (tab) url += `&tab=${tab}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (searchBy) url += `&search_by=${searchBy}`;
+    if (viewAll) url += `&view_all=${viewAll}`;
+    
+    // Show loading message
+    const typeLabels = {
+        'all': 'All Patients',
+        'registered': 'Registered Patients',
+        'regular': 'Regular Patients'
+    };
+    showNotification('info', `Exporting ${typeLabels[currentPatientType] || 'Current Filter'}...`);
+    
+    // Open export URL in new tab
+    const exportWindow = window.open(url, '_blank');
+    
+    // Check if popup was blocked
+    if (!exportWindow || exportWindow.closed || typeof exportWindow.closed == 'undefined') {
+        showNotification('error', 'Pop-up blocked! Please allow pop-ups for this site to export.');
+        
+        // Alternative: Use form submission
+        const form = document.createElement('form');
+        form.method = 'GET';
+        form.action = url;
+        form.target = '_blank';
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
+}
     </script>
 </body>
 </html>
