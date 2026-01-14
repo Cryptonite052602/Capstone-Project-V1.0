@@ -191,11 +191,10 @@ try {
         }
         
         .btn-restore { 
-            background-color: white; 
-            color: #2ecc71; 
-            border: 2px solid #bbf7d0; 
-            border-radius: 8px; 
-            padding: 10px 20px; 
+            background-color: #2ecc71; 
+            color: #ffffff; 
+            border-radius: 30px; 
+            padding: 15px 25px; 
             transition: all 0.3s ease; 
             font-weight: 500;
             min-height: 45px;
@@ -205,18 +204,16 @@ try {
             text-decoration: none;
         }
         .btn-restore:hover { 
-            background-color: #f0fdf4; 
-            border-color: #2ecc71;
+            background-color: #42d881; 
             transform: translateY(-2px); 
             box-shadow: 0 4px 12px rgba(46, 204, 113, 0.15);
         }
         
         .btn-delete { 
-            background-color: white; 
-            color: #e74c3c; 
-            border: 2px solid #fecaca; 
-            border-radius: 8px; 
-            padding: 10px 20px; 
+            background-color: #e74c3c; 
+            color: #ffffff; 
+            border-radius: 30px; 
+            padding: 15px 25px; 
             transition: all 0.3s ease; 
             font-weight: 500;
             min-height: 45px;
@@ -226,8 +223,7 @@ try {
             text-decoration: none;
         }
         .btn-delete:hover { 
-            background-color: #fef2f2; 
-            border-color: #e74c3c;
+            background-color: #e65e4f; 
             transform: translateY(-2px); 
             box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
         }
