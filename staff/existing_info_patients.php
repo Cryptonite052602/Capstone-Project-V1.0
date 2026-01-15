@@ -675,7 +675,7 @@ if (isset($_GET['delete_patient'])) {
     }
 }
 
-// Handle patient restoration
+// Handle patient restoration - UPDATED to properly restore with all original data
 if (isset($_GET['restore_patient'])) {
     $patientId = $_GET['restore_patient'];
     
@@ -683,72 +683,138 @@ if (isset($_GET['restore_patient'])) {
         // Start transaction
         $pdo->beginTransaction();
         
-        // Get archived patient data including user_id
-        $stmt = $pdo->prepare("SELECT * FROM deleted_patients WHERE original_id = ? AND deleted_by = ?");
+        // Get archived patient data including ALL medical info
+        $stmt = $pdo->prepare("
+            SELECT 
+                dp.*,
+                eip.gender as health_gender,
+                eip.height,
+                eip.weight,
+                eip.temperature,
+                eip.blood_pressure,
+                eip.blood_type,
+                eip.allergies,
+                eip.medical_history,
+                eip.current_medications,
+                eip.family_history,
+                eip.immunization_record,
+                eip.chronic_conditions,
+                eip.updated_at as health_updated
+            FROM deleted_patients dp
+            LEFT JOIN existing_info_patients eip ON dp.original_id = eip.patient_id
+            WHERE dp.original_id = ? AND dp.deleted_by = ?
+        ");
         $stmt->execute([$patientId, $_SESSION['user']['id']]);
         $archivedPatient = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($archivedPatient) {
-            // Get column information from sitio1_patients table
-            $stmt = $pdo->prepare("SHOW COLUMNS FROM sitio1_patients");
-            $stmt->execute();
-            $mainTableColumns = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            // Check if patient already exists in main table
+            $stmt = $pdo->prepare("SELECT id FROM sitio1_patients WHERE id = ? AND added_by = ?");
+            $stmt->execute([$patientId, $_SESSION['user']['id']]);
+            $existingPatient = $stmt->fetch();
             
-            // Filter columns that exist in both source and destination
-            $columns = [];
-            $placeholders = [];
-            $values = [];
-            
-            foreach ($archivedPatient as $column => $value) {
-                // Skip columns that don't exist in sitio1_patients
-                if (!in_array($column, $mainTableColumns)) {
-                    continue;
-                }
+            if ($existingPatient) {
+                $error = 'This patient already exists in the active records!';
+            } else {
+                // Get column information from sitio1_patients table
+                $stmt = $pdo->prepare("SHOW COLUMNS FROM sitio1_patients");
+                $stmt->execute();
+                $mainTableColumns = $stmt->fetchAll(PDO::FETCH_COLUMN);
                 
-                // Map original_id back to id
-                if ($column === 'original_id') {
-                    $columns[] = 'id';
+                // Prepare data for restoration
+                $columns = [];
+                $placeholders = [];
+                $values = [];
+                
+                // Map archived data to main table columns
+                foreach ($archivedPatient as $column => $value) {
+                    // Skip columns that don't exist in sitio1_patients
+                    if (!in_array($column, $mainTableColumns)) {
+                        continue;
+                    }
+                    
+                    // Skip metadata columns from deleted_patients
+                    if (in_array($column, ['deleted_by', 'deleted_at', 'id', 'created_at'])) {
+                        continue;
+                    }
+                    
+                    // Map original_id back to id
+                    if ($column === 'original_id') {
+                        $columns[] = 'id';
+                        $placeholders[] = "?";
+                        $values[] = $value;
+                        continue;
+                    }
+                    
+                    $columns[] = $column;
                     $placeholders[] = "?";
                     $values[] = $value;
-                    continue;
                 }
                 
-                // Skip metadata columns from deleted_patients
-                if (in_array($column, ['deleted_by', 'deleted_at', 'id', 'created_at'])) {
-                    continue;
+                // Add restored timestamp
+                $columns[] = 'restored_at';
+                $placeholders[] = "NOW()";
+                
+                $insertQuery = "INSERT INTO sitio1_patients (" . implode(", ", $columns) . ") VALUES (" . implode(", ", $placeholders) . ")";
+                
+                // Debug: Uncomment to see the generated query
+                // error_log("Restore Query: " . $insertQuery);
+                // error_log("Values: " . implode(', ', $values));
+                
+                // Restore to main patients table with original ID
+                $stmt = $pdo->prepare($insertQuery);
+                $stmt->execute($values);
+                
+                // Restore medical info if it exists
+                if (!empty($archivedPatient['health_gender'])) {
+                    $stmt = $pdo->prepare("INSERT INTO existing_info_patients 
+                        (patient_id, gender, height, weight, temperature, blood_pressure, 
+                         blood_type, allergies, medical_history, current_medications, 
+                         family_history, immunization_record, chronic_conditions, updated_at) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+                        ON DUPLICATE KEY UPDATE 
+                            gender = VALUES(gender),
+                            height = VALUES(height),
+                            weight = VALUES(weight),
+                            temperature = VALUES(temperature),
+                            blood_pressure = VALUES(blood_pressure),
+                            blood_type = VALUES(blood_type),
+                            allergies = VALUES(allergies),
+                            medical_history = VALUES(medical_history),
+                            current_medications = VALUES(current_medications),
+                            family_history = VALUES(family_history),
+                            immunization_record = VALUES(immunization_record),
+                            chronic_conditions = VALUES(chronic_conditions),
+                            updated_at = VALUES(updated_at)");
+                    
+                    $stmt->execute([
+                        $patientId,
+                        $archivedPatient['health_gender'],
+                        $archivedPatient['height'] ?? null,
+                        $archivedPatient['weight'] ?? null,
+                        $archivedPatient['temperature'] ?? null,
+                        $archivedPatient['blood_pressure'] ?? null,
+                        $archivedPatient['blood_type'] ?? null,
+                        $archivedPatient['allergies'] ?? null,
+                        $archivedPatient['medical_history'] ?? null,
+                        $archivedPatient['current_medications'] ?? null,
+                        $archivedPatient['family_history'] ?? null,
+                        $archivedPatient['immunization_record'] ?? null,
+                        $archivedPatient['chronic_conditions'] ?? null,
+                        $archivedPatient['health_updated'] ?? date('Y-m-d H:i:s')
+                    ]);
                 }
                 
-                $columns[] = $column;
-                $placeholders[] = "?";
-                $values[] = $value;
+                // Delete from archive
+                $stmt = $pdo->prepare("DELETE FROM deleted_patients WHERE original_id = ?");
+                $stmt->execute([$patientId]);
+                
+                $pdo->commit();
+                
+                $_SESSION['success_message'] = 'Patient record restored successfully! All data has been recovered.';
+                header('Location: deleted_patients.php');
+                exit();
             }
-            
-            $insertQuery = "INSERT INTO sitio1_patients (" . implode(", ", $columns) . ") VALUES (" . implode(", ", $placeholders) . ")";
-            
-            // Debug: Uncomment to see the generated query
-            // error_log("Restore Query: " . $insertQuery);
-            // error_log("Values: " . implode(', ', $values));
-            
-            // Restore to main patients table
-            $stmt = $pdo->prepare($insertQuery);
-            $stmt->execute($values);
-            
-            // Also restore health info with gender
-            $stmt = $pdo->prepare("INSERT INTO existing_info_patients 
-                (patient_id, gender, height, weight, blood_type) 
-                VALUES (?, ?, 0, 0, '') 
-                ON DUPLICATE KEY UPDATE gender = VALUES(gender)");
-            $stmt->execute([$patientId, $archivedPatient['gender']]);
-            
-            // Delete from archive
-            $stmt = $pdo->prepare("DELETE FROM deleted_patients WHERE original_id = ?");
-            $stmt->execute([$patientId]);
-            
-            $pdo->commit();
-            
-            $_SESSION['success_message'] = 'Patient record restored successfully!';
-            header('Location: deleted_patients.php');
-            exit();
         } else {
             $error = 'Archived patient not found!';
         }
@@ -933,27 +999,35 @@ try {
 
 // Get all patients with their medical info for the patient list with pagination or all records
 try {
-    // Build SELECT query based on your table structure
-    // Update the main patient listing query (around line 588)
     $selectQuery = "SELECT 
             p.id,
             p.full_name,
-            p.date_of_birth,
+            -- Prioritize patient table date_of_birth, fallback to user table
+            COALESCE(p.date_of_birth, u.date_of_birth) as date_of_birth,
             p.age,
             COALESCE(e.gender, p.gender) as gender,
             p.sitio,
             p.civil_status,
             p.occupation,
+            p.user_id,
             e.blood_type,
             e.height, e.weight, e.temperature, e.blood_pressure,
             e.allergies, e.immunization_record, e.chronic_conditions,
             e.medical_history, e.current_medications, e.family_history,
+            u.unique_number,
+            u.email as user_email,
+            u.sitio as user_sitio,
+            u.civil_status as user_civil_status,
+            u.occupation as user_occupation,
+            u.gender as user_gender,
+            u.date_of_birth as user_date_of_birth, -- Get this separately for debugging
             CASE 
                 WHEN p.user_id IS NOT NULL THEN 'Registered Patient'
                 ELSE 'Regular Patient'
             END as patient_type
         FROM sitio1_patients p
         LEFT JOIN existing_info_patients e ON p.id = e.patient_id
+        LEFT JOIN sitio1_users u ON p.user_id = u.id
         WHERE p.added_by = ? AND p.deleted_at IS NULL";
     
     // Add patient type filter to main query
@@ -974,7 +1048,6 @@ try {
     if ($viewAll || $manualSelectMode) {
         $stmt->execute([$_SESSION['user']['id']]);
     } else {
-        // Bind parameters with explicit types for LIMIT and OFFSET
         $stmt->bindParam(1, $_SESSION['user']['id'], PDO::PARAM_INT);
         $stmt->bindParam(2, $recordsPerPage, PDO::PARAM_INT);
         $stmt->bindParam(3, $offset, PDO::PARAM_INT);
@@ -2527,9 +2600,7 @@ if (!empty($selectedPatientId)) {
                                                         <td>
                                                             <?php if ($patient['patient_type'] === 'Registered Patient'): ?>
                                                                 <span class="user-badge">Registered Patient</span>
-                                                                <?php if (!empty($patient['user_sitio'])): ?>
-                                                                    <br><small class="text-gray-500"><?= htmlspecialchars($patient['user_sitio']) ?></small>
-                                                                <?php endif; ?>
+                                                                
                                                             <?php else: ?>
                                                                 <span class="regular-badge">Regular Patient</span>
                                                             <?php endif; ?>
@@ -2647,9 +2718,7 @@ if (!empty($selectedPatientId)) {
                                                 <td>
                                                     <?php if ($patient['patient_type'] === 'Registered Patient'): ?>
                                                         <span class="user-badge">Registered Patient</span>
-                                                        <?php if (!empty($patient['user_sitio'])): ?>
-                                                            <br><small class="text-gray-500"><?= htmlspecialchars($patient['user_sitio']) ?></small>
-                                                        <?php endif; ?>
+                                                        
                                                     <?php else: ?>
                                                         <span class="regular-badge">Regular Patient</span>
                                                     <?php endif; ?>
