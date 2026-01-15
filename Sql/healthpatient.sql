@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 09, 2025 at 05:00 AM
+-- Generation Time: Jan 15, 2026 at 03:07 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -137,6 +137,13 @@ CREATE TABLE `deleted_patients` (
   `deleted_by` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `deleted_patients`
+--
+
+INSERT INTO `deleted_patients` (`id`, `original_id`, `full_name`, `date_of_birth`, `age`, `gender`, `address`, `contact`, `last_checkup`, `added_by`, `user_id`, `deleted_at`, `deleted_by`) VALUES
+(86, 175, 'Russel Evan Loquinario', '2000-01-15', 26, 'Male', 'Tisa Cebu City', '09206001470', '2026-01-15', 2, NULL, '2026-01-15 02:02:47', 2);
+
 -- --------------------------------------------------------
 
 --
@@ -160,6 +167,15 @@ CREATE TABLE `existing_info_patients` (
   `immunization_record` text DEFAULT NULL,
   `chronic_conditions` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `existing_info_patients`
+--
+
+INSERT INTO `existing_info_patients` (`id`, `patient_id`, `gender`, `height`, `weight`, `blood_type`, `allergies`, `medical_history`, `current_medications`, `family_history`, `updated_at`, `temperature`, `blood_pressure`, `immunization_record`, `chronic_conditions`) VALUES
+(129, 166, 'Male', 34.00, 34.00, 'AB+', 'sad', 'sad', 'sad', 'sad', '2026-01-08 11:51:56', 45.00, '120/80', 'sad', 'sad'),
+(142, 172, 'Female', 45.00, 45.00, 'B+', 'sad', 'asd', 'asd', 'asd', NULL, 45.00, '120/80', 'sad', 'asd'),
+(146, 174, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -266,6 +282,16 @@ CREATE TABLE `sitio1_announcements` (
   `image_path` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `sitio1_announcements`
+--
+
+INSERT INTO `sitio1_announcements` (`id`, `staff_id`, `title`, `message`, `priority`, `expiry_date`, `post_date`, `updated_at`, `status`, `audience_type`, `image_path`) VALUES
+(50, 2, 'Cebu Eastern College Inc. Sinulog Festival', 'Everyone must come for the celebration of fiesta senor santo nino here in oval at cebu city', 'medium', '2026-01-10', '2026-01-09 00:05:23', NULL, 'archived', 'landing_page', NULL),
+(51, 2, 'Cebu Eastern College Defense', 'Hello', 'normal', '2026-01-14', '2026-01-14 07:17:57', NULL, 'active', 'landing_page', NULL),
+(52, 2, 'Cebu Eastern College Defense', 'Hello', 'medium', '2026-01-14', '2026-01-14 07:18:41', NULL, 'active', 'landing_page', NULL),
+(53, 2, 'Cebu Eastern College Defense', 'Hello', 'high', '2026-01-14', '2026-01-14 07:19:06', NULL, 'active', 'landing_page', NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -287,6 +313,19 @@ CREATE TABLE `sitio1_appointments` (
   `service_type` enum('General Checkup','Vaccination','Dental','Blood Test') DEFAULT 'General Checkup',
   `is_auto_created` tinyint(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `sitio1_appointments`
+--
+
+INSERT INTO `sitio1_appointments` (`id`, `staff_id`, `date`, `start_time`, `end_time`, `max_slots`, `slots_taken`, `slots_available`, `created_at`, `health_condition`, `service_id`, `service_type`, `is_auto_created`) VALUES
+(172, 2, '2026-01-09', '08:00:00', '09:00:00', 5, 0, 0, '2026-01-08 05:08:14', NULL, NULL, 'General Checkup', 0),
+(173, 2, '2026-01-12', '08:00:00', '09:00:00', 5, 0, 0, '2026-01-09 02:32:42', NULL, NULL, 'General Checkup', 0),
+(174, 2, '2026-01-12', '09:00:00', '10:00:00', 5, 0, 0, '2026-01-10 12:27:26', NULL, NULL, 'General Checkup', 0),
+(175, 2, '2026-01-12', '11:00:00', '12:00:00', 5, 0, 0, '2026-01-12 02:07:30', NULL, NULL, 'General Checkup', 0),
+(176, 2, '2026-01-15', '08:00:00', '09:00:00', 5, 0, 0, '2026-01-14 07:02:18', NULL, NULL, 'General Checkup', 0),
+(177, 2, '2026-01-16', '08:00:00', '09:00:00', 5, 0, 0, '2026-01-14 07:03:41', NULL, NULL, 'General Checkup', 0),
+(178, 2, '2026-01-15', '09:00:00', '10:00:00', 5, 0, 0, '2026-01-14 07:03:56', NULL, NULL, 'General Checkup', 0);
 
 -- --------------------------------------------------------
 
@@ -327,6 +366,7 @@ CREATE TABLE `sitio1_patients` (
   `added_by` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `deleted_at` datetime DEFAULT NULL,
+  `restored_at` timestamp NULL DEFAULT NULL,
   `gender` varchar(10) DEFAULT NULL,
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `consultation_type` varchar(20) DEFAULT 'onsite',
@@ -335,6 +375,15 @@ CREATE TABLE `sitio1_patients` (
   `consent_given` tinyint(1) DEFAULT 0,
   `consent_date` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `sitio1_patients`
+--
+
+INSERT INTO `sitio1_patients` (`id`, `user_id`, `full_name`, `date_of_birth`, `age`, `address`, `sitio`, `disease`, `contact`, `last_checkup`, `medical_history`, `added_by`, `created_at`, `deleted_at`, `restored_at`, `gender`, `updated_at`, `consultation_type`, `civil_status`, `occupation`, `consent_given`, `consent_date`) VALUES
+(166, NULL, 'Archiel R. Cabanag', '1999-01-08', 27, 'Labangon Cebu City', 'Luz Proper', NULL, '09206001470', '2026-01-08', NULL, 2, '2026-01-08 05:28:14', NULL, NULL, 'Male', '2026-01-08 05:28:14', 'onsite', 'Single', 'Student', 1, '2026-01-08 13:28:14'),
+(172, NULL, 'Creshiel Manloloyo', '2026-01-15', 26, 'Labangon Cebu City', 'Panganiban', NULL, '09816497664', '2026-01-15', NULL, 2, '2026-01-14 23:38:51', NULL, '2026-01-14 23:38:51', 'Female', '2026-01-14 23:39:34', 'onsite', 'Single', 'Student', 0, NULL),
+(174, 162, 'Jaycar Otida', NULL, 21, 'Barangay Luz, Cebu City', NULL, NULL, '09206001470', '2026-01-15', NULL, 2, '2026-01-15 00:44:56', NULL, NULL, 'Male', '2026-01-15 00:44:56', 'onsite', NULL, NULL, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -429,6 +478,17 @@ CREATE TABLE `sitio1_users` (
   `verified_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `sitio1_users`
+--
+
+INSERT INTO `sitio1_users` (`id`, `username`, `password`, `email`, `full_name`, `gender`, `age`, `date_of_birth`, `address`, `sitio`, `contact`, `civil_status`, `occupation`, `approved`, `approved_by`, `unique_number`, `created_at`, `status`, `role`, `specialization`, `license_number`, `updated_at`, `verification_method`, `id_image_path`, `profile_image`, `verification_notes`, `verification_consent`, `id_verified`, `verified_at`) VALUES
+(158, 'Warren', '$2y$10$5le3PRRAJGZ9lJffOMWvwulrPIqhJLUG0gAjy8IyPUUrmscWKqDhK', 'warrenmiguel789@gmail.com', 'Warren Miguel Miras', 'male', 25, '2001-01-06', 'Barangay Luz, Cebu City', 'Panganiban', '09206001470', 'married', 'Test', 1, NULL, 'CHT931628', '2026-01-08 04:39:10', 'approved', 'patient', NULL, NULL, '2026-01-08 12:07:44', 'id_upload', 'uploads/id_documents/id_Warren_1767847150.jpg', NULL, 'Hello Po sir', 1, 0, NULL),
+(160, 'Russel', '$2y$10$xvmVSl1fpBeYvHBkwGJ2Le/Qse58qDDbnELmriPZvcbzP8Xrqr9BO', 'russel@gmail.com', 'Russel Loquinario', 'male', 31, '1995-01-10', 'Barangay Luz, Cebu City', 'Proper Luz', '09312312421', 'single', 'Test', 0, NULL, NULL, '2026-01-10 12:34:19', 'pending', 'patient', NULL, NULL, NULL, 'id_upload', 'uploads/id_documents/id_Russel_1768048459.pdf', NULL, 'Hello', 1, 0, NULL),
+(161, 'Jerecho', '$2y$10$kDHnv2QWqBn6jNYemkxU7ew26thxLOW.utuMUWrVr0IPfhx1ZAWr2', 'jerecho@gmail.com', 'Jerecho Latosa', 'male', 26, '2000-01-10', 'Barangay Luz, Cebu City', 'Panganiban', '09206001470', 'married', 'Test', 1, NULL, 'CHT429900', '2026-01-10 12:39:29', 'approved', 'patient', NULL, NULL, '2026-01-11 13:43:42', 'id_upload', 'uploads/id_documents/id_Jerecho_1768048769.jpg', NULL, 'Boss', 1, 0, NULL),
+(162, 'Jaycar', '$2y$10$yq5EHa6NdURONXjJ8HB/yuDTFJNlNWgtRhOb2lLcMv6Hqyzm.d8n6', 'jaycarotida@gmail.com', 'Jaycar Otida', 'male', 21, '2004-04-03', 'Barangay Luz, Cebu City', 'Panganiban', '09206001470', 'single', 'Test', 1, NULL, 'CHT895106', '2026-01-14 06:59:42', 'approved', 'patient', NULL, NULL, '2026-01-14 07:01:26', 'id_upload', 'uploads/id_documents/id_Jaycar_1768373982.jpg', NULL, 'Hello', 1, 0, NULL),
+(163, 'Archiel', '$2y$10$7Pc5AbU2AG2o.0grI0ii6.WwF9xAHCsCdQOBPfE4RatsCIS4Lpq22', 'cabanagarchielrosel@gmail.com', 'Archiel  Rosel Cabanag', 'male', 23, '2002-05-26', 'Barangay Luz, Cebu City', 'Panganiban', '09816497664', 'separated', 'Test', 1, NULL, 'CHT049042', '2026-01-14 07:26:42', 'approved', 'patient', NULL, NULL, '2026-01-14 07:28:03', 'id_upload', 'uploads/id_documents/id_Archiel_1768375602.jpg', NULL, 'asdad', 1, 0, NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -482,7 +542,7 @@ CREATE TABLE `user_appointments` (
   `user_id` int(11) NOT NULL,
   `service_id` int(11) DEFAULT NULL,
   `appointment_id` int(11) NOT NULL,
-  `status` enum('pending','approved','completed','cancelled','rejected','rescheduled') NOT NULL DEFAULT 'pending',
+  `status` enum('pending','approved','completed','cancelled','rejected','rescheduled','missed') NOT NULL DEFAULT 'pending',
   `priority_number` varchar(50) DEFAULT NULL,
   `invoice_number` varchar(50) DEFAULT NULL,
   `rescheduled_from` int(11) DEFAULT NULL,
@@ -503,8 +563,24 @@ CREATE TABLE `user_appointments` (
   `rescheduled_at` datetime DEFAULT NULL,
   `rescheduled_count` int(11) DEFAULT 0,
   `cancelled_by_user` tinyint(1) DEFAULT 0,
-  `appointment_ticket` longtext DEFAULT NULL
+  `appointment_ticket` longtext DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `user_appointments`
+--
+
+INSERT INTO `user_appointments` (`id`, `user_id`, `service_id`, `appointment_id`, `status`, `priority_number`, `invoice_number`, `rescheduled_from`, `notes`, `created_at`, `rejection_reason`, `cancel_reason`, `cancelled_at`, `last_processed`, `reschedule_count`, `previous_appointment_id`, `service_type`, `processed_at`, `invoice_generated_at`, `completed_at`, `health_concerns`, `consent`, `rescheduled_at`, `rescheduled_count`, `cancelled_by_user`, `appointment_ticket`, `updated_at`) VALUES
+(268, 159, 174, 174, 'completed', '01', 'INV-20260112-0268', NULL, 'sad', '2026-01-12 01:44:22', NULL, NULL, NULL, NULL, 0, NULL, 'General Checkup', '2026-01-12 01:44:38', '2026-01-12 09:44:38', '2026-01-12 09:45:58', 'Obesity', '0000-00-00 00:00:00', NULL, 0, 0, NULL, '2026-01-12 01:45:58'),
+(269, 159, 175, 175, 'cancelled', '1', NULL, NULL, 'sad', '2026-01-12 02:07:51', NULL, 'jgfhfgderwrtgereartfdsf', '2026-01-12 10:10:12', NULL, 0, NULL, 'General Checkup', NULL, NULL, NULL, 'Other', '0000-00-00 00:00:00', NULL, 0, 1, NULL, '2026-01-12 02:10:12'),
+(270, 159, 175, 175, 'missed', '1', NULL, NULL, 'bvcbvc', '2026-01-12 02:10:43', NULL, NULL, NULL, NULL, 0, NULL, 'General Checkup', NULL, NULL, NULL, 'Depression', '0000-00-00 00:00:00', NULL, 0, 0, NULL, '2026-01-12 12:00:37'),
+(271, 162, 176, 176, 'cancelled', '1', NULL, NULL, 'Sakit ako likod', '2026-01-14 07:05:30', NULL, 'asdasdgasdasdasdasdas', '2026-01-14 15:05:57', NULL, 0, NULL, 'General Checkup', NULL, NULL, NULL, 'Obesity, Other', '0000-00-00 00:00:00', NULL, 0, 1, NULL, '2026-01-14 07:05:57'),
+(272, 162, 178, 178, 'rejected', '1', NULL, NULL, 'sad', '2026-01-14 07:06:29', 'scam appointment', NULL, NULL, NULL, 0, NULL, 'General Checkup', NULL, NULL, NULL, 'Other', '0000-00-00 00:00:00', NULL, 0, 0, NULL, '2026-01-14 07:07:19'),
+(273, 162, 176, 176, 'completed', '01', 'INV-20260114-0273', NULL, 'sad', '2026-01-14 07:07:38', NULL, NULL, NULL, NULL, 0, NULL, 'General Checkup', '2026-01-14 07:07:55', '2026-01-14 15:07:55', '2026-01-14 15:15:48', 'Depression', '0000-00-00 00:00:00', NULL, 0, 0, NULL, '2026-01-14 07:15:48'),
+(274, 162, 178, 178, 'completed', '01', 'INV-20260114-0274', NULL, 'sad', '2026-01-14 12:47:18', NULL, NULL, NULL, NULL, 0, NULL, 'General Checkup', '2026-01-14 12:47:27', '2026-01-14 20:47:27', '2026-01-14 23:11:10', 'Other', '0000-00-00 00:00:00', NULL, 0, 0, NULL, '2026-01-14 15:11:10'),
+(275, 162, 177, 177, 'cancelled', '1', NULL, NULL, 'sad', '2026-01-14 15:12:56', NULL, 'asddsadasd', '2026-01-14 23:13:27', NULL, 0, NULL, 'General Checkup', NULL, NULL, NULL, 'Depression', '0000-00-00 00:00:00', NULL, 0, 1, NULL, '2026-01-14 15:13:27'),
+(276, 162, 177, 177, 'approved', '01', 'INV-20260115-0276', NULL, 'sad', '2026-01-14 23:27:14', NULL, NULL, NULL, NULL, 0, NULL, 'General Checkup', '2026-01-14 23:27:26', '2026-01-15 07:27:26', NULL, 'Other', '0000-00-00 00:00:00', NULL, 0, 0, NULL, '2026-01-14 23:27:26');
 
 -- --------------------------------------------------------
 
@@ -727,13 +803,13 @@ ALTER TABLE `chat_sessions`
 -- AUTO_INCREMENT for table `deleted_patients`
 --
 ALTER TABLE `deleted_patients`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=71;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=87;
 
 --
 -- AUTO_INCREMENT for table `existing_info_patients`
 --
 ALTER TABLE `existing_info_patients`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=129;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=148;
 
 --
 -- AUTO_INCREMENT for table `health_chats`
@@ -757,13 +833,13 @@ ALTER TABLE `patient_visits`
 -- AUTO_INCREMENT for table `sitio1_announcements`
 --
 ALTER TABLE `sitio1_announcements`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=54;
 
 --
 -- AUTO_INCREMENT for table `sitio1_appointments`
 --
 ALTER TABLE `sitio1_appointments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=172;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=179;
 
 --
 -- AUTO_INCREMENT for table `sitio1_consultations`
@@ -775,7 +851,7 @@ ALTER TABLE `sitio1_consultations`
 -- AUTO_INCREMENT for table `sitio1_patients`
 --
 ALTER TABLE `sitio1_patients`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=166;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=176;
 
 --
 -- AUTO_INCREMENT for table `sitio1_staff`
@@ -793,7 +869,7 @@ ALTER TABLE `sitio1_staff_schedule`
 -- AUTO_INCREMENT for table `sitio1_users`
 --
 ALTER TABLE `sitio1_users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=158;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=164;
 
 --
 -- AUTO_INCREMENT for table `staff_documents`
@@ -811,7 +887,7 @@ ALTER TABLE `user_announcements`
 -- AUTO_INCREMENT for table `user_appointments`
 --
 ALTER TABLE `user_appointments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=259;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=277;
 
 --
 -- AUTO_INCREMENT for table `user_notifications`
