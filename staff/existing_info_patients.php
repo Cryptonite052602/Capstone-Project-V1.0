@@ -1274,9 +1274,9 @@ if (!empty($selectedPatientId)) {
 
         /* Export Button */
         .btn-export {
-            background-color: #10b981;
+            background-color: #12AF03;
             color: #ffffffff;
-            border: 2px solid #10b981;
+            /* border: 2px solid #10b981; */
             opacity: 1;
             border-radius: 30px;
             padding: 15px 25px;
@@ -1289,9 +1289,9 @@ if (!empty($selectedPatientId)) {
         }
 
         .btn-export:hover {
-            background-color: #34d399;
+            background-color: #12AF03;
             border-color: #10b981;
-            opacity: 0.6;
+            /* opacity: 0.6; */
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
         }
@@ -1489,7 +1489,7 @@ if (!empty($selectedPatientId)) {
         }
 
         .btn-print:hover {
-            background-color: #3c9dddff;
+            background-color: #2563EB;
             border-color: #3498db;
             opacity: 0.8;
             transform: translateY(-2px);
@@ -3125,17 +3125,15 @@ if (!empty($selectedPatientId)) {
         <div
             class="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col border-2 border-primary">
             <!-- Sticky Header -->
-            <div
-                class="p-8 border-b border-primary flex justify-between items-center bg-blue-500 rounded-t-2xl sticky top-0 z-10">
-                <h3 class="text-2xl font-semibold flex items-center  px-4 py-3 rounded-lg">
-                    <i class="fa-solid fa-circle-info mr-4 text-5xl text-white"></i>
+            <div class="sticky top-0 z-20 bg-[#2563EB] px-10 py-6 flex items-center">
+                <h3 class="text-2xl font-medium flex justify-center text-center w-full items-center text-white">
                     <span class="text-white">Patient Health Information</span>
                 </h3>
 
 
 
                 <button onclick="closeViewModal()"
-                    class="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full w-10 h-10 flex items-center justify-center transition duration-200">
+                    class="border-2 border-white text-white hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center transition">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
@@ -3155,17 +3153,30 @@ if (!empty($selectedPatientId)) {
 
             <!-- Sticky Footer - UPDATED: Added Edit Button -->
             <div class="p-8 border-t border-gray-200 bg-white rounded-b-2xl sticky bottom-0">
-                <div class="flex flex-wrap justify-center items-center gap-6">
-                    <div class="flex flex-col items-center">
-                        <button onclick="printPatientRecord()" class="btn-print">
-                            <i class="fas fa-print mr-3"></i>Print Patient Record
-                        </button>
-
-                    </div>
-                    <div class="flex items-center space-x-3">
-                        <span class="text-md text-gray-500 bg-gray-100 px-8 py-5 rounded-full">
-                            <i class="fas fa-info-circle mr-3 text-1xl"></i>View and edit patient information
+                <div class="flex flex-wrap items-center justify-between">
+                    <div class="flex flex-col items-start">
+                        <span
+                            class="flex items-center text-center gap-3 text-md text-gray-500 bg-gray-100 px-8 py-5 rounded-full">
+                            <svg width="34" height="34" viewBox="0 0 34 34" fill="none"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path fill-rule="evenodd" clip-rule="evenodd"
+                                    d="M16.6667 33.3333C25.8717 33.3333 33.3333 25.8717 33.3333 16.6667C33.3333 7.46167 25.8717 0 16.6667 0C7.46167 0 0 7.46167 0 16.6667C0 25.8717 7.46167 33.3333 16.6667 33.3333ZM19.1667 9.58333C19.1667 10.3569 18.8594 11.0987 18.3124 11.6457C17.7654 12.1927 17.0235 12.5 16.25 12.5C15.4765 12.5 14.7346 12.1927 14.1876 11.6457C13.6406 11.0987 13.3333 10.3569 13.3333 9.58333C13.3333 8.80978 13.6406 8.06792 14.1876 7.52094C14.7346 6.97396 15.4765 6.66667 16.25 6.66667C17.0235 6.66667 17.7654 6.97396 18.3124 7.52094C18.8594 8.06792 19.1667 8.80978 19.1667 9.58333ZM17.6008 14.87C17.8264 15.0227 18.0111 15.2283 18.1388 15.4689C18.2665 15.7094 18.3333 15.9776 18.3333 16.25V22.72L19.9117 21.9308L21.4033 24.9117L17.4117 26.9075C17.1576 27.0345 16.8752 27.0944 16.5915 27.0816C16.3077 27.0688 16.0319 26.9836 15.7903 26.8343C15.5487 26.6849 15.3493 26.4763 15.2109 26.2282C15.0726 25.9801 15 25.7007 15 25.4167V18.7117L13.655 19.25L12.4167 16.155L16.0475 14.7025C16.3003 14.6013 16.5741 14.5635 16.8449 14.5926C17.1157 14.6216 17.3752 14.7174 17.6008 14.87Z"
+                                    fill="black" fill-opacity="0.25" />
+                            </svg>
+                            View and edit patient information
                         </span>
+                    </div>
+                    <div class="flex space-x-4">
+                        <div class="flex flex-col items-center mt-2">
+                            <button onclick="printPatientRecord()" class="btn-export text-lg px-8 py-3 font-semibold">
+                                <i class="fas fa-print mr-3"></i>Print Patient Record
+                            </button>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <button class="btn-print px-8 py-5">
+                                <i class="fas fa-edit mr-2"></i>Save Medical Information
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3196,13 +3207,12 @@ if (!empty($selectedPatientId)) {
                     <div class="bg-white p-8">
                         <h3
                             class="text-2xl font-normal border-b border-black-100 py-4 text-[#2563EB] mb-8 gap-4 flex items-center">
-                            <svg width="33" height="34" viewBox="0 0 33 34" fill="none"
+                            <svg width="42" height="38" viewBox="0 0 42 38" fill="none"
                                 xmlns="http://www.w3.org/2000/svg">
                                 <path
-                                    d="M31.8891 6.72969L31.1609 6.30938C31.2464 5.85712 31.2464 5.39288 31.1609 4.94063L31.8891 4.52031C32.1763 4.35455 32.3858 4.0815 32.4717 3.76122C32.5575 3.44095 32.5126 3.09968 32.3469 2.8125C32.1811 2.52532 31.9081 2.31575 31.5878 2.22989C31.2675 2.14404 30.9263 2.18893 30.6391 2.35469L29.9094 2.77656C29.5602 2.47696 29.1587 2.24442 28.725 2.09063V1.25C28.725 0.918479 28.5933 0.600537 28.3589 0.366116C28.1245 0.131696 27.8065 0 27.475 0C27.1435 0 26.8256 0.131696 26.5911 0.366116C26.3567 0.600537 26.225 0.918479 26.225 1.25V2.09063C25.7914 2.24442 25.3898 2.47696 25.0406 2.77656L24.311 2.35469C24.1688 2.27261 24.0118 2.21935 23.849 2.19793C23.6862 2.17652 23.5208 2.18738 23.3622 2.22989C23.2036 2.27241 23.055 2.34574 22.9247 2.4457C22.7945 2.54566 22.6852 2.6703 22.6031 2.8125C22.5211 2.9547 22.4678 3.11167 22.4464 3.27445C22.425 3.43723 22.4358 3.60264 22.4783 3.76122C22.5209 3.91981 22.5942 4.06847 22.6942 4.19871C22.7941 4.32896 22.9188 4.43824 23.061 4.52031L23.7891 4.94063C23.7037 5.39288 23.7037 5.85712 23.7891 6.30938L23.061 6.72969C22.8225 6.86721 22.6361 7.07959 22.5307 7.33387C22.4253 7.58815 22.4068 7.87011 22.478 8.13599C22.5493 8.40187 22.7063 8.6368 22.9247 8.80433C23.1431 8.97186 23.4107 9.06261 23.686 9.0625C23.9054 9.06318 24.1211 9.00548 24.311 8.89531L25.0406 8.47344C25.3898 8.77304 25.7914 9.00558 26.225 9.15938V10C26.225 10.3315 26.3567 10.6495 26.5911 10.8839C26.8256 11.1183 27.1435 11.25 27.475 11.25C27.8065 11.25 28.1245 11.1183 28.3589 10.8839C28.5933 10.6495 28.725 10.3315 28.725 10V9.15938C29.1587 9.00558 29.5602 8.77304 29.9094 8.47344L30.6391 8.89531C30.8289 9.00548 31.0446 9.06318 31.2641 9.0625C31.5393 9.06261 31.8069 8.97186 32.0253 8.80433C32.2437 8.6368 32.4007 8.40187 32.472 8.13599C32.5432 7.87011 32.5247 7.58815 32.4193 7.33387C32.3139 7.07959 32.1275 6.86721 31.8891 6.72969ZM26.225 5.625C26.225 5.37777 26.2983 5.1361 26.4357 4.93054C26.573 4.72498 26.7683 4.56476 26.9967 4.47015C27.2251 4.37554 27.4764 4.35079 27.7189 4.39902C27.9614 4.44725 28.1841 4.5663 28.3589 4.74112C28.5337 4.91593 28.6528 5.13866 28.701 5.38114C28.7492 5.62361 28.7245 5.87495 28.6299 6.10335C28.5353 6.33176 28.375 6.52699 28.1695 6.66434C27.9639 6.80169 27.7222 6.875 27.475 6.875C27.1435 6.875 26.8256 6.7433 26.5911 6.50888C26.3567 6.27446 26.225 5.95652 26.225 5.625ZM30.811 13.1422C30.484 13.1969 30.1922 13.3793 29.9996 13.6491C29.8071 13.919 29.7297 14.2543 29.7844 14.5813C29.9113 15.3392 29.9751 16.1065 29.975 16.875C29.978 20.2409 28.7409 23.49 26.5 26.0016C25.1059 23.9814 23.1456 22.4185 20.8656 21.5094C22.0904 20.5448 22.984 19.2225 23.4224 17.7264C23.8608 16.2303 23.822 14.6348 23.3116 13.1618C22.8012 11.6888 21.8444 10.4114 20.5743 9.50733C19.3042 8.60327 17.784 8.11747 16.225 8.11747C14.666 8.11747 13.1458 8.60327 11.8757 9.50733C10.6057 10.4114 9.64888 11.6888 9.13843 13.1618C8.62799 14.6348 8.58926 16.2303 9.02763 17.7264C9.466 19.2225 10.3597 20.5448 11.5844 21.5094C9.30442 22.4185 7.34413 23.9814 5.95002 26.0016C4.19176 24.0203 3.04325 21.5732 2.64258 18.9548C2.24192 16.3363 2.60615 13.6578 3.69148 11.2414C4.77681 8.82494 6.53704 6.77346 8.76052 5.3336C10.984 3.89375 13.576 3.12681 16.225 3.125C16.9936 3.12488 17.7608 3.18864 18.5188 3.31563C18.8443 3.36698 19.1769 3.28774 19.4442 3.09514C19.7116 2.90254 19.8921 2.61216 19.9465 2.28716C20.0008 1.96216 19.9247 1.62884 19.7346 1.3597C19.5444 1.09057 19.2557 0.907383 18.9313 0.85C15.5366 0.27893 12.0484 0.80146 8.97007 2.34215C5.89178 3.88283 3.38277 6.36195 1.8053 9.42156C0.227837 12.4812 -0.336461 15.9629 0.193886 19.3642C0.724233 22.7654 2.32178 25.9101 4.75587 28.3441C7.18996 30.7782 10.3346 32.3758 13.7359 32.9061C17.1371 33.4365 20.6189 32.8722 23.6785 31.2947C26.7381 29.7172 29.2172 27.2082 30.7579 24.1299C32.2986 21.0517 32.8211 17.5634 32.25 14.1688C32.1953 13.8418 32.013 13.55 31.7431 13.3574C31.4732 13.1649 31.1379 13.0875 30.811 13.1422ZM11.225 15.625C11.225 14.6361 11.5183 13.6694 12.0677 12.8472C12.6171 12.0249 13.398 11.384 14.3116 11.0056C15.2252 10.6272 16.2306 10.5281 17.2005 10.7211C18.1704 10.914 19.0613 11.3902 19.7605 12.0895C20.4598 12.7887 20.936 13.6796 21.1289 14.6495C21.3219 15.6195 21.2229 16.6248 20.8444 17.5384C20.466 18.452 19.8251 19.2329 19.0029 19.7823C18.1806 20.3318 17.2139 20.625 16.225 20.625C14.8989 20.625 13.6272 20.0982 12.6895 19.1605C11.7518 18.2229 11.225 16.9511 11.225 15.625ZM7.80002 27.7344C8.70429 26.3201 9.95002 25.1563 11.4224 24.3501C12.8948 23.5439 14.5464 23.1213 16.225 23.1213C17.9036 23.1213 19.5553 23.5439 21.0276 24.3501C22.5 25.1563 23.7457 26.3201 24.65 27.7344C22.2412 29.6078 19.2766 30.6249 16.225 30.6249C13.1734 30.6249 10.2089 29.6078 7.80002 27.7344Z"
+                                    d="M0 2.06875C0.00381259 1.52162 0.222709 0.997953 0.609402 0.61087C0.996095 0.223787 1.51954 0.00436385 2.06667 0H39.6C40.7417 0 41.6667 0.927083 41.6667 2.06875V35.4312C41.6629 35.9784 41.444 36.502 41.0573 36.8891C40.6706 37.2762 40.1471 37.4956 39.6 37.5H2.06667C1.51836 37.4994 0.992702 37.2812 0.605186 36.8933C0.217671 36.5054 -2.78032e-07 35.9796 0 35.4312V2.06875ZM8.33333 25V29.1667H33.3333V25H8.33333ZM8.33333 8.33333V20.8333H20.8333V8.33333H8.33333ZM25 8.33333V12.5H33.3333V8.33333H25ZM25 16.6667V20.8333H33.3333V16.6667H25ZM12.5 12.5H16.6667V16.6667H12.5V12.5Z"
                                     fill="#2563EB" />
                             </svg>
-
                             Personal Information
                         </h3>
 
@@ -3314,21 +3324,19 @@ if (!empty($selectedPatientId)) {
                     <div class="bg-white px-8">
                         <h3
                             class="text-2xl border-b border-black-100 py-4 font-normal text-blue-700 gap-4 mb-8 flex items-center">
-
-                            <svg width="33" height="33" viewBox="0 0 33 33" fill="none"
+                            <svg width="42" height="42" viewBox="0 0 42 42" fill="none"
                                 xmlns="http://www.w3.org/2000/svg">
                                 <path
-                                    d="M18.125 24.375C18.125 24.7458 18.015 25.1084 17.809 25.4167C17.603 25.725 17.3101 25.9654 16.9675 26.1073C16.6249 26.2492 16.2479 26.2863 15.8842 26.214C15.5205 26.1416 15.1864 25.963 14.9242 25.7008C14.662 25.4386 14.4834 25.1045 14.411 24.7408C14.3387 24.3771 14.3758 24.0001 14.5177 23.6575C14.6596 23.3149 14.9 23.022 15.2083 22.816C15.5167 22.61 15.8792 22.5 16.25 22.5C16.7473 22.5 17.2242 22.6975 17.5758 23.0492C17.9275 23.4008 18.125 23.8777 18.125 24.375ZM16.25 7.5C12.8031 7.5 10 10.0234 10 13.125V13.75C10 14.0815 10.1317 14.3995 10.3661 14.6339C10.6005 14.8683 10.9185 15 11.25 15C11.5815 15 11.8995 14.8683 12.1339 14.6339C12.3683 14.3995 12.5 14.0815 12.5 13.75V13.125C12.5 11.4062 14.1828 10 16.25 10C18.3172 10 20 11.4062 20 13.125C20 14.8438 18.3172 16.25 16.25 16.25C15.9185 16.25 15.6005 16.3817 15.3661 16.6161C15.1317 16.8505 15 17.1685 15 17.5V18.75C15 19.0815 15.1317 19.3995 15.3661 19.6339C15.6005 19.8683 15.9185 20 16.25 20C16.5815 20 16.8995 19.8683 17.1339 19.6339C17.3683 19.3995 17.5 19.0815 17.5 18.75V18.6375C20.35 18.1141 22.5 15.8406 22.5 13.125C22.5 10.0234 19.6969 7.5 16.25 7.5ZM32.5 16.25C32.5 19.4639 31.547 22.6057 29.7614 25.278C27.9758 27.9503 25.4379 30.0331 22.4686 31.263C19.4993 32.493 16.232 32.8148 13.0798 32.1878C9.9276 31.5607 7.03213 30.0131 4.75952 27.7405C2.48692 25.4679 0.939256 22.5724 0.312247 19.4202C-0.314763 16.268 0.00704086 13.0007 1.23696 10.0314C2.46689 7.06209 4.54969 4.52419 7.22199 2.73862C9.89429 0.953046 13.0361 0 16.25 0C20.5584 0.00454972 24.689 1.71806 27.7355 4.76454C30.7819 7.81102 32.4955 11.9416 32.5 16.25ZM30 16.25C30 13.5305 29.1936 10.8721 27.6827 8.61091C26.1718 6.34973 24.0244 4.58736 21.5119 3.54666C18.9994 2.50595 16.2348 2.23366 13.5675 2.7642C10.9003 3.29475 8.45026 4.60431 6.52729 6.52728C4.60432 8.45025 3.29476 10.9003 2.76421 13.5675C2.23366 16.2347 2.50596 18.9994 3.54666 21.5119C4.58737 24.0244 6.34974 26.1718 8.61092 27.6827C10.8721 29.1936 13.5305 30 16.25 30C19.8955 29.9959 23.3904 28.5459 25.9682 25.9682C28.5459 23.3904 29.9959 19.8955 30 16.25Z"
+                                    d="M14.5833 26.9104V28.125C14.5833 30.6114 15.5711 32.996 17.3292 34.7541C19.0874 36.5123 21.4719 37.5 23.9583 37.5C26.4447 37.5 28.8293 36.5123 30.5875 34.7541C32.3456 32.996 33.3333 30.6114 33.3333 28.125V24.6458C31.9427 24.1544 30.7706 23.1871 30.0243 21.915C29.2779 20.6429 29.0052 19.1479 29.2546 17.6942C29.5039 16.2405 30.2591 14.9218 31.3867 13.9711C32.5144 13.0204 33.9418 12.499 35.4167 12.499C36.8916 12.499 38.319 13.0204 39.4466 13.9711C40.5742 14.9218 41.3295 16.2405 41.5788 17.6942C41.8281 19.1479 41.5555 20.6429 40.8091 21.915C40.0627 23.1871 38.8906 24.1544 37.5 24.6458V28.125C37.5 31.7165 36.0733 35.1608 33.5337 37.7004C30.9942 40.24 27.5498 41.6667 23.9583 41.6667C20.3669 41.6667 16.9225 40.24 14.3829 37.7004C11.8434 35.1608 10.4167 31.7165 10.4167 28.125V26.9104C7.50365 26.418 4.85919 24.9098 2.95235 22.6532C1.04551 20.3967 -0.000452952 17.5377 1.47146e-07 14.5833V4.16667C1.47146e-07 3.0616 0.438987 2.00179 1.22039 1.22039C2.00179 0.438987 3.0616 0 4.16667 0L6.25 0C6.80253 0 7.33244 0.219493 7.72314 0.610194C8.11384 1.00089 8.33333 1.5308 8.33333 2.08333C8.33333 2.63587 8.11384 3.16577 7.72314 3.55647C7.33244 3.94717 6.80253 4.16667 6.25 4.16667H4.16667V14.5833C4.16667 16.7935 5.04464 18.9131 6.60744 20.4759C8.17025 22.0387 10.2899 22.9167 12.5 22.9167C14.7101 22.9167 16.8298 22.0387 18.3926 20.4759C19.9554 18.9131 20.8333 16.7935 20.8333 14.5833V4.16667H18.75C18.1975 4.16667 17.6676 3.94717 17.2769 3.55647C16.8862 3.16577 16.6667 2.63587 16.6667 2.08333C16.6667 1.5308 16.8862 1.00089 17.2769 0.610194C17.6676 0.219493 18.1975 0 18.75 0L20.8333 0C21.9384 0 22.9982 0.438987 23.7796 1.22039C24.561 2.00179 25 3.0616 25 4.16667V14.5833C25.0005 17.5377 23.9545 20.3967 22.0477 22.6532C20.1408 24.9098 17.4963 26.418 14.5833 26.9104ZM35.4167 20.8333C35.9692 20.8333 36.4991 20.6138 36.8898 20.2231C37.2805 19.8324 37.5 19.3025 37.5 18.75C37.5 18.1975 37.2805 17.6676 36.8898 17.2769C36.4991 16.8862 35.9692 16.6667 35.4167 16.6667C34.8641 16.6667 34.3342 16.8862 33.9435 17.2769C33.5528 17.6676 33.3333 18.1975 33.3333 18.75C33.3333 19.3025 33.5528 19.8324 33.9435 20.2231C34.3342 20.6138 34.8641 20.8333 35.4167 20.8333Z"
                                     fill="#2563EB" />
                             </svg>
-
                             Medical Information
                         </h3>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
                             <div>
-                                <label for="modal_height" class="block text-sm font-semibold text-blue-700 mb-2">
+                                <label for="modal_height" class="block text-sm font-medium mb-2">
                                     Height (cm) <span class="text-red-500">*</span>
                                 </label>
                                 <input type="number" id="modal_height" name="height" placeholder="0.0" required
@@ -3336,7 +3344,7 @@ if (!empty($selectedPatientId)) {
                             </div>
 
                             <div>
-                                <label for="modal_weight" class="block text-sm font-semibold text-blue-700 mb-2">
+                                <label for="modal_weight" class="block text-sm font-medium mb-2">
                                     Weight (kg) <span class="text-red-500">*</span>
                                 </label>
                                 <input type="number" id="modal_weight" name="weight" placeholder="0.0" required
@@ -3344,7 +3352,7 @@ if (!empty($selectedPatientId)) {
                             </div>
 
                             <div>
-                                <label for="modal_temperature" class="block text-sm font-semibold text-blue-700 mb-2">
+                                <label for="modal_temperature" class="block text-sm font-medium mb-2">
                                     Temperature (°C)
                                 </label>
                                 <input type="number" id="modal_temperature" name="temperature" placeholder="0"
@@ -3352,16 +3360,15 @@ if (!empty($selectedPatientId)) {
                             </div>
 
                             <div>
-                                <label for="modal_blood_pressure"
-                                    class="block text-sm font-semibold text-blue-700 mb-2">
+                                <label for="modal_blood_pressure" class="block text-sm font-medium mb-2">
                                     Blood Pressure
                                 </label>
-                                <input type="text" id="modal_blood_pressure" name="blood_pressure" placeholder="0"
+                                <input type="text" id="modal_blood_pressure" name="blood_pressure" placeholder="120/80"
                                     class="form-input-modal w-full rounded-xl border-blue-200 px-4 py-3">
                             </div>
 
                             <div>
-                                <label for="modal_blood_type" class="block text-sm font-semibold text-blue-700 mb-2">
+                                <label for="modal_blood_type" class="block text-sm font-medium mb-2">
                                     Blood Type <span class="text-red-500">*</span>
                                 </label>
                                 <select id="modal_blood_type" name="blood_type" required
@@ -3380,7 +3387,7 @@ if (!empty($selectedPatientId)) {
                             </div>
 
                             <div>
-                                <label for="modal_last_checkup" class="block text-sm font-semibold text-blue-700 mb-2">
+                                <label for="modal_last_checkup" class="block text-sm font-medium mb-2">
                                     Last Check-up Date
                                 </label>
                                 <input type="date" id="modal_last_checkup" name="last_checkup"
@@ -3388,31 +3395,60 @@ if (!empty($selectedPatientId)) {
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                            <textarea id="modal_allergies" name="allergies" rows="3"
-                                class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
-                                placeholder="Allergies"></textarea>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 mb-5">
+                            <div class="flex flex-col gap-2">
+                                <label for="modal_allergies" class="text-gray-700 font-medium">Allergies</label>
+                                <textarea id="modal_allergies" name="allergies" rows="3"
+                                    class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
+                                    placeholder="Food, drug, environmental allergies..."></textarea>
+                            </div>
 
-                            <textarea id="modal_current_medications" name="current_medications" rows="3"
-                                class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
-                                placeholder="Current Medications"></textarea>
+                            <div class="flex flex-col gap-2">
+                                <label for="modal_current_medications" class="text-gray-700 font-medium">Current
+                                    Medications</label>
+                                <textarea id="modal_current_medications" name="current_medications" rows="3"
+                                    class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
+                                    placeholder="Medications with dosage and frequency..."></textarea>
+                            </div>
 
-                            <textarea id="modal_immunization_record" name="immunization_record" rows="3"
-                                class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
-                                placeholder="Immunization Record"></textarea>
+                            <div class="flex flex-col gap-2">
+                                <label for="modal_immunization_record" class="text-gray-700 font-medium">Immunization
+                                    Record</label>
+                                <textarea id="modal_immunization_record" name="immunization_record" rows="3"
+                                    class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
+                                    placeholder="Provide immunization history or recent vaccines"></textarea>
+                            </div>
 
-                            <textarea id="modal_chronic_conditions" name="chronic_conditions" rows="3"
-                                class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
-                                placeholder="Chronic Conditions"></textarea>
+                            <div class="flex flex-col gap-2">
+                                <label for="modal_chronic_conditions" class="text-gray-700 font-medium">Chronic
+                                    Conditions</label>
+                                <textarea id="modal_chronic_conditions" name="chronic_conditions" rows="3"
+                                    class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
+                                    placeholder="Hypertension, diabetes, asthma, etc..."></textarea>
+                            </div>
                         </div>
 
-                        <textarea id="modal_medical_history" name="medical_history" rows="4"
-                            class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3 mt-6"
-                            placeholder="Medical History"></textarea>
+                        <div class="flex flex-col gap-6 mb-3">
 
-                        <textarea id="modal_family_history" name="family_history" rows="4"
-                            class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3 mt-6"
-                            placeholder="Family Medical History"></textarea>
+                            <div class="flex flex-col gap-2">
+                                <label for="modal_medical_history" class="text-gray-700 font-medium">
+                                    Medical History
+                                </label>
+                                <textarea id="modal_medical_history" name="medical_history" rows="4"
+                                    class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
+                                    placeholder="Past illnesses, surgeries, hospitalizations, chronic conditions..."></textarea>
+                            </div>
+
+                            <div class="flex flex-col gap-2">
+                                <label for="modal_family_history" class="text-gray-700 font-medium">
+                                    Family Medical History
+                                </label>
+                                <textarea id="modal_family_history" name="family_history" rows="4"
+                                    class="form-textarea-modal w-full rounded-xl border-blue-200 px-4 py-3"
+                                    placeholder="Family history of diseases (parents, siblings)..."></textarea>
+                            </div>
+                        </div>
+
                     </div>
 
                     <input type="hidden" name="add_patient" value="1">
@@ -3423,11 +3459,12 @@ if (!empty($selectedPatientId)) {
             <!-- ================= FOOTER ================= -->
             <div class="sticky bottom-0 bg-white border-t border-blue-100 px-10 py-6">
                 <div class="flex justify-between items-center flex-wrap gap-4">
-                    <span class="flex text-center items-center gap-3 text-sm text-blue-600 px-4 py-2 rounded-full">
-                        <svg width="33" height="33" viewBox="0 0 33 33" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path
-                                d="M16.25 0C13.0361 0 9.89429 0.953046 7.22199 2.73862C4.54969 4.52419 2.46689 7.06209 1.23696 10.0314C0.00704087 13.0007 -0.314763 16.268 0.312247 19.4202C0.939256 22.5724 2.48692 25.4679 4.75952 27.7405C7.03213 30.0131 9.9276 31.5607 13.0798 32.1878C16.232 32.8148 19.4993 32.493 22.4686 31.263C25.4379 30.0331 27.9758 27.9503 29.7614 25.278C31.547 22.6057 32.5 19.4639 32.5 16.25C32.4955 11.9416 30.7819 7.81102 27.7355 4.76454C24.689 1.71806 20.5584 0.00454972 16.25 0ZM16.25 30C13.5305 30 10.8721 29.1936 8.61092 27.6827C6.34974 26.1718 4.58737 24.0244 3.54666 21.5119C2.50596 18.9994 2.23366 16.2347 2.76421 13.5675C3.29476 10.9003 4.60432 8.45025 6.52729 6.52728C8.45026 4.60431 10.9003 3.29475 13.5675 2.7642C16.2348 2.23366 18.9994 2.50595 21.5119 3.54666C24.0244 4.58736 26.1718 6.34973 27.6827 8.61091C29.1936 10.8721 30 13.5305 30 16.25C29.9959 19.8955 28.5459 23.3904 25.9682 25.9682C23.3904 28.5459 19.8955 29.9959 16.25 30ZM18.75 23.75C18.75 24.0815 18.6183 24.3995 18.3839 24.6339C18.1495 24.8683 17.8315 25 17.5 25C16.837 25 16.2011 24.7366 15.7322 24.2678C15.2634 23.7989 15 23.163 15 22.5V16.25C14.6685 16.25 14.3505 16.1183 14.1161 15.8839C13.8817 15.6495 13.75 15.3315 13.75 15C13.75 14.6685 13.8817 14.3505 14.1161 14.1161C14.3505 13.8817 14.6685 13.75 15 13.75C15.663 13.75 16.2989 14.0134 16.7678 14.4822C17.2366 14.9511 17.5 15.587 17.5 16.25V22.5C17.8315 22.5 18.1495 22.6317 18.3839 22.8661C18.6183 23.1005 18.75 23.4185 18.75 23.75ZM13.75 9.375C13.75 9.00416 13.86 8.64165 14.066 8.33331C14.272 8.02496 14.5649 7.78464 14.9075 7.64273C15.2501 7.50081 15.6271 7.46368 15.9908 7.53603C16.3545 7.60837 16.6886 7.78695 16.9508 8.04917C17.2131 8.3114 17.3916 8.64549 17.464 9.0092C17.5363 9.37292 17.4992 9.74992 17.3573 10.0925C17.2154 10.4351 16.975 10.728 16.6667 10.934C16.3584 11.14 15.9958 11.25 15.625 11.25C15.1277 11.25 14.6508 11.0525 14.2992 10.7008C13.9476 10.3492 13.75 9.87228 13.75 9.375Z"
-                                fill="#2563EB" />
+                    <span
+                        class="flex items-center text-center gap-3 text-md text-gray-500 bg-gray-100 px-8 py-5 rounded-full">
+                        <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path fill-rule="evenodd" clip-rule="evenodd"
+                                d="M16.6667 33.3333C25.8717 33.3333 33.3333 25.8717 33.3333 16.6667C33.3333 7.46167 25.8717 0 16.6667 0C7.46167 0 0 7.46167 0 16.6667C0 25.8717 7.46167 33.3333 16.6667 33.3333ZM19.1667 9.58333C19.1667 10.3569 18.8594 11.0987 18.3124 11.6457C17.7654 12.1927 17.0235 12.5 16.25 12.5C15.4765 12.5 14.7346 12.1927 14.1876 11.6457C13.6406 11.0987 13.3333 10.3569 13.3333 9.58333C13.3333 8.80978 13.6406 8.06792 14.1876 7.52094C14.7346 6.97396 15.4765 6.66667 16.25 6.66667C17.0235 6.66667 17.7654 6.97396 18.3124 7.52094C18.8594 8.06792 19.1667 8.80978 19.1667 9.58333ZM17.6008 14.87C17.8264 15.0227 18.0111 15.2283 18.1388 15.4689C18.2665 15.7094 18.3333 15.9776 18.3333 16.25V22.72L19.9117 21.9308L21.4033 24.9117L17.4117 26.9075C17.1576 27.0345 16.8752 27.0944 16.5915 27.0816C16.3077 27.0688 16.0319 26.9836 15.7903 26.8343C15.5487 26.6849 15.3493 26.4763 15.2109 26.2282C15.0726 25.9801 15 25.7007 15 25.4167V18.7117L13.655 19.25L12.4167 16.155L16.0475 14.7025C16.3003 14.6013 16.5741 14.5635 16.8449 14.5926C17.1157 14.6216 17.3752 14.7174 17.6008 14.87Z"
+                                fill="black" fill-opacity="0.25" />
                         </svg>
                         Fields marked with * are required
                     </span>
